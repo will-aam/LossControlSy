@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
-import { Search, Package, X, Barcode, Check } from "lucide-react";
+import { Search, Package, X, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -160,7 +160,6 @@ export function ItemSearch({
                         {item.codigoBarras && (
                           <>
                             <span className="w-1 h-1 rounded-full bg-muted-foreground/30" />
-                            <Barcode className="h-3 w-3" />
                             <span>{item.codigoBarras}</span>
                           </>
                         )}
