@@ -26,6 +26,15 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "@/components/ui/command";
+import {
   mockEventos,
   Evento,
   formatCurrency,
@@ -47,10 +56,20 @@ import {
   ChevronRight,
   ChevronRightSquare,
   ListFilter,
+  Download,
+  Filter,
 } from "lucide-react";
 import { toast } from "sonner";
 import { DateRange } from "react-day-picker";
-import { format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
+import {
+  format,
+  isWithinInterval,
+  startOfDay,
+  endOfDay,
+  subMonths,
+  startOfMonth,
+  endOfMonth,
+} from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 
@@ -67,7 +86,6 @@ interface LoteDiario {
   autor: string;
 }
 
-// Classe utilitária para esconder scrollbar mantendo funcionalidade
 const hideScrollClass =
   "[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]";
 
@@ -106,7 +124,7 @@ export default function EventosPage() {
         const end = endOfDay(dateRange.to || dateRange.from);
         if (!isWithinInterval(eventoDate, { start, end })) return false;
       }
-      // 2. Busca Texto
+      // 2. Busca Texto (Nome ou Código)
       if (globalSearch) {
         const s = globalSearch.toLowerCase();
         const matches =
@@ -115,13 +133,16 @@ export default function EventosPage() {
           evento.criadoPor.nome.toLowerCase().includes(s);
         if (!matches) return false;
       }
-      // 3. Status
-      if (viewMode === "lista-completa" && statusFilter !== "todos") {
-        if (evento.status !== statusFilter) return false;
+      // 3. Status (Agora aplica em AMBOS os modos se selecionado)
+      if (statusFilter !== "todos") {
+        // Mapeamento visual: 'pendente' na UI = 'enviado' no banco
+        const targetStatus =
+          statusFilter === "pendente" ? "enviado" : statusFilter;
+        if (evento.status !== targetStatus) return false;
       }
       return true;
     });
-  }, [eventosLocais, dateRange, globalSearch, statusFilter, viewMode]);
+  }, [eventosLocais, dateRange, globalSearch, statusFilter]);
 
   // Lógica de Agrupamento (Lotes)
   const lotesDiarios = useMemo(() => {
@@ -138,9 +159,11 @@ export default function EventosPage() {
     return Object.entries(grupos)
       .map(([data, eventos]) => {
         let status: BatchStatus = "pendente";
+        // Se todos aprovados ou exportados -> aprovado
         const todosOk = eventos.every((e) =>
           ["aprovado", "exportado"].includes(e.status),
         );
+        // Se tem algum rejeitado -> rejeitado
         const temRejeitado = eventos.some((e) => e.status === "rejeitado");
 
         if (todosOk) status = "aprovado";
@@ -153,7 +176,7 @@ export default function EventosPage() {
           totalCusto: eventos.reduce(
             (acc, e) => acc + (e.custoSnapshot || 0) * e.quantidade,
             0,
-          ),
+          ), // Fix TS: check undefined
           status,
           autor: eventos[0].criadoPor.nome,
         } as LoteDiario;
@@ -164,7 +187,7 @@ export default function EventosPage() {
   // Paginação
   const dadosPaginados = useMemo(() => {
     let dados: any[] = [];
-    const itemsPerPage = viewMode === "pastas" && !loteSelecionado ? 10 : 5; // Lotes lista 10, Tabela lista 5
+    const itemsPerPage = viewMode === "pastas" && !loteSelecionado ? 10 : 5;
 
     if (loteSelecionado) {
       dados = loteSelecionado.eventos.filter((e) => {
@@ -198,19 +221,23 @@ export default function EventosPage() {
   ]);
 
   // Ações
-  const handleStatusChange = (eventoId: string, novoStatus: EventoStatus) => {
+  const handleStatusChange = (eventoId: string, novoStatus: string) => {
+    // Cast manual para EventoStatus para evitar erro de TS se a string vier do Select
+    const statusTyped = novoStatus as EventoStatus;
+
     setEventosLocais((prev) =>
       prev.map((ev) =>
-        ev.id === eventoId ? { ...ev, status: novoStatus } : ev,
+        ev.id === eventoId ? { ...ev, status: statusTyped } : ev,
       ),
     );
+
     if (loteSelecionado) {
       setLoteSelecionado((prev) => {
         if (!prev) return null;
         const novosEventos = prev.eventos.map((ev) =>
-          ev.id === eventoId ? { ...ev, status: novoStatus } : ev,
+          ev.id === eventoId ? { ...ev, status: statusTyped } : ev,
         );
-        // Recalcula status simples
+
         const todosOk = novosEventos.every((e) =>
           ["aprovado", "exportado"].includes(e.status),
         );
@@ -220,6 +247,7 @@ export default function EventosPage() {
           : temRejeitado
             ? "rejeitado"
             : "pendente";
+
         return { ...prev, eventos: novosEventos, status };
       });
     }
@@ -239,12 +267,19 @@ export default function EventosPage() {
       prev
         ? {
             ...prev,
-            eventos: prev.eventos.map((e) => ({ ...e, status: "aprovado" })),
+            eventos: prev.eventos.map((e) => ({
+              ...e,
+              status: "aprovado" as EventoStatus,
+            })),
             status: "aprovado",
           }
         : null,
     );
     toast.success("Lote aprovado!");
+  };
+
+  const handleExportar = () => {
+    toast.success("Gerando CSV dos itens filtrados...");
   };
 
   if (!hasPermission("eventos:ver_todos")) return null;
@@ -285,6 +320,78 @@ export default function EventosPage() {
     </div>
   );
 
+  // Componente de Filtro de Data Avançado ("Excel-like")
+  const DateFilter = () => (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className={cn(
+            "h-9 border-dashed",
+            !dateRange && "text-muted-foreground",
+          )}
+        >
+          <CalendarIcon className="mr-2 h-4 w-4" />
+          {dateRange?.from ? (
+            dateRange.to ? (
+              <>
+                {format(dateRange.from, "dd/MM/yy")} -{" "}
+                {format(dateRange.to, "dd/MM/yy")}
+              </>
+            ) : (
+              format(dateRange.from, "dd/MM/yyyy")
+            )
+          ) : (
+            <span>Filtrar Data</span>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-75 p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Buscar (Ex: Janeiro, 2026)..." />
+          <CommandList>
+            <CommandEmpty>Nenhum período encontrado.</CommandEmpty>
+            <CommandGroup heading="Atalhos">
+              <CommandItem
+                onSelect={() =>
+                  setDateRange({
+                    from: startOfMonth(new Date()),
+                    to: endOfMonth(new Date()),
+                  })
+                }
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" /> Este Mês
+              </CommandItem>
+              <CommandItem
+                onSelect={() =>
+                  setDateRange({
+                    from: startOfMonth(subMonths(new Date(), 1)),
+                    to: endOfMonth(subMonths(new Date(), 1)),
+                  })
+                }
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" /> Mês Passado
+              </CommandItem>
+              <CommandItem onSelect={() => setDateRange(undefined)}>
+                <XCircle className="mr-2 h-4 w-4" /> Limpar Filtro
+              </CommandItem>
+            </CommandGroup>
+            <CommandSeparator />
+            <div className="p-2">
+              <Calendar
+                mode="range"
+                selected={dateRange}
+                onSelect={setDateRange}
+                initialFocus
+                locale={ptBR}
+              />
+            </div>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+
   // =================================================================================
   // RENDER: DETALHE DO LOTE
   // =================================================================================
@@ -318,21 +425,19 @@ export default function EventosPage() {
                 </Badge>
               </h1>
               <p className="text-sm text-muted-foreground">
-                Autor: {loteSelecionado.autor} • Total:{" "}
-                {formatCurrency(loteSelecionado.totalCusto)}
+                Autor: {loteSelecionado.autor}
               </p>
             </div>
           </div>
           <div className="flex gap-2">
-            <div className="relative w-64">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Buscar no lote..."
-                value={globalSearch}
-                onChange={(e) => setGlobalSearch(e.target.value)}
-                className="pl-9 h-9"
-              />
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportar}
+              className="h-9"
+            >
+              <Download className="mr-2 h-4 w-4" /> Exportar
+            </Button>
             {loteSelecionado.status === "pendente" && (
               <Button
                 onClick={handleAprovarLoteInteiro}
@@ -375,9 +480,14 @@ export default function EventosPage() {
                   </TableCell>
                   <TableCell>
                     <Select
-                      value={evento.status}
+                      value={
+                        evento.status === "enviado" ? "pendente" : evento.status
+                      }
                       onValueChange={(v) =>
-                        handleStatusChange(evento.id, v as EventoStatus)
+                        handleStatusChange(
+                          evento.id,
+                          v === "pendente" ? "enviado" : v,
+                        )
                       }
                     >
                       <SelectTrigger
@@ -417,139 +527,111 @@ export default function EventosPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg border">
+        <div className="flex items-center gap-3">
           <Button
-            variant="ghost"
+            variant="outline"
             size="sm"
-            className={cn(
-              "h-8 gap-2 text-xs hover:bg-background/60",
-              viewMode === "pastas" &&
-                "bg-background shadow-sm text-foreground hover:bg-background",
-            )}
-            onClick={() => {
-              setViewMode("pastas");
-              // Reseta filtros ao trocar de modo se necessário, mas data pode manter
-              setDateRange(undefined);
-            }}
+            onClick={handleExportar}
+            className="h-8"
           >
-            <LayoutGrid className="h-3.5 w-3.5" />
-            Lotes
+            <Download className="mr-2 h-3.5 w-3.5" />
+            Exportar
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              "h-8 gap-2 text-xs hover:bg-background/60",
-              viewMode === "lista-completa" &&
-                "bg-background shadow-sm text-foreground hover:bg-background",
-            )}
-            onClick={() => setViewMode("lista-completa")}
-          >
-            <LayoutList className="h-3.5 w-3.5" />
-            Lista
-          </Button>
+
+          <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg border">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "h-8 gap-2 text-xs hover:bg-background/60",
+                viewMode === "pastas" &&
+                  "bg-background shadow-sm text-foreground hover:bg-background",
+              )}
+              onClick={() => {
+                setViewMode("pastas");
+                setDateRange(undefined);
+              }}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Lotes
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "h-8 gap-2 text-xs hover:bg-background/60",
+                viewMode === "lista-completa" &&
+                  "bg-background shadow-sm text-foreground hover:bg-background",
+              )}
+              onClick={() => setViewMode("lista-completa")}
+            >
+              <LayoutList className="h-3.5 w-3.5" />
+              Lista
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* ÁREA DE FILTROS */}
-      <div className="flex flex-col gap-4">
-        {/* MODO PASTAS: Filtro de Data Global aparece aqui */}
+      {/* BARRA DE FILTROS UNIFICADA */}
+      <div className="flex flex-col md:flex-row gap-4 items-end">
+        {/* Busca por Texto (Apenas para Lista ou se quiser buscar lotes por nome de autor) */}
+        <div className="flex-1 w-full">
+          <span className="text-xs font-medium mb-1.5 block text-muted-foreground ml-1">
+            Buscar
+          </span>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Nome, código ou autor..."
+              value={globalSearch}
+              onChange={(e) => setGlobalSearch(e.target.value)}
+              className="pl-9 h-9"
+            />
+          </div>
+        </div>
+
+        {/* Filtro de Status (Agora disponível sempre) */}
+        <div className="w-full md:w-48">
+          <span className="text-xs font-medium mb-1.5 block text-muted-foreground ml-1">
+            Status
+          </span>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="aprovado">Aprovado</SelectItem>
+              <SelectItem value="pendente">Pendente</SelectItem>
+              <SelectItem value="rejeitado">Rejeitado</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Filtro de Data (Visível na barra apenas em modo Pastas, pois na lista fica na coluna) */}
         {viewMode === "pastas" && (
-          <div className="w-full md:w-75">
+          <div className="w-full md:w-auto">
             <span className="text-xs font-medium mb-1.5 block text-muted-foreground ml-1">
               Período
             </span>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant={"outline"}
-                  className={cn(
-                    "w-full justify-start text-left font-normal h-9",
-                    !dateRange && "text-muted-foreground",
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {dateRange?.from ? (
-                    dateRange.to ? (
-                      <>
-                        {format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })}{" "}
-                        - {format(dateRange.to, "dd/MM/yyyy", { locale: ptBR })}
-                      </>
-                    ) : (
-                      format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })
-                    )
-                  ) : (
-                    <span>Selecione uma data...</span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  initialFocus
-                  mode="range"
-                  defaultMonth={dateRange?.from}
-                  selected={dateRange}
-                  onSelect={setDateRange}
-                  numberOfMonths={2}
-                  locale={ptBR}
-                />
-              </PopoverContent>
-            </Popover>
+            <DateFilter />
           </div>
         )}
 
-        {/* MODO LISTA: Filtros de Busca e Status (Data foi para a Tabela) */}
-        {viewMode === "lista-completa" && (
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
-              <span className="text-xs font-medium mb-1.5 block text-muted-foreground ml-1">
-                Buscar
-              </span>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Nome, código ou autor..."
-                  value={globalSearch}
-                  onChange={(e) => setGlobalSearch(e.target.value)}
-                  className="pl-9 h-9"
-                />
-              </div>
-            </div>
-            <div className="w-full md:w-48">
-              <span className="text-xs font-medium mb-1.5 block text-muted-foreground ml-1">
-                Status
-              </span>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-9">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos</SelectItem>
-                  <SelectItem value="aprovado">Aprovado</SelectItem>
-                  <SelectItem value="pendente">Pendente</SelectItem>
-                  <SelectItem value="rejeitado">Rejeitado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        )}
-
-        {/* Botão limpar filtros */}
+        {/* Limpar filtros */}
         {(dateRange || globalSearch || statusFilter !== "todos") && (
-          <div className="flex justify-start">
-            <Button
-              variant="link"
-              size="sm"
-              onClick={() => {
-                setDateRange(undefined);
-                setGlobalSearch("");
-                setStatusFilter("todos");
-              }}
-              className="text-muted-foreground h-auto p-0 px-1"
-            >
-              Limpar filtros
-            </Button>
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setDateRange(undefined);
+              setGlobalSearch("");
+              setStatusFilter("todos");
+            }}
+            className="text-muted-foreground h-9"
+          >
+            Limpar
+          </Button>
         )}
       </div>
 
@@ -564,7 +646,6 @@ export default function EventosPage() {
                 className="group flex items-center justify-between p-3 rounded-md border bg-background hover:bg-muted/40 hover:border-primary/30 transition-all cursor-pointer shadow-sm"
                 onClick={() => setLoteSelecionado(lote)}
               >
-                {/* Esquerda: Data e Status */}
                 <div className="flex items-center gap-4">
                   <div
                     className={cn(
@@ -600,7 +681,6 @@ export default function EventosPage() {
                   </div>
                 </div>
 
-                {/* Direita: Valores e Seta */}
                 <div className="flex items-center gap-6 md:gap-12">
                   <div className="hidden md:block text-right">
                     <p className="text-[10px] text-muted-foreground uppercase">
@@ -636,32 +716,10 @@ export default function EventosPage() {
               <TableRow>
                 {/* COLUNA DATA AGORA É O FILTRO */}
                 <TableHead className="w-45">
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="-ml-3 h-8 gap-2 font-semibold text-xs hover:bg-muted/80"
-                      >
-                        Data
-                        <ListFilter className="h-3.5 w-3.5" />
-                        {dateRange && (
-                          <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-primary" />
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        initialFocus
-                        mode="range"
-                        defaultMonth={dateRange?.from}
-                        selected={dateRange}
-                        onSelect={setDateRange}
-                        numberOfMonths={2}
-                        locale={ptBR}
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  <div className="flex items-center gap-2">
+                    Data
+                    <DateFilter />
+                  </div>
                 </TableHead>
 
                 <TableHead>Código</TableHead>
@@ -693,9 +751,14 @@ export default function EventosPage() {
                   </TableCell>
                   <TableCell>
                     <Select
-                      value={evento.status}
+                      value={
+                        evento.status === "enviado" ? "pendente" : evento.status
+                      }
                       onValueChange={(v) =>
-                        handleStatusChange(evento.id, v as EventoStatus)
+                        handleStatusChange(
+                          evento.id,
+                          v === "pendente" ? "enviado" : v,
+                        )
                       }
                     >
                       <SelectTrigger
