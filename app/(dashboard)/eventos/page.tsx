@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,19 +35,18 @@ import {
 } from "@/lib/mock-data";
 import { useAuth } from "@/lib/auth-context";
 import {
-  FileSpreadsheet,
+  FileText,
   Search,
   ArrowLeft,
   CheckCircle2,
   XCircle,
   LayoutList,
   LayoutGrid,
-  AlertCircle,
   CalendarIcon,
   ChevronLeft,
   ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
+  ChevronRightSquare,
+  ListFilter,
 } from "lucide-react";
 import { toast } from "sonner";
 import { DateRange } from "react-day-picker";
@@ -69,7 +67,9 @@ interface LoteDiario {
   autor: string;
 }
 
-const ITEMS_PER_PAGE = 10;
+// Classe utilitária para esconder scrollbar mantendo funcionalidade
+const hideScrollClass =
+  "[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]";
 
 export default function EventosPage() {
   const { hasPermission } = useAuth();
@@ -96,23 +96,17 @@ export default function EventosPage() {
     setCurrentPage(1);
   }, [viewMode, dateRange, globalSearch, statusFilter, loteSelecionado]);
 
-  // =================================================================================
-  // LÓGICA DE FILTRAGEM COM DATA AVANÇADA
-  // =================================================================================
+  // Lógica de Filtragem
   const eventosFiltradosGlobalmente = useMemo(() => {
     return eventosLocais.filter((evento) => {
-      // 1. Filtro de Data (Range)
+      // 1. Data
       if (dateRange?.from) {
         const eventoDate = new Date(evento.dataHora);
         const start = startOfDay(dateRange.from);
         const end = endOfDay(dateRange.to || dateRange.from);
-
-        if (!isWithinInterval(eventoDate, { start, end })) {
-          return false;
-        }
+        if (!isWithinInterval(eventoDate, { start, end })) return false;
       }
-
-      // 2. Filtro de Busca Texto (apenas na Lista Completa ou Lote Detalhado)
+      // 2. Busca Texto
       if (globalSearch) {
         const s = globalSearch.toLowerCase();
         const matches =
@@ -121,21 +115,16 @@ export default function EventosPage() {
           evento.criadoPor.nome.toLowerCase().includes(s);
         if (!matches) return false;
       }
-
-      // 3. Filtro Status (apenas na Lista Completa)
+      // 3. Status
       if (viewMode === "lista-completa" && statusFilter !== "todos") {
         if (evento.status !== statusFilter) return false;
       }
-
       return true;
     });
   }, [eventosLocais, dateRange, globalSearch, statusFilter, viewMode]);
 
-  // =================================================================================
-  // LÓGICA DE AGRUPAMENTO (VISÃO PASTAS)
-  // =================================================================================
+  // Lógica de Agrupamento (Lotes)
   const lotesDiarios = useMemo(() => {
-    // Se estiver em modo lista, não calcula lotes pra economizar
     if (viewMode === "lista-completa") return [];
 
     const grupos: Record<string, Evento[]> = {};
@@ -172,15 +161,12 @@ export default function EventosPage() {
       .sort((a, b) => b.dataOriginal.getTime() - a.dataOriginal.getTime());
   }, [eventosFiltradosGlobalmente, viewMode]);
 
-  // =================================================================================
-  // PAGINAÇÃO
-  // =================================================================================
-  // Dados finais a serem exibidos (paginados)
+  // Paginação
   const dadosPaginados = useMemo(() => {
     let dados: any[] = [];
+    const itemsPerPage = viewMode === "pastas" && !loteSelecionado ? 10 : 5; // Lotes lista 10, Tabela lista 5
 
     if (loteSelecionado) {
-      // Se tiver lote selecionado, a fonte é o lote (filtrado pela busca local se houver)
       dados = loteSelecionado.eventos.filter((e) => {
         if (!globalSearch) return true;
         const s = globalSearch.toLowerCase();
@@ -196,12 +182,12 @@ export default function EventosPage() {
     }
 
     const totalItems = dados.length;
-    const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
     const currentItems = dados.slice(startIndex, endIndex);
 
-    return { currentItems, totalPages, totalItems };
+    return { currentItems, totalPages, totalItems, itemsPerPage };
   }, [
     loteSelecionado,
     viewMode,
@@ -211,40 +197,32 @@ export default function EventosPage() {
     globalSearch,
   ]);
 
-  // =================================================================================
-  // AÇÕES
-  // =================================================================================
+  // Ações
   const handleStatusChange = (eventoId: string, novoStatus: EventoStatus) => {
     setEventosLocais((prev) =>
-      prev.map((ev) => {
-        if (ev.id === eventoId) {
-          return { ...ev, status: novoStatus };
-        }
-        return ev;
-      }),
+      prev.map((ev) =>
+        ev.id === eventoId ? { ...ev, status: novoStatus } : ev,
+      ),
     );
-
-    // Se estivermos vendo um lote, precisamos atualizar o estado do lote selecionado também para refletir na UI
     if (loteSelecionado) {
       setLoteSelecionado((prev) => {
         if (!prev) return null;
         const novosEventos = prev.eventos.map((ev) =>
           ev.id === eventoId ? { ...ev, status: novoStatus } : ev,
         );
-
-        // Recalcula status do lote
-        let statusLote: BatchStatus = "pendente";
+        // Recalcula status simples
         const todosOk = novosEventos.every((e) =>
           ["aprovado", "exportado"].includes(e.status),
         );
         const temRejeitado = novosEventos.some((e) => e.status === "rejeitado");
-        if (todosOk) statusLote = "aprovado";
-        else if (temRejeitado) statusLote = "rejeitado";
-
-        return { ...prev, eventos: novosEventos, status: statusLote };
+        const status = todosOk
+          ? "aprovado"
+          : temRejeitado
+            ? "rejeitado"
+            : "pendente";
+        return { ...prev, eventos: novosEventos, status };
       });
     }
-
     toast.success("Status atualizado");
   };
 
@@ -257,8 +235,6 @@ export default function EventosPage() {
       return ev;
     });
     setEventosLocais(novosEventos);
-
-    // Atualiza lote selecionado visualmente
     setLoteSelecionado((prev) =>
       prev
         ? {
@@ -268,13 +244,12 @@ export default function EventosPage() {
           }
         : null,
     );
-
-    toast.success("Todos os itens do lote foram aprovados!");
+    toast.success("Lote aprovado!");
   };
 
   if (!hasPermission("eventos:ver_todos")) return null;
 
-  // Componente de Paginação Reutilizável
+  // Componente de Paginação
   const PaginationControls = () => (
     <div className="flex items-center justify-end space-x-2 py-4">
       <div className="flex-1 text-sm text-muted-foreground">
@@ -289,10 +264,9 @@ export default function EventosPage() {
           disabled={currentPage === 1}
         >
           <ChevronLeft className="h-4 w-4" />
-          Anterior
         </Button>
         <div className="inline-flex items-center px-2 text-sm font-medium">
-          Página {currentPage} de {Math.max(1, dadosPaginados.totalPages)}
+          {currentPage} / {Math.max(1, dadosPaginados.totalPages)}
         </div>
         <Button
           variant="outline"
@@ -305,7 +279,6 @@ export default function EventosPage() {
             dadosPaginados.totalPages === 0
           }
         >
-          Próximo
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
@@ -313,23 +286,25 @@ export default function EventosPage() {
   );
 
   // =================================================================================
-  // RENDER: DETALHE DO LOTE (MODO AUDITORIA)
+  // RENDER: DETALHE DO LOTE
   // =================================================================================
   if (loteSelecionado) {
     return (
-      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+      <div
+        className={`space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300 ${hideScrollClass}`}
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button
-              variant="outline"
+              variant="ghost"
               size="icon"
               onClick={() => setLoteSelecionado(null)}
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-2xl font-semibold flex items-center gap-3">
-                Registro: {loteSelecionado.data}
+              <h1 className="text-xl font-semibold flex items-center gap-3">
+                {loteSelecionado.data}
                 <Badge
                   variant={
                     loteSelecionado.status === "aprovado"
@@ -342,7 +317,7 @@ export default function EventosPage() {
                   {loteSelecionado.status.toUpperCase()}
                 </Badge>
               </h1>
-              <p className="text-muted-foreground">
+              <p className="text-sm text-muted-foreground">
                 Autor: {loteSelecionado.autor} • Total:{" "}
                 {formatCurrency(loteSelecionado.totalCusto)}
               </p>
@@ -352,16 +327,16 @@ export default function EventosPage() {
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Buscar neste lote..."
+                placeholder="Buscar no lote..."
                 value={globalSearch}
                 onChange={(e) => setGlobalSearch(e.target.value)}
-                className="pl-9 bg-background"
+                className="pl-9 h-9"
               />
             </div>
             {loteSelecionado.status === "pendente" && (
               <Button
                 onClick={handleAprovarLoteInteiro}
-                className="bg-success hover:bg-success/90 text-white"
+                className="bg-success hover:bg-success/90 text-white h-9"
               >
                 <CheckCircle2 className="mr-2 h-4 w-4" />
                 Aprovar Tudo
@@ -370,7 +345,7 @@ export default function EventosPage() {
           </div>
         </div>
 
-        <div className="border rounded-md bg-card shadow-sm">
+        <div className="border rounded-md bg-background shadow-sm">
           <Table>
             <TableHeader>
               <TableRow>
@@ -387,18 +362,13 @@ export default function EventosPage() {
                   <TableCell className="font-mono text-xs text-muted-foreground">
                     {evento.item?.codigoInterno}
                   </TableCell>
-                  <TableCell className="font-medium">
+                  <TableCell className="font-medium text-sm">
                     {evento.item?.nome}
-                    {evento.motivo && (
-                      <p className="text-xs text-muted-foreground font-normal">
-                        Motivo: {evento.motivo}
-                      </p>
-                    )}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right text-sm">
                     {evento.quantidade} {evento.unidade}
                   </TableCell>
-                  <TableCell className="text-right font-medium">
+                  <TableCell className="text-right text-sm font-medium">
                     {formatCurrency(
                       (evento.custoSnapshot || 0) * evento.quantidade,
                     )}
@@ -411,7 +381,7 @@ export default function EventosPage() {
                       }
                     >
                       <SelectTrigger
-                        className={`h-8 w-full ${getStatusColor(evento.status)} border-transparent`}
+                        className={`h-8 w-full ${getStatusColor(evento.status)} border-transparent text-xs`}
                       >
                         <SelectValue />
                       </SelectTrigger>
@@ -436,108 +406,121 @@ export default function EventosPage() {
   // RENDER: PÁGINA PRINCIPAL
   // =================================================================================
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 ${hideScrollClass}`}>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
             Histórico de Perdas
           </h1>
           <p className="text-muted-foreground">
-            {viewMode === "pastas"
-              ? "Lotes agrupados por dia"
-              : "Todos os registros detalhados"}
+            Gerencie e audite os registros de perdas.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 bg-muted p-1 rounded-lg">
+        <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg border">
           <Button
-            variant={viewMode === "pastas" ? "secondary" : "ghost"}
+            variant="ghost"
             size="sm"
-            onClick={() => setViewMode("pastas")}
-            className="gap-2"
+            className={cn(
+              "h-8 gap-2 text-xs hover:bg-background/60",
+              viewMode === "pastas" &&
+                "bg-background shadow-sm text-foreground hover:bg-background",
+            )}
+            onClick={() => {
+              setViewMode("pastas");
+              // Reseta filtros ao trocar de modo se necessário, mas data pode manter
+              setDateRange(undefined);
+            }}
           >
-            <LayoutGrid className="h-4 w-4" />
+            <LayoutGrid className="h-3.5 w-3.5" />
             Lotes
           </Button>
           <Button
-            variant={viewMode === "lista-completa" ? "secondary" : "ghost"}
+            variant="ghost"
             size="sm"
+            className={cn(
+              "h-8 gap-2 text-xs hover:bg-background/60",
+              viewMode === "lista-completa" &&
+                "bg-background shadow-sm text-foreground hover:bg-background",
+            )}
             onClick={() => setViewMode("lista-completa")}
-            className="gap-2"
           >
-            <LayoutList className="h-4 w-4" />
+            <LayoutList className="h-3.5 w-3.5" />
             Lista
           </Button>
         </div>
       </div>
 
-      {/* BARRA DE FILTROS AVANÇADA */}
-      <div className="flex flex-col md:flex-row gap-4 items-end bg-card p-4 rounded-lg border shadow-sm">
-        {/* Filtro de Data (Comum a ambos) */}
-        <div className="w-full md:w-75">
-          <span className="text-xs font-medium mb-1.5 block text-muted-foreground">
-            Período
-          </span>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant={"outline"}
-                className={cn(
-                  "w-full justify-start text-left font-normal",
-                  !dateRange && "text-muted-foreground",
-                )}
-              >
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {dateRange?.from ? (
-                  dateRange.to ? (
-                    <>
-                      {format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })} -{" "}
-                      {format(dateRange.to, "dd/MM/yyyy", { locale: ptBR })}
-                    </>
+      {/* ÁREA DE FILTROS */}
+      <div className="flex flex-col gap-4">
+        {/* MODO PASTAS: Filtro de Data Global aparece aqui */}
+        {viewMode === "pastas" && (
+          <div className="w-full md:w-75">
+            <span className="text-xs font-medium mb-1.5 block text-muted-foreground ml-1">
+              Período
+            </span>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={cn(
+                    "w-full justify-start text-left font-normal h-9",
+                    !dateRange && "text-muted-foreground",
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {dateRange?.from ? (
+                    dateRange.to ? (
+                      <>
+                        {format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })}{" "}
+                        - {format(dateRange.to, "dd/MM/yyyy", { locale: ptBR })}
+                      </>
+                    ) : (
+                      format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })
+                    )
                   ) : (
-                    format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })
-                  )
-                ) : (
-                  <span>Selecione uma data ou período</span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                initialFocus
-                mode="range"
-                defaultMonth={dateRange?.from}
-                selected={dateRange}
-                onSelect={setDateRange}
-                numberOfMonths={2}
-                locale={ptBR}
-              />
-            </PopoverContent>
-          </Popover>
-        </div>
+                    <span>Selecione uma data...</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  initialFocus
+                  mode="range"
+                  defaultMonth={dateRange?.from}
+                  selected={dateRange}
+                  onSelect={setDateRange}
+                  numberOfMonths={2}
+                  locale={ptBR}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+        )}
 
+        {/* MODO LISTA: Filtros de Busca e Status (Data foi para a Tabela) */}
         {viewMode === "lista-completa" && (
-          <>
-            <div className="flex-1 w-full">
-              <span className="text-xs font-medium mb-1.5 block text-muted-foreground">
+          <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex-1">
+              <span className="text-xs font-medium mb-1.5 block text-muted-foreground ml-1">
                 Buscar
               </span>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  placeholder="Item, código ou autor..."
+                  placeholder="Nome, código ou autor..."
                   value={globalSearch}
                   onChange={(e) => setGlobalSearch(e.target.value)}
-                  className="pl-9"
+                  className="pl-9 h-9"
                 />
               </div>
             </div>
-            <div className="w-full md:w-40">
-              <span className="text-xs font-medium mb-1.5 block text-muted-foreground">
+            <div className="w-full md:w-48">
+              <span className="text-xs font-medium mb-1.5 block text-muted-foreground ml-1">
                 Status
               </span>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger>
+                <SelectTrigger className="h-9">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -548,89 +531,139 @@ export default function EventosPage() {
                 </SelectContent>
               </Select>
             </div>
-          </>
+          </div>
         )}
 
         {/* Botão limpar filtros */}
         {(dateRange || globalSearch || statusFilter !== "todos") && (
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setDateRange(undefined);
-              setGlobalSearch("");
-              setStatusFilter("todos");
-            }}
-            className="text-muted-foreground"
-          >
-            Limpar
-          </Button>
+          <div className="flex justify-start">
+            <Button
+              variant="link"
+              size="sm"
+              onClick={() => {
+                setDateRange(undefined);
+                setGlobalSearch("");
+                setStatusFilter("todos");
+              }}
+              className="text-muted-foreground h-auto p-0 px-1"
+            >
+              Limpar filtros
+            </Button>
+          </div>
         )}
       </div>
 
       {/* CONTEÚDO PRINCIPAL */}
       {viewMode === "pastas" ? (
+        // === VIEW 1: LOTES RETANGULARES ===
         <>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="flex flex-col gap-2">
             {dadosPaginados.currentItems.map((lote: LoteDiario) => (
-              <Card
+              <div
                 key={lote.data}
-                className="hover:border-primary/50 transition-all cursor-pointer group hover:shadow-md"
+                className="group flex items-center justify-between p-3 rounded-md border bg-background hover:bg-muted/40 hover:border-primary/30 transition-all cursor-pointer shadow-sm"
                 onClick={() => setLoteSelecionado(lote)}
               >
-                <CardHeader className="flex flex-row items-start justify-between pb-2">
-                  <div className="bg-primary/10 p-2.5 rounded-lg group-hover:bg-primary/20 transition-colors">
-                    <FileSpreadsheet className="h-5 w-5 text-primary" />
+                {/* Esquerda: Data e Status */}
+                <div className="flex items-center gap-4">
+                  <div
+                    className={cn(
+                      "flex h-9 w-9 items-center justify-center rounded-full border",
+                      lote.status === "aprovado"
+                        ? "bg-success/10 text-success border-success/20"
+                        : lote.status === "rejeitado"
+                          ? "bg-destructive/10 text-destructive border-destructive/20"
+                          : "bg-muted text-muted-foreground",
+                    )}
+                  >
+                    <FileText className="h-4 w-4" />
                   </div>
-                  {lote.status === "aprovado" ? (
-                    <CheckCircle2 className="h-5 w-5 text-success" />
-                  ) : lote.status === "rejeitado" ? (
-                    <XCircle className="h-5 w-5 text-destructive" />
-                  ) : (
-                    <AlertCircle className="h-5 w-5 text-muted-foreground" />
-                  )}
-                </CardHeader>
-                <CardContent>
-                  <div className="mb-1">
-                    <p className="text-xs text-muted-foreground font-medium uppercase">
-                      Dia
-                    </p>
-                    <h3 className="text-lg font-bold tracking-tight">
-                      {lote.data}
-                    </h3>
-                  </div>
-                  <div className="flex justify-between items-end mt-4">
-                    <div>
-                      <p className="text-xs text-muted-foreground">
-                        {lote.eventos.length} itens
-                      </p>
-                      <p className="font-semibold text-sm">
-                        {formatCurrency(lote.totalCusto)}
-                      </p>
+                  <div>
+                    <h3 className="text-sm font-semibold">{lote.data}</h3>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>{lote.autor}</span>
+                      <span>•</span>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "h-4 px-1 text-[10px] border-0 bg-transparent p-0 font-normal",
+                          lote.status === "aprovado"
+                            ? "text-success"
+                            : lote.status === "rejeitado"
+                              ? "text-destructive"
+                              : "text-muted-foreground",
+                        )}
+                      >
+                        {lote.status.toUpperCase()}
+                      </Badge>
                     </div>
-                    <Badge
-                      variant="outline"
-                      className="text-xs group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
-                    >
-                      Abrir
-                    </Badge>
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+
+                {/* Direita: Valores e Seta */}
+                <div className="flex items-center gap-6 md:gap-12">
+                  <div className="hidden md:block text-right">
+                    <p className="text-[10px] text-muted-foreground uppercase">
+                      Itens
+                    </p>
+                    <p className="text-sm font-medium">{lote.eventos.length}</p>
+                  </div>
+                  <div className="text-right min-w-20">
+                    <p className="text-[10px] text-muted-foreground uppercase">
+                      Total
+                    </p>
+                    <p className="text-sm font-bold">
+                      {formatCurrency(lote.totalCusto)}
+                    </p>
+                  </div>
+                  <ChevronRightSquare className="h-5 w-5 text-muted-foreground/30 group-hover:text-primary/50 transition-colors" />
+                </div>
+              </div>
             ))}
           </div>
           {dadosPaginados.totalItems === 0 && (
-            <div className="py-12 text-center text-muted-foreground border-2 border-dashed rounded-lg">
-              Nenhum lote encontrado neste período.
+            <div className="py-12 text-center text-muted-foreground border border-dashed rounded-lg bg-muted/5">
+              Nenhum lote encontrado.
             </div>
           )}
           <PaginationControls />
         </>
       ) : (
-        <div className="border rounded-md bg-card shadow-sm">
+        // === VIEW 2: LISTA COMPLETA ===
+        <div className="border rounded-md bg-background shadow-sm">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Data</TableHead>
+                {/* COLUNA DATA AGORA É O FILTRO */}
+                <TableHead className="w-45">
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="-ml-3 h-8 gap-2 font-semibold text-xs hover:bg-muted/80"
+                      >
+                        Data
+                        <ListFilter className="h-3.5 w-3.5" />
+                        {dateRange && (
+                          <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-primary" />
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        initialFocus
+                        mode="range"
+                        defaultMonth={dateRange?.from}
+                        selected={dateRange}
+                        onSelect={setDateRange}
+                        numberOfMonths={2}
+                        locale={ptBR}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </TableHead>
+
                 <TableHead>Código</TableHead>
                 <TableHead>Produto</TableHead>
                 <TableHead className="text-right">Qtd.</TableHead>
@@ -641,7 +674,7 @@ export default function EventosPage() {
             <TableBody>
               {dadosPaginados.currentItems.map((evento: Evento) => (
                 <TableRow key={evento.id}>
-                  <TableCell className="text-xs whitespace-nowrap">
+                  <TableCell className="text-xs whitespace-nowrap text-muted-foreground">
                     {formatDate(evento.dataHora)}
                   </TableCell>
                   <TableCell className="font-mono text-xs text-muted-foreground">
