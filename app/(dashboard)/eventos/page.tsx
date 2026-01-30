@@ -346,10 +346,11 @@ export default function EventosPage() {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-75 p-0" align="start">
+      <PopoverContent className="w-auto p-0" align="start">
+        {" "}
         <Command>
           <CommandInput placeholder="Buscar (Ex: Janeiro, 2026)..." />
-          <CommandList>
+          <CommandList className={hideScrollClass}>
             <CommandEmpty>Nenhum período encontrado.</CommandEmpty>
             <CommandGroup heading="Atalhos">
               <CommandItem
