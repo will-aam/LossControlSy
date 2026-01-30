@@ -1,23 +1,10 @@
 "use client";
 
-import { useState, useMemo } from "react";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
+import { useState, useMemo, useEffect } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -27,298 +14,688 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import {
   mockEventos,
   Evento,
   formatCurrency,
   formatDate,
   getStatusColor,
-  getStatusLabel,
+  EventoStatus,
 } from "@/lib/mock-data";
 import { useAuth } from "@/lib/auth-context";
 import {
   FileSpreadsheet,
-  Calendar,
   Search,
+  ArrowLeft,
+  CheckCircle2,
+  XCircle,
+  LayoutList,
+  LayoutGrid,
+  AlertCircle,
+  CalendarIcon,
+  ChevronLeft,
   ChevronRight,
-  Package,
-  AlertTriangle,
-  Eye,
-  Filter,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
+import { toast } from "sonner";
+import { DateRange } from "react-day-picker";
+import { format, isWithinInterval, startOfDay, endOfDay } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
-// Interface auxiliar para o agrupamento
+// Tipos
+type ViewMode = "pastas" | "lista-completa";
+type BatchStatus = "pendente" | "aprovado" | "rejeitado";
+
 interface LoteDiario {
-  data: string; // DD/MM/YYYY
+  data: string;
   dataOriginal: Date;
   eventos: Evento[];
-  totalItens: number;
   totalCusto: number;
-  statusDominante: string;
+  status: BatchStatus;
+  autor: string;
 }
+
+const ITEMS_PER_PAGE = 10;
 
 export default function EventosPage() {
   const { hasPermission } = useAuth();
-  const [searchQuery, setSearchQuery] = useState("");
+
+  // Estados de Navegação e Filtro
+  const [viewMode, setViewMode] = useState<ViewMode>("pastas");
   const [loteSelecionado, setLoteSelecionado] = useState<LoteDiario | null>(
     null,
   );
 
-  // 1. Agrupar eventos por data
+  // Filtros
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [globalSearch, setGlobalSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("todos");
+
+  // Paginação
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Dados Locais
+  const [eventosLocais, setEventosLocais] = useState<Evento[]>(mockEventos);
+
+  // Resetar página quando mudar filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [viewMode, dateRange, globalSearch, statusFilter, loteSelecionado]);
+
+  // =================================================================================
+  // LÓGICA DE FILTRAGEM COM DATA AVANÇADA
+  // =================================================================================
+  const eventosFiltradosGlobalmente = useMemo(() => {
+    return eventosLocais.filter((evento) => {
+      // 1. Filtro de Data (Range)
+      if (dateRange?.from) {
+        const eventoDate = new Date(evento.dataHora);
+        const start = startOfDay(dateRange.from);
+        const end = endOfDay(dateRange.to || dateRange.from);
+
+        if (!isWithinInterval(eventoDate, { start, end })) {
+          return false;
+        }
+      }
+
+      // 2. Filtro de Busca Texto (apenas na Lista Completa ou Lote Detalhado)
+      if (globalSearch) {
+        const s = globalSearch.toLowerCase();
+        const matches =
+          evento.item?.nome.toLowerCase().includes(s) ||
+          evento.item?.codigoInterno.toLowerCase().includes(s) ||
+          evento.criadoPor.nome.toLowerCase().includes(s);
+        if (!matches) return false;
+      }
+
+      // 3. Filtro Status (apenas na Lista Completa)
+      if (viewMode === "lista-completa" && statusFilter !== "todos") {
+        if (evento.status !== statusFilter) return false;
+      }
+
+      return true;
+    });
+  }, [eventosLocais, dateRange, globalSearch, statusFilter, viewMode]);
+
+  // =================================================================================
+  // LÓGICA DE AGRUPAMENTO (VISÃO PASTAS)
+  // =================================================================================
   const lotesDiarios = useMemo(() => {
+    // Se estiver em modo lista, não calcula lotes pra economizar
+    if (viewMode === "lista-completa") return [];
+
     const grupos: Record<string, Evento[]> = {};
 
-    // Filtra e agrupa
-    mockEventos.forEach((evento) => {
-      // Filtro de busca simples (se houver texto digitado)
-      if (searchQuery) {
-        const query = searchQuery.toLowerCase();
-        const matches =
-          evento.item?.nome.toLowerCase().includes(query) ||
-          evento.criadoPor.nome.toLowerCase().includes(query);
-
-        if (!matches) return;
-      }
-
+    eventosFiltradosGlobalmente.forEach((evento) => {
       const dataFormatada = formatDate(evento.dataHora);
-      if (!grupos[dataFormatada]) {
-        grupos[dataFormatada] = [];
-      }
+      if (!grupos[dataFormatada]) grupos[dataFormatada] = [];
       grupos[dataFormatada].push(evento);
     });
 
-    // Transforma em array e ordena (mais recente primeiro)
     return Object.entries(grupos)
       .map(([data, eventos]) => {
-        const totalCusto = eventos.reduce(
-          (acc, e) => acc + (e.custoSnapshot || 0) * e.quantidade,
-          0,
+        let status: BatchStatus = "pendente";
+        const todosOk = eventos.every((e) =>
+          ["aprovado", "exportado"].includes(e.status),
         );
+        const temRejeitado = eventos.some((e) => e.status === "rejeitado");
 
-        // Lógica simples para definir "Status do Lote" (visual)
-        // Se tiver algum rejeitado, marca alerta. Se todos aprovados, verde.
-        let status = "Variado";
-        const todosAprovados = eventos.every(
-          (e) => e.status === "aprovado" || e.status === "exportado",
-        );
-        const temRejeicao = eventos.some((e) => e.status === "rejeitado");
-
-        if (todosAprovados) status = "Aprovado";
-        else if (temRejeicao) status = "Com Rejeições";
-        else if (eventos.every((e) => e.status === "enviado"))
-          status = "Pendente";
+        if (todosOk) status = "aprovado";
+        else if (temRejeitado) status = "rejeitado";
 
         return {
           data,
           dataOriginal: new Date(eventos[0].dataHora),
           eventos,
-          totalItens: eventos.length,
-          totalCusto,
-          statusDominante: status,
+          totalCusto: eventos.reduce(
+            (acc, e) => acc + (e.custoSnapshot || 0) * e.quantidade,
+            0,
+          ),
+          status,
+          autor: eventos[0].criadoPor.nome,
         } as LoteDiario;
       })
       .sort((a, b) => b.dataOriginal.getTime() - a.dataOriginal.getTime());
-  }, [searchQuery]);
+  }, [eventosFiltradosGlobalmente, viewMode]);
 
-  if (!hasPermission("eventos:ver_todos")) {
+  // =================================================================================
+  // PAGINAÇÃO
+  // =================================================================================
+  // Dados finais a serem exibidos (paginados)
+  const dadosPaginados = useMemo(() => {
+    let dados: any[] = [];
+
+    if (loteSelecionado) {
+      // Se tiver lote selecionado, a fonte é o lote (filtrado pela busca local se houver)
+      dados = loteSelecionado.eventos.filter((e) => {
+        if (!globalSearch) return true;
+        const s = globalSearch.toLowerCase();
+        return (
+          e.item?.nome.toLowerCase().includes(s) ||
+          e.item?.codigoInterno.toLowerCase().includes(s)
+        );
+      });
+    } else if (viewMode === "pastas") {
+      dados = lotesDiarios;
+    } else {
+      dados = eventosFiltradosGlobalmente;
+    }
+
+    const totalItems = dados.length;
+    const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    const currentItems = dados.slice(startIndex, endIndex);
+
+    return { currentItems, totalPages, totalItems };
+  }, [
+    loteSelecionado,
+    viewMode,
+    lotesDiarios,
+    eventosFiltradosGlobalmente,
+    currentPage,
+    globalSearch,
+  ]);
+
+  // =================================================================================
+  // AÇÕES
+  // =================================================================================
+  const handleStatusChange = (eventoId: string, novoStatus: EventoStatus) => {
+    setEventosLocais((prev) =>
+      prev.map((ev) => {
+        if (ev.id === eventoId) {
+          return { ...ev, status: novoStatus };
+        }
+        return ev;
+      }),
+    );
+
+    // Se estivermos vendo um lote, precisamos atualizar o estado do lote selecionado também para refletir na UI
+    if (loteSelecionado) {
+      setLoteSelecionado((prev) => {
+        if (!prev) return null;
+        const novosEventos = prev.eventos.map((ev) =>
+          ev.id === eventoId ? { ...ev, status: novoStatus } : ev,
+        );
+
+        // Recalcula status do lote
+        let statusLote: BatchStatus = "pendente";
+        const todosOk = novosEventos.every((e) =>
+          ["aprovado", "exportado"].includes(e.status),
+        );
+        const temRejeitado = novosEventos.some((e) => e.status === "rejeitado");
+        if (todosOk) statusLote = "aprovado";
+        else if (temRejeitado) statusLote = "rejeitado";
+
+        return { ...prev, eventos: novosEventos, status: statusLote };
+      });
+    }
+
+    toast.success("Status atualizado");
+  };
+
+  const handleAprovarLoteInteiro = () => {
+    if (!loteSelecionado) return;
+    const novosEventos = eventosLocais.map((ev) => {
+      if (loteSelecionado.eventos.some((le) => le.id === ev.id)) {
+        return { ...ev, status: "aprovado" as EventoStatus };
+      }
+      return ev;
+    });
+    setEventosLocais(novosEventos);
+
+    // Atualiza lote selecionado visualmente
+    setLoteSelecionado((prev) =>
+      prev
+        ? {
+            ...prev,
+            eventos: prev.eventos.map((e) => ({ ...e, status: "aprovado" })),
+            status: "aprovado",
+          }
+        : null,
+    );
+
+    toast.success("Todos os itens do lote foram aprovados!");
+  };
+
+  if (!hasPermission("eventos:ver_todos")) return null;
+
+  // Componente de Paginação Reutilizável
+  const PaginationControls = () => (
+    <div className="flex items-center justify-end space-x-2 py-4">
+      <div className="flex-1 text-sm text-muted-foreground">
+        Mostrando {dadosPaginados.currentItems.length} de{" "}
+        {dadosPaginados.totalItems} registros
+      </div>
+      <div className="space-x-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+          disabled={currentPage === 1}
+        >
+          <ChevronLeft className="h-4 w-4" />
+          Anterior
+        </Button>
+        <div className="inline-flex items-center px-2 text-sm font-medium">
+          Página {currentPage} de {Math.max(1, dadosPaginados.totalPages)}
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() =>
+            setCurrentPage((p) => Math.min(dadosPaginados.totalPages, p + 1))
+          }
+          disabled={
+            currentPage === dadosPaginados.totalPages ||
+            dadosPaginados.totalPages === 0
+          }
+        >
+          Próximo
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+
+  // =================================================================================
+  // RENDER: DETALHE DO LOTE (MODO AUDITORIA)
+  // =================================================================================
+  if (loteSelecionado) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <AlertTriangle className="h-12 w-12 text-muted-foreground" />
-        <h2 className="text-xl font-semibold">Acesso Restrito</h2>
-        <p className="text-muted-foreground">
-          Você não tem permissão para visualizar os eventos.
-        </p>
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setLoteSelecionado(null)}
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div>
+              <h1 className="text-2xl font-semibold flex items-center gap-3">
+                Registro: {loteSelecionado.data}
+                <Badge
+                  variant={
+                    loteSelecionado.status === "aprovado"
+                      ? "default"
+                      : loteSelecionado.status === "rejeitado"
+                        ? "destructive"
+                        : "secondary"
+                  }
+                >
+                  {loteSelecionado.status.toUpperCase()}
+                </Badge>
+              </h1>
+              <p className="text-muted-foreground">
+                Autor: {loteSelecionado.autor} • Total:{" "}
+                {formatCurrency(loteSelecionado.totalCusto)}
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <div className="relative w-64">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                placeholder="Buscar neste lote..."
+                value={globalSearch}
+                onChange={(e) => setGlobalSearch(e.target.value)}
+                className="pl-9 bg-background"
+              />
+            </div>
+            {loteSelecionado.status === "pendente" && (
+              <Button
+                onClick={handleAprovarLoteInteiro}
+                className="bg-success hover:bg-success/90 text-white"
+              >
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                Aprovar Tudo
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <div className="border rounded-md bg-card shadow-sm">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Código</TableHead>
+                <TableHead>Produto</TableHead>
+                <TableHead className="text-right">Qtd.</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead className="w-45">Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {dadosPaginados.currentItems.map((evento: Evento) => (
+                <TableRow key={evento.id}>
+                  <TableCell className="font-mono text-xs text-muted-foreground">
+                    {evento.item?.codigoInterno}
+                  </TableCell>
+                  <TableCell className="font-medium">
+                    {evento.item?.nome}
+                    {evento.motivo && (
+                      <p className="text-xs text-muted-foreground font-normal">
+                        Motivo: {evento.motivo}
+                      </p>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {evento.quantidade} {evento.unidade}
+                  </TableCell>
+                  <TableCell className="text-right font-medium">
+                    {formatCurrency(
+                      (evento.custoSnapshot || 0) * evento.quantidade,
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Select
+                      value={evento.status}
+                      onValueChange={(v) =>
+                        handleStatusChange(evento.id, v as EventoStatus)
+                      }
+                    >
+                      <SelectTrigger
+                        className={`h-8 w-full ${getStatusColor(evento.status)} border-transparent`}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pendente">Pendente</SelectItem>
+                        <SelectItem value="aprovado">Aprovado</SelectItem>
+                        <SelectItem value="rejeitado">Rejeitado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+        <PaginationControls />
       </div>
     );
   }
 
+  // =================================================================================
+  // RENDER: PÁGINA PRINCIPAL
+  // =================================================================================
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
             Histórico de Perdas
           </h1>
           <p className="text-muted-foreground">
-            Visualize os registros agrupados por data de envio
+            {viewMode === "pastas"
+              ? "Lotes agrupados por dia"
+              : "Todos os registros detalhados"}
           </p>
         </div>
 
-        {/* Barra de Busca Simples */}
-        <div className="relative w-full md:w-72">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar em todos os registros..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
+        <div className="flex items-center gap-2 bg-muted p-1 rounded-lg">
+          <Button
+            variant={viewMode === "pastas" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("pastas")}
+            className="gap-2"
+          >
+            <LayoutGrid className="h-4 w-4" />
+            Lotes
+          </Button>
+          <Button
+            variant={viewMode === "lista-completa" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setViewMode("lista-completa")}
+            className="gap-2"
+          >
+            <LayoutList className="h-4 w-4" />
+            Lista
+          </Button>
         </div>
       </div>
 
-      {/* Grid de Lotes (Pastas Diárias) */}
-      {lotesDiarios.length > 0 ? (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {lotesDiarios.map((lote) => (
-            <Card
-              key={lote.data}
-              className="hover:border-primary/50 transition-colors cursor-pointer group"
-              onClick={() => setLoteSelecionado(lote)}
-            >
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {lote.data}
-                </CardTitle>
-                <FileSpreadsheet className="h-4 w-4 text-primary group-hover:text-primary/80" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold mb-1">
-                  {formatCurrency(lote.totalCusto)}
-                </div>
-                <div className="flex items-center text-xs text-muted-foreground mb-4">
-                  <Package className="mr-1 h-3 w-3" />
-                  {lote.totalItens} registros
-                </div>
-
-                <div className="flex items-center justify-between mt-4">
-                  <Badge
-                    variant={
-                      lote.statusDominante === "Aprovado"
-                        ? "default"
-                        : lote.statusDominante === "Com Rejeições"
-                          ? "destructive"
-                          : "secondary"
-                    }
-                  >
-                    {lote.statusDominante}
-                  </Badge>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2">
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+      {/* BARRA DE FILTROS AVANÇADA */}
+      <div className="flex flex-col md:flex-row gap-4 items-end bg-card p-4 rounded-lg border shadow-sm">
+        {/* Filtro de Data (Comum a ambos) */}
+        <div className="w-full md:w-75">
+          <span className="text-xs font-medium mb-1.5 block text-muted-foreground">
+            Período
+          </span>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={"outline"}
+                className={cn(
+                  "w-full justify-start text-left font-normal",
+                  !dateRange && "text-muted-foreground",
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {dateRange?.from ? (
+                  dateRange.to ? (
+                    <>
+                      {format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })} -{" "}
+                      {format(dateRange.to, "dd/MM/yyyy", { locale: ptBR })}
+                    </>
+                  ) : (
+                    format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })
+                  )
+                ) : (
+                  <span>Selecione uma data ou período</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                initialFocus
+                mode="range"
+                defaultMonth={dateRange?.from}
+                selected={dateRange}
+                onSelect={setDateRange}
+                numberOfMonths={2}
+                locale={ptBR}
+              />
+            </PopoverContent>
+          </Popover>
         </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center py-16 text-center border-2 border-dashed rounded-lg bg-muted/10">
-          <Filter className="h-10 w-10 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold">Nenhum registro encontrado</h3>
-          <p className="text-muted-foreground">
-            Não encontramos perdas com os filtros atuais.
-          </p>
-        </div>
-      )}
 
-      {/* Modal de Detalhes (A "Planilha Aberta") */}
-      <Dialog
-        open={!!loteSelecionado}
-        onOpenChange={(open) => !open && setLoteSelecionado(null)}
-      >
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <div className="flex items-center gap-2">
-              <div className="bg-primary/10 p-2 rounded-full">
-                <Calendar className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <DialogTitle>
-                  Registro de Perdas - {loteSelecionado?.data}
-                </DialogTitle>
-                <DialogDescription>
-                  Detalhamento dos itens registrados nesta data.
-                </DialogDescription>
+        {viewMode === "lista-completa" && (
+          <>
+            <div className="flex-1 w-full">
+              <span className="text-xs font-medium mb-1.5 block text-muted-foreground">
+                Buscar
+              </span>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Item, código ou autor..."
+                  value={globalSearch}
+                  onChange={(e) => setGlobalSearch(e.target.value)}
+                  className="pl-9"
+                />
               </div>
             </div>
-          </DialogHeader>
+            <div className="w-full md:w-40">
+              <span className="text-xs font-medium mb-1.5 block text-muted-foreground">
+                Status
+              </span>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todos">Todos</SelectItem>
+                  <SelectItem value="aprovado">Aprovado</SelectItem>
+                  <SelectItem value="pendente">Pendente</SelectItem>
+                  <SelectItem value="rejeitado">Rejeitado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        )}
 
-          {loteSelecionado && (
-            <div className="mt-4">
-              {/* Resumo do Lote */}
-              <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-muted/30 rounded-lg">
-                <div>
-                  <span className="text-xs text-muted-foreground uppercase font-bold">
-                    Total Custo
-                  </span>
-                  <div className="text-lg font-semibold">
-                    {formatCurrency(loteSelecionado.totalCusto)}
-                  </div>
-                </div>
-                <div>
-                  <span className="text-xs text-muted-foreground uppercase font-bold">
-                    Total Itens
-                  </span>
-                  <div className="text-lg font-semibold">
-                    {loteSelecionado.totalItens}
-                  </div>
-                </div>
-                <div>
-                  <span className="text-xs text-muted-foreground uppercase font-bold">
-                    Criado Por
-                  </span>
-                  <div className="text-sm font-medium mt-1">
-                    {loteSelecionado.eventos[0].criadoPor.nome}
-                  </div>
-                </div>
-              </div>
+        {/* Botão limpar filtros */}
+        {(dateRange || globalSearch || statusFilter !== "todos") && (
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setDateRange(undefined);
+              setGlobalSearch("");
+              setStatusFilter("todos");
+            }}
+            className="text-muted-foreground"
+          >
+            Limpar
+          </Button>
+        )}
+      </div>
 
-              {/* Tabela de Itens */}
-              <div className="border rounded-md">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Item</TableHead>
-                      <TableHead>Categoria</TableHead>
-                      <TableHead className="text-right">Qtd.</TableHead>
-                      <TableHead className="text-right">Custo</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      <TableHead className="text-center">Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {loteSelecionado.eventos.map((evento) => (
-                      <TableRow key={evento.id}>
-                        <TableCell>
-                          <div className="flex flex-col">
-                            <span className="font-medium">
-                              {evento.item?.nome || "Item Desconhecido"}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {evento.item?.codigoInterno}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground">
-                          {evento.item?.categoria}
-                        </TableCell>
-                        <TableCell className="text-right font-mono">
-                          {evento.quantidade} {evento.unidade}
-                        </TableCell>
-                        <TableCell className="text-right text-xs text-muted-foreground">
-                          {formatCurrency(evento.custoSnapshot || 0)}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          {formatCurrency(
-                            (evento.custoSnapshot || 0) * evento.quantidade,
-                          )}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge
-                            variant="outline"
-                            className={`text-xs ${getStatusColor(evento.status)} bg-transparent border-current`}
-                          >
-                            {getStatusLabel(evento.status)}
-                          </Badge>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+      {/* CONTEÚDO PRINCIPAL */}
+      {viewMode === "pastas" ? (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {dadosPaginados.currentItems.map((lote: LoteDiario) => (
+              <Card
+                key={lote.data}
+                className="hover:border-primary/50 transition-all cursor-pointer group hover:shadow-md"
+                onClick={() => setLoteSelecionado(lote)}
+              >
+                <CardHeader className="flex flex-row items-start justify-between pb-2">
+                  <div className="bg-primary/10 p-2.5 rounded-lg group-hover:bg-primary/20 transition-colors">
+                    <FileSpreadsheet className="h-5 w-5 text-primary" />
+                  </div>
+                  {lote.status === "aprovado" ? (
+                    <CheckCircle2 className="h-5 w-5 text-success" />
+                  ) : lote.status === "rejeitado" ? (
+                    <XCircle className="h-5 w-5 text-destructive" />
+                  ) : (
+                    <AlertCircle className="h-5 w-5 text-muted-foreground" />
+                  )}
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-1">
+                    <p className="text-xs text-muted-foreground font-medium uppercase">
+                      Dia
+                    </p>
+                    <h3 className="text-lg font-bold tracking-tight">
+                      {lote.data}
+                    </h3>
+                  </div>
+                  <div className="flex justify-between items-end mt-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground">
+                        {lote.eventos.length} itens
+                      </p>
+                      <p className="font-semibold text-sm">
+                        {formatCurrency(lote.totalCusto)}
+                      </p>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className="text-xs group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
+                    >
+                      Abrir
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          {dadosPaginados.totalItems === 0 && (
+            <div className="py-12 text-center text-muted-foreground border-2 border-dashed rounded-lg">
+              Nenhum lote encontrado neste período.
             </div>
           )}
-        </DialogContent>
-      </Dialog>
+          <PaginationControls />
+        </>
+      ) : (
+        <div className="border rounded-md bg-card shadow-sm">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Data</TableHead>
+                <TableHead>Código</TableHead>
+                <TableHead>Produto</TableHead>
+                <TableHead className="text-right">Qtd.</TableHead>
+                <TableHead className="text-right">Total</TableHead>
+                <TableHead className="w-45">Status</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {dadosPaginados.currentItems.map((evento: Evento) => (
+                <TableRow key={evento.id}>
+                  <TableCell className="text-xs whitespace-nowrap">
+                    {formatDate(evento.dataHora)}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-muted-foreground">
+                    {evento.item?.codigoInterno}
+                  </TableCell>
+                  <TableCell className="font-medium text-sm">
+                    {evento.item?.nome}
+                  </TableCell>
+                  <TableCell className="text-right text-sm">
+                    {evento.quantidade} {evento.unidade}
+                  </TableCell>
+                  <TableCell className="text-right text-sm font-medium">
+                    {formatCurrency(
+                      (evento.custoSnapshot || 0) * evento.quantidade,
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <Select
+                      value={evento.status}
+                      onValueChange={(v) =>
+                        handleStatusChange(evento.id, v as EventoStatus)
+                      }
+                    >
+                      <SelectTrigger
+                        className={`h-8 w-full ${getStatusColor(evento.status)} border-transparent text-xs`}
+                      >
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pendente">Pendente</SelectItem>
+                        <SelectItem value="aprovado">Aprovado</SelectItem>
+                        <SelectItem value="rejeitado">Rejeitado</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {dadosPaginados.totalItems === 0 && (
+                <TableRow>
+                  <TableCell
+                    colSpan={6}
+                    className="h-24 text-center text-muted-foreground"
+                  >
+                    Nenhum item corresponde aos filtros.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+          <div className="border-t px-4">
+            <PaginationControls />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
