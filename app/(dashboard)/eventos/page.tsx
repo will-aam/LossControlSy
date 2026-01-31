@@ -1,3 +1,4 @@
+// app/(dashboard)/eventos/page.tsx
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -35,13 +36,13 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import {
-  mockEventos,
   Evento,
   formatCurrency,
   formatDate,
   getStatusColor,
   EventoStatus,
 } from "@/lib/mock-data";
+import { StorageService } from "@/lib/storage"; // Importar Storage
 import { useAuth } from "@/lib/auth-context";
 import {
   FileText,
@@ -55,9 +56,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronRightSquare,
-  ListFilter,
   Download,
-  Filter,
+  AlertTriangle,
 } from "lucide-react";
 import { toast } from "sonner";
 import { DateRange } from "react-day-picker";
@@ -106,8 +106,13 @@ export default function EventosPage() {
   // Paginação
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Dados Locais
-  const [eventosLocais, setEventosLocais] = useState<Evento[]>(mockEventos);
+  // Dados Locais (Inicialmente vazio)
+  const [eventosLocais, setEventosLocais] = useState<Evento[]>([]);
+
+  // Carregar dados do Storage
+  useEffect(() => {
+    setEventosLocais(StorageService.getEventos());
+  }, []);
 
   // Resetar página quando mudar filtros
   useEffect(() => {
@@ -159,11 +164,9 @@ export default function EventosPage() {
     return Object.entries(grupos)
       .map(([data, eventos]) => {
         let status: BatchStatus = "pendente";
-        // Se todos aprovados ou exportados -> aprovado
         const todosOk = eventos.every((e) =>
           ["aprovado", "exportado"].includes(e.status),
         );
-        // Se tem algum rejeitado -> rejeitado
         const temRejeitado = eventos.some((e) => e.status === "rejeitado");
 
         if (todosOk) status = "aprovado";
@@ -176,7 +179,7 @@ export default function EventosPage() {
           totalCusto: eventos.reduce(
             (acc, e) => acc + (e.custoSnapshot || 0) * e.quantidade,
             0,
-          ), // Fix TS: check undefined
+          ),
           status,
           autor: eventos[0].criadoPor.nome,
         } as LoteDiario;
@@ -187,7 +190,7 @@ export default function EventosPage() {
   // Paginação
   const dadosPaginados = useMemo(() => {
     let dados: any[] = [];
-    const itemsPerPage = viewMode === "pastas" && !loteSelecionado ? 10 : 5;
+    const itemsPerPage = viewMode === "pastas" && !loteSelecionado ? 10 : 15; // Mais itens na lista
 
     if (loteSelecionado) {
       dados = loteSelecionado.eventos.filter((e) => {
@@ -222,33 +225,37 @@ export default function EventosPage() {
 
   // Ações
   const handleStatusChange = (eventoId: string, novoStatus: string) => {
-    // Cast manual para EventoStatus para evitar erro de TS se a string vier do Select
     const statusTyped = novoStatus as EventoStatus;
 
-    setEventosLocais((prev) =>
-      prev.map((ev) =>
-        ev.id === eventoId ? { ...ev, status: statusTyped } : ev,
-      ),
+    // Atualiza estado local
+    const novosEventos = eventosLocais.map((ev) =>
+      ev.id === eventoId ? { ...ev, status: statusTyped } : ev,
     );
+    setEventosLocais(novosEventos);
 
+    // Salva no Storage
+    const eventoAlterado = novosEventos.find((ev) => ev.id === eventoId);
+    if (eventoAlterado) StorageService.saveEvento(eventoAlterado);
+
+    // Atualiza lote selecionado se existir
     if (loteSelecionado) {
       setLoteSelecionado((prev) => {
         if (!prev) return null;
-        const novosEventos = prev.eventos.map((ev) =>
+        const eventosLote = prev.eventos.map((ev) =>
           ev.id === eventoId ? { ...ev, status: statusTyped } : ev,
         );
 
-        const todosOk = novosEventos.every((e) =>
+        const todosOk = eventosLote.every((e) =>
           ["aprovado", "exportado"].includes(e.status),
         );
-        const temRejeitado = novosEventos.some((e) => e.status === "rejeitado");
+        const temRejeitado = eventosLote.some((e) => e.status === "rejeitado");
         const status = todosOk
           ? "aprovado"
           : temRejeitado
             ? "rejeitado"
             : "pendente";
 
-        return { ...prev, eventos: novosEventos, status };
+        return { ...prev, eventos: eventosLote, status };
       });
     }
     toast.success("Status atualizado");
@@ -256,12 +263,17 @@ export default function EventosPage() {
 
   const handleAprovarLoteInteiro = () => {
     if (!loteSelecionado) return;
+
     const novosEventos = eventosLocais.map((ev) => {
       if (loteSelecionado.eventos.some((le) => le.id === ev.id)) {
-        return { ...ev, status: "aprovado" as EventoStatus };
+        const atualizado = { ...ev, status: "aprovado" as EventoStatus };
+        // Salva cada um no storage
+        StorageService.saveEvento(atualizado);
+        return atualizado;
       }
       return ev;
     });
+
     setEventosLocais(novosEventos);
     setLoteSelecionado((prev) =>
       prev
@@ -279,33 +291,42 @@ export default function EventosPage() {
   };
 
   const handleExportar = () => {
-    toast.success("Gerando CSV dos itens filtrados...");
+    toast.success("Funcionalidade de exportação em desenvolvimento.");
   };
 
-  if (!hasPermission("eventos:ver_todos")) return null;
+  if (!hasPermission("eventos:ver_todos")) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <AlertTriangle className="h-12 w-12 text-muted-foreground" />
+        <h2 className="text-xl font-semibold">Acesso Restrito</h2>
+      </div>
+    );
+  }
 
   // Componente de Paginação
   const PaginationControls = () => (
-    <div className="flex items-center justify-end space-x-2 py-4">
-      <div className="flex-1 text-sm text-muted-foreground">
+    <div className="flex items-center justify-between py-2 border-t mt-auto shrink-0">
+      <div className="text-xs text-muted-foreground">
         Mostrando {dadosPaginados.currentItems.length} de{" "}
         {dadosPaginados.totalItems} registros
       </div>
-      <div className="space-x-2">
+      <div className="space-x-2 flex items-center">
         <Button
           variant="outline"
           size="sm"
+          className="h-8 w-8 p-0"
           onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
           disabled={currentPage === 1}
         >
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <div className="inline-flex items-center px-2 text-sm font-medium">
+        <div className="text-xs font-medium w-16 text-center">
           {currentPage} / {Math.max(1, dadosPaginados.totalPages)}
         </div>
         <Button
           variant="outline"
           size="sm"
+          className="h-8 w-8 p-0"
           onClick={() =>
             setCurrentPage((p) => Math.min(dadosPaginados.totalPages, p + 1))
           }
@@ -320,18 +341,18 @@ export default function EventosPage() {
     </div>
   );
 
-  // Componente de Filtro de Data Avançado ("Excel-like")
+  // Componente de Filtro de Data
   const DateFilter = () => (
     <Popover>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
           className={cn(
-            "h-9 border-dashed",
+            "h-9 border-dashed text-xs px-3",
             !dateRange && "text-muted-foreground",
           )}
         >
-          <CalendarIcon className="mr-2 h-4 w-4" />
+          <CalendarIcon className="mr-2 h-3.5 w-3.5" />
           {dateRange?.from ? (
             dateRange.to ? (
               <>
@@ -342,16 +363,15 @@ export default function EventosPage() {
               format(dateRange.from, "dd/MM/yyyy")
             )
           ) : (
-            <span>Filtrar Data</span>
+            <span>Período</span>
           )}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
-        {" "}
         <Command>
-          <CommandInput placeholder="Buscar (Ex: Janeiro, 2026)..." />
+          <CommandInput placeholder="Buscar mês..." />
           <CommandList className={hideScrollClass}>
-            <CommandEmpty>Nenhum período encontrado.</CommandEmpty>
+            <CommandEmpty>Nenhum período.</CommandEmpty>
             <CommandGroup heading="Atalhos">
               <CommandItem
                 onSelect={() =>
@@ -361,7 +381,7 @@ export default function EventosPage() {
                   })
                 }
               >
-                <CalendarIcon className="mr-2 h-4 w-4" /> Este Mês
+                Este Mês
               </CommandItem>
               <CommandItem
                 onSelect={() =>
@@ -371,10 +391,10 @@ export default function EventosPage() {
                   })
                 }
               >
-                <CalendarIcon className="mr-2 h-4 w-4" /> Mês Passado
+                Mês Passado
               </CommandItem>
               <CommandItem onSelect={() => setDateRange(undefined)}>
-                <XCircle className="mr-2 h-4 w-4" /> Limpar Filtro
+                Limpar Filtro
               </CommandItem>
             </CommandGroup>
             <CommandSeparator />
@@ -393,15 +413,13 @@ export default function EventosPage() {
     </Popover>
   );
 
-  // =================================================================================
-  // RENDER: DETALHE DO LOTE
-  // =================================================================================
+  // RENDER DETALHE DO LOTE
   if (loteSelecionado) {
     return (
       <div
-        className={`space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300 ${hideScrollClass}`}
+        className={`flex flex-col h-[calc(100vh-2rem)] space-y-4 ${hideScrollClass}`}
       >
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between shrink-0">
           <div className="flex items-center gap-4">
             <Button
               variant="ghost"
@@ -431,18 +449,13 @@ export default function EventosPage() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExportar}
-              className="h-9"
-            >
+            <Button variant="outline" size="sm" onClick={handleExportar}>
               <Download className="mr-2 h-4 w-4" /> Exportar
             </Button>
             {loteSelecionado.status === "pendente" && (
               <Button
                 onClick={handleAprovarLoteInteiro}
-                className="bg-success hover:bg-success/90 text-white h-9"
+                className="bg-success hover:bg-success/90 text-white"
               >
                 <CheckCircle2 className="mr-2 h-4 w-4" />
                 Aprovar Tudo
@@ -451,74 +464,80 @@ export default function EventosPage() {
           </div>
         </div>
 
-        <div className="border rounded-md bg-background shadow-sm">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Código</TableHead>
-                <TableHead>Produto</TableHead>
-                <TableHead className="text-right">Qtd.</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead className="w-45">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {dadosPaginados.currentItems.map((evento: Evento) => (
-                <TableRow key={evento.id}>
-                  <TableCell className="font-mono text-xs text-muted-foreground">
-                    {evento.item?.codigoInterno}
-                  </TableCell>
-                  <TableCell className="font-medium text-sm">
-                    {evento.item?.nome}
-                  </TableCell>
-                  <TableCell className="text-right text-sm">
-                    {evento.quantidade} {evento.unidade}
-                  </TableCell>
-                  <TableCell className="text-right text-sm font-medium">
-                    {formatCurrency(
-                      (evento.custoSnapshot || 0) * evento.quantidade,
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Select
-                      value={
-                        evento.status === "enviado" ? "pendente" : evento.status
-                      }
-                      onValueChange={(v) =>
-                        handleStatusChange(
-                          evento.id,
-                          v === "pendente" ? "enviado" : v,
-                        )
-                      }
-                    >
-                      <SelectTrigger
-                        className={`h-8 w-full ${getStatusColor(evento.status)} border-transparent text-xs`}
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pendente">Pendente</SelectItem>
-                        <SelectItem value="aprovado">Aprovado</SelectItem>
-                        <SelectItem value="rejeitado">Rejeitado</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
+        <div className="flex-1 border rounded-md bg-card overflow-hidden relative shadow-sm">
+          <div
+            className={`absolute inset-0 overflow-y-auto ${hideScrollClass}`}
+          >
+            <Table>
+              <TableHeader className="sticky top-0 bg-card z-10 shadow-sm">
+                <TableRow>
+                  <TableHead>Código</TableHead>
+                  <TableHead>Produto</TableHead>
+                  <TableHead className="text-right">Qtd.</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="w-45">Status</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {dadosPaginados.currentItems.map((evento: Evento) => (
+                  <TableRow key={evento.id}>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {evento.item?.codigoInterno}
+                    </TableCell>
+                    <TableCell className="font-medium text-sm">
+                      {evento.item?.nome}
+                    </TableCell>
+                    <TableCell className="text-right text-sm">
+                      {evento.quantidade} {evento.unidade}
+                    </TableCell>
+                    <TableCell className="text-right text-sm font-medium">
+                      {formatCurrency(
+                        (evento.custoSnapshot || 0) * evento.quantidade,
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Select
+                        value={
+                          evento.status === "enviado"
+                            ? "pendente"
+                            : evento.status
+                        }
+                        onValueChange={(v) =>
+                          handleStatusChange(
+                            evento.id,
+                            v === "pendente" ? "enviado" : v,
+                          )
+                        }
+                      >
+                        <SelectTrigger
+                          className={`h-8 w-full ${getStatusColor(evento.status)} border-transparent text-xs`}
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pendente">Pendente</SelectItem>
+                          <SelectItem value="aprovado">Aprovado</SelectItem>
+                          <SelectItem value="rejeitado">Rejeitado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </div>
         <PaginationControls />
       </div>
     );
   }
 
-  // =================================================================================
-  // RENDER: PÁGINA PRINCIPAL
-  // =================================================================================
+  // RENDER PÁGINA PRINCIPAL
   return (
-    <div className={`space-y-6 ${hideScrollClass}`}>
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div
+      className={`flex flex-col h-[calc(100vh-2rem)] space-y-4 overflow-hidden ${hideScrollClass}`}
+    >
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
             Histórico de Perdas
@@ -533,10 +552,9 @@ export default function EventosPage() {
             variant="outline"
             size="sm"
             onClick={handleExportar}
-            className="h-8"
+            className="h-9"
           >
-            <Download className="mr-2 h-3.5 w-3.5" />
-            Exportar
+            <Download className="mr-2 h-3.5 w-3.5" /> Exportar
           </Button>
 
           <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg border">
@@ -573,9 +591,8 @@ export default function EventosPage() {
         </div>
       </div>
 
-      {/* BARRA DE FILTROS UNIFICADA */}
-      <div className="flex flex-col md:flex-row gap-4 items-end">
-        {/* Busca por Texto (Apenas para Lista ou se quiser buscar lotes por nome de autor) */}
+      {/* FILTROS */}
+      <div className="flex flex-col md:flex-row gap-3 items-end shrink-0 bg-background z-10 py-1">
         <div className="flex-1 w-full">
           <span className="text-xs font-medium mb-1.5 block text-muted-foreground ml-1">
             Buscar
@@ -591,7 +608,6 @@ export default function EventosPage() {
           </div>
         </div>
 
-        {/* Filtro de Status (Agora disponível sempre) */}
         <div className="w-full md:w-48">
           <span className="text-xs font-medium mb-1.5 block text-muted-foreground ml-1">
             Status
@@ -609,17 +625,13 @@ export default function EventosPage() {
           </Select>
         </div>
 
-        {/* Filtro de Data (Visível na barra apenas em modo Pastas, pois na lista fica na coluna) */}
-        {viewMode === "pastas" && (
-          <div className="w-full md:w-auto">
-            <span className="text-xs font-medium mb-1.5 block text-muted-foreground ml-1">
-              Período
-            </span>
-            <DateFilter />
-          </div>
-        )}
+        <div className="w-full md:w-auto">
+          <span className="text-xs font-medium mb-1.5 block text-muted-foreground ml-1">
+            Período
+          </span>
+          <DateFilter />
+        </div>
 
-        {/* Limpar filtros */}
         {(dateRange || globalSearch || statusFilter !== "todos") && (
           <Button
             variant="ghost"
@@ -629,170 +641,154 @@ export default function EventosPage() {
               setGlobalSearch("");
               setStatusFilter("todos");
             }}
-            className="text-muted-foreground h-9"
+            className="text-muted-foreground h-9 self-end"
           >
             Limpar
           </Button>
         )}
       </div>
 
-      {/* CONTEÚDO PRINCIPAL */}
-      {viewMode === "pastas" ? (
-        // === VIEW 1: LOTES RETANGULARES ===
-        <>
-          <div className="flex flex-col gap-2">
-            {dadosPaginados.currentItems.map((lote: LoteDiario) => (
-              <div
-                key={lote.data}
-                className="group flex items-center justify-between p-3 rounded-md border bg-background hover:bg-muted/40 hover:border-primary/30 transition-all cursor-pointer shadow-sm"
-                onClick={() => setLoteSelecionado(lote)}
-              >
-                <div className="flex items-center gap-4">
-                  <div
-                    className={cn(
-                      "flex h-9 w-9 items-center justify-center rounded-full border",
-                      lote.status === "aprovado"
-                        ? "bg-success/10 text-success border-success/20"
-                        : lote.status === "rejeitado"
-                          ? "bg-destructive/10 text-destructive border-destructive/20"
-                          : "bg-muted text-muted-foreground",
-                    )}
-                  >
-                    <FileText className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold">{lote.data}</h3>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>{lote.autor}</span>
-                      <span>•</span>
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "h-4 px-1 text-[10px] border-0 bg-transparent p-0 font-normal",
-                          lote.status === "aprovado"
-                            ? "text-success"
-                            : lote.status === "rejeitado"
-                              ? "text-destructive"
-                              : "text-muted-foreground",
-                        )}
-                      >
-                        {lote.status.toUpperCase()}
-                      </Badge>
+      {/* CONTEÚDO */}
+      <div className="flex-1 min-h-0 border rounded-md bg-card relative overflow-hidden shadow-sm">
+        <div
+          className={`absolute inset-0 overflow-y-auto ${hideScrollClass} p-2`}
+        >
+          {viewMode === "pastas" ? (
+            <div className="flex flex-col gap-2">
+              {dadosPaginados.currentItems.map((lote: LoteDiario) => (
+                <div
+                  key={lote.data}
+                  className="group flex items-center justify-between p-3 rounded-md border bg-background hover:bg-muted/40 hover:border-primary/30 transition-all cursor-pointer shadow-sm"
+                  onClick={() => setLoteSelecionado(lote)}
+                >
+                  <div className="flex items-center gap-4">
+                    <div
+                      className={cn(
+                        "flex h-9 w-9 items-center justify-center rounded-full border",
+                        lote.status === "aprovado"
+                          ? "bg-success/10 text-success border-success/20"
+                          : lote.status === "rejeitado"
+                            ? "bg-destructive/10 text-destructive border-destructive/20"
+                            : "bg-muted text-muted-foreground",
+                      )}
+                    >
+                      <FileText className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold">{lote.data}</h3>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>{lote.autor}</span>
+                        <span>•</span>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "h-4 px-1 text-[10px] border-0 bg-transparent p-0 font-normal",
+                            lote.status === "aprovado"
+                              ? "text-success"
+                              : lote.status === "rejeitado"
+                                ? "text-destructive"
+                                : "text-muted-foreground",
+                          )}
+                        >
+                          {lote.status.toUpperCase()}
+                        </Badge>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="flex items-center gap-6 md:gap-12">
-                  <div className="hidden md:block text-right">
-                    <p className="text-[10px] text-muted-foreground uppercase">
-                      Itens
-                    </p>
-                    <p className="text-sm font-medium">{lote.eventos.length}</p>
+                  <div className="flex items-center gap-6 md:gap-12">
+                    <div className="hidden md:block text-right">
+                      <p className="text-[10px] text-muted-foreground uppercase">
+                        Itens
+                      </p>
+                      <p className="text-sm font-medium">
+                        {lote.eventos.length}
+                      </p>
+                    </div>
+                    <div className="text-right min-w-20">
+                      <p className="text-[10px] text-muted-foreground uppercase">
+                        Total
+                      </p>
+                      <p className="text-sm font-bold">
+                        {formatCurrency(lote.totalCusto)}
+                      </p>
+                    </div>
+                    <ChevronRightSquare className="h-5 w-5 text-muted-foreground/30 group-hover:text-primary/50 transition-colors" />
                   </div>
-                  <div className="text-right min-w-20">
-                    <p className="text-[10px] text-muted-foreground uppercase">
-                      Total
-                    </p>
-                    <p className="text-sm font-bold">
-                      {formatCurrency(lote.totalCusto)}
-                    </p>
-                  </div>
-                  <ChevronRightSquare className="h-5 w-5 text-muted-foreground/30 group-hover:text-primary/50 transition-colors" />
                 </div>
-              </div>
-            ))}
-          </div>
-          {dadosPaginados.totalItems === 0 && (
-            <div className="py-12 text-center text-muted-foreground border border-dashed rounded-lg bg-muted/5">
-              Nenhum lote encontrado.
-            </div>
-          )}
-          <PaginationControls />
-        </>
-      ) : (
-        // === VIEW 2: LISTA COMPLETA ===
-        <div className="border rounded-md bg-background shadow-sm">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {/* COLUNA DATA AGORA É O FILTRO */}
-                <TableHead className="w-45">
-                  <div className="flex items-center gap-2">
-                    Data
-                    <DateFilter />
-                  </div>
-                </TableHead>
-
-                <TableHead>Código</TableHead>
-                <TableHead>Produto</TableHead>
-                <TableHead className="text-right">Qtd.</TableHead>
-                <TableHead className="text-right">Total</TableHead>
-                <TableHead className="w-45">Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {dadosPaginados.currentItems.map((evento: Evento) => (
-                <TableRow key={evento.id}>
-                  <TableCell className="text-xs whitespace-nowrap text-muted-foreground">
-                    {formatDate(evento.dataHora)}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-muted-foreground">
-                    {evento.item?.codigoInterno}
-                  </TableCell>
-                  <TableCell className="font-medium text-sm">
-                    {evento.item?.nome}
-                  </TableCell>
-                  <TableCell className="text-right text-sm">
-                    {evento.quantidade} {evento.unidade}
-                  </TableCell>
-                  <TableCell className="text-right text-sm font-medium">
-                    {formatCurrency(
-                      (evento.custoSnapshot || 0) * evento.quantidade,
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <Select
-                      value={
-                        evento.status === "enviado" ? "pendente" : evento.status
-                      }
-                      onValueChange={(v) =>
-                        handleStatusChange(
-                          evento.id,
-                          v === "pendente" ? "enviado" : v,
-                        )
-                      }
-                    >
-                      <SelectTrigger
-                        className={`h-8 w-full ${getStatusColor(evento.status)} border-transparent text-xs`}
-                      >
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pendente">Pendente</SelectItem>
-                        <SelectItem value="aprovado">Aprovado</SelectItem>
-                        <SelectItem value="rejeitado">Rejeitado</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                </TableRow>
               ))}
               {dadosPaginados.totalItems === 0 && (
-                <TableRow>
-                  <TableCell
-                    colSpan={6}
-                    className="h-24 text-center text-muted-foreground"
-                  >
-                    Nenhum item corresponde aos filtros.
-                  </TableCell>
-                </TableRow>
+                <div className="py-12 text-center text-muted-foreground border border-dashed rounded-lg bg-muted/5">
+                  Nenhum lote encontrado.
+                </div>
               )}
-            </TableBody>
-          </Table>
-          <div className="border-t px-4">
-            <PaginationControls />
-          </div>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader className="sticky top-0 bg-card z-10 shadow-sm">
+                <TableRow>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Código</TableHead>
+                  <TableHead>Produto</TableHead>
+                  <TableHead className="text-right">Qtd.</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="w-45">Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {dadosPaginados.currentItems.map((evento: Evento) => (
+                  <TableRow key={evento.id}>
+                    <TableCell className="text-xs whitespace-nowrap text-muted-foreground">
+                      {formatDate(evento.dataHora)}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">
+                      {evento.item?.codigoInterno}
+                    </TableCell>
+                    <TableCell className="font-medium text-sm">
+                      {evento.item?.nome}
+                    </TableCell>
+                    <TableCell className="text-right text-sm">
+                      {evento.quantidade} {evento.unidade}
+                    </TableCell>
+                    <TableCell className="text-right text-sm font-medium">
+                      {formatCurrency(
+                        (evento.custoSnapshot || 0) * evento.quantidade,
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          evento.status === "aprovado"
+                            ? "default"
+                            : evento.status === "rejeitado"
+                              ? "destructive"
+                              : "secondary"
+                        }
+                      >
+                        {evento.status === "enviado"
+                          ? "Pendente"
+                          : evento.status}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {dadosPaginados.totalItems === 0 && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      className="h-24 text-center text-muted-foreground"
+                    >
+                      Nenhum item corresponde aos filtros.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          )}
         </div>
-      )}
+      </div>
+
+      <PaginationControls />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -25,11 +25,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { mockItems, Item, categorias, formatCurrency } from "@/lib/mock-data";
+import { Item, categorias, formatCurrency } from "@/lib/mock-data";
 import { parseItemsCSV } from "@/lib/csv-parser";
 import { useAuth } from "@/lib/auth-context";
-// Importando o novo componente
 import { ItemFormDialog } from "@/components/catalogo/item-form-dialog";
+import { StorageService } from "@/lib/storage"; // <-- Importar
 import {
   Search,
   Plus,
@@ -56,8 +56,8 @@ const hideScrollClass =
 export default function CatalogoPage() {
   const { hasPermission } = useAuth();
 
-  // Estado de Dados
-  const [items, setItems] = useState<Item[]>(mockItems);
+  // Estado de Dados (Começa vazio)
+  const [items, setItems] = useState<Item[]>([]);
 
   // Filtros
   const [searchQuery, setSearchQuery] = useState("");
@@ -75,6 +75,11 @@ export default function CatalogoPage() {
   const [isImporting, setIsImporting] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // --- CARREGAR DADOS DO STORAGE ---
+  useEffect(() => {
+    setItems(StorageService.getItems());
+  }, []);
 
   // --- LÓGICA DE FILTRAGEM ---
   const filteredItems = useMemo(() => {
@@ -134,7 +139,12 @@ export default function CatalogoPage() {
     try {
       const newItems = await parseItemsCSV(file);
       if (newItems.length > 0) {
-        setItems((prev) => [...newItems, ...prev]);
+        // Salva cada item novo no Storage
+        newItems.forEach((item) => StorageService.saveItem(item));
+
+        // Atualiza estado local
+        setItems(StorageService.getItems());
+
         toast.success(`${newItems.length} itens importados!`);
       } else {
         toast.warning("Arquivo inválido ou vazio.");
@@ -152,11 +162,12 @@ export default function CatalogoPage() {
   const handleSaveItem = (itemData: Partial<Item>) => {
     if (editingItem) {
       // Editar existente
-      setItems((prev) =>
-        prev.map((i) =>
-          i.id === editingItem.id ? ({ ...i, ...itemData } as Item) : i,
-        ),
-      );
+      const updatedItem = { ...editingItem, ...itemData } as Item;
+
+      // Salva no Storage
+      StorageService.saveItem(updatedItem);
+      setItems(StorageService.getItems());
+
       toast.success("Item atualizado!");
     } else {
       // Criar novo
@@ -164,7 +175,11 @@ export default function CatalogoPage() {
         id: Math.random().toString(36).substr(2, 9),
         ...itemData,
       } as Item;
-      setItems((prev) => [newItem, ...prev]);
+
+      // Salva no Storage
+      StorageService.saveItem(newItem);
+      setItems(StorageService.getItems());
+
       toast.success("Item criado com sucesso!");
     }
   };

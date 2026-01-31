@@ -1,3 +1,5 @@
+// app/(dashboard)/eventos/novo/page.tsx
+// Essa página é similar a app/(dashboard)/eventos/page.tsx, mas para criação de novos eventos
 "use client";
 
 import { useState } from "react";
@@ -13,8 +15,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ItemSearch } from "@/components/forms/item-search";
-import { Item, formatCurrency } from "@/lib/mock-data";
+import { Item, formatCurrency, Evento } from "@/lib/mock-data";
 import { useAuth } from "@/lib/auth-context";
+import { StorageService } from "@/lib/storage"; // Importar Storage
 import {
   Plus,
   Trash2,
@@ -52,11 +55,10 @@ interface ItemLancamento {
 
 export default function NovoEventoPage() {
   const router = useRouter();
-  const { hasPermission } = useAuth();
+  const { user, hasPermission } = useAuth(); // Pegar o usuário logado
 
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [quantidade, setQuantidade] = useState("");
-  // Unidade agora é derivada apenas do item selecionado, visualmente
   const [itemsList, setItemsList] = useState<ItemLancamento[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -92,6 +94,7 @@ export default function NovoEventoPage() {
   };
 
   const handleAddPhoto = (tempId: string) => {
+    // Em um app real, aqui abriria o input de arquivo ou câmera
     const mockPhoto =
       "https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=400";
     setItemsList(
@@ -100,20 +103,59 @@ export default function NovoEventoPage() {
         return entry;
       }),
     );
-    toast.success("Foto anexada");
+    toast.success("Foto anexada (Simulação)");
   };
 
   const handleSubmit = async () => {
-    if (itemsList.length === 0) return;
+    if (itemsList.length === 0 || !user) return;
+
     setIsSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 1500));
-    setIsSubmitting(false);
-    setShowSuccess(true);
+
+    // Simula delay de rede
+    await new Promise((resolve) => setTimeout(resolve, 800));
+
+    try {
+      // Cria e salva cada evento individualmente
+      itemsList.forEach((entry) => {
+        const novoEvento: Evento = {
+          id: Math.random().toString(36).substr(2, 9),
+          dataHora: new Date().toISOString(),
+          item: entry.item,
+          quantidade: entry.quantidade,
+          unidade: entry.unidade,
+          custoSnapshot: entry.item.custo, // Salva o custo no momento da perda
+          precoVendaSnapshot: entry.item.precoVenda,
+          motivo: "Perda Operacional", // Poderia ser um input extra
+          status: "enviado", // Status inicial padrão
+          criadoPor: user, // Usuário logado
+          evidencias: entry.fotoUrl
+            ? [
+                {
+                  id: Math.random().toString(36).substr(2, 9),
+                  url: entry.fotoUrl,
+                  dataUpload: new Date().toISOString(),
+                },
+              ]
+            : [],
+        };
+
+        StorageService.saveEvento(novoEvento);
+      });
+
+      setIsSubmitting(false);
+      setShowSuccess(true);
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao salvar eventos");
+      setIsSubmitting(false);
+    }
   };
 
   const handleSuccessClose = () => {
     setShowSuccess(false);
     setItemsList([]);
+    // Opcional: Redirecionar para a lista de eventos
+    // router.push('/eventos');
   };
 
   if (!hasPermission("eventos:criar")) {
@@ -126,9 +168,8 @@ export default function NovoEventoPage() {
   }
 
   return (
-    // Container Principal: Sem Scroll na Página (overflow-hidden) e altura ajustada para caber na tela
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 max-w-6xl mx-auto w-full overflow-hidden">
-      {/* 1. Header simples */}
+      {/* 1. Header */}
       <div className="flex items-center justify-between shrink-0 px-1">
         <div>
           <h1 className="text-xl font-bold tracking-tight">Registrar Perda</h1>
@@ -137,7 +178,9 @@ export default function NovoEventoPage() {
           </p>
         </div>
         <div className="text-right">
-          <span className="text-xs text-muted-foreground block">Total</span>
+          <span className="text-xs text-muted-foreground block">
+            Total Estimado
+          </span>
           <span className="text-xl font-bold text-primary">
             {formatCurrency(
               itemsList.reduce(
@@ -149,9 +192,8 @@ export default function NovoEventoPage() {
         </div>
       </div>
 
-      {/* 2. Área de Input (Tudo na mesma altura h-10) */}
+      {/* 2. Área de Input */}
       <div className="flex flex-col md:flex-row gap-3 items-end shrink-0 pb-2">
-        {/* Busca */}
         <div className="flex-1 w-full relative">
           <label className="text-xs font-medium text-muted-foreground mb-1.5 ml-1 block">
             Produto
@@ -165,7 +207,6 @@ export default function NovoEventoPage() {
           </div>
         </div>
 
-        {/* Quantidade e Unidade */}
         <div className="flex gap-2 w-full md:w-auto">
           <div className="w-28">
             <label className="text-xs font-medium text-muted-foreground mb-1.5 ml-1 block">
@@ -182,7 +223,6 @@ export default function NovoEventoPage() {
             />
           </div>
 
-          {/* Caixa de Unidade (Visual Apenas - Imitando Input) */}
           <div className="w-20">
             <label className="text-xs font-medium text-muted-foreground mb-1.5 ml-1 block">
               Unid.
@@ -193,7 +233,6 @@ export default function NovoEventoPage() {
           </div>
         </div>
 
-        {/* Botão Adicionar */}
         <Button
           onClick={handleAddItem}
           disabled={!selectedItem || !quantidade}
@@ -203,14 +242,12 @@ export default function NovoEventoPage() {
         </Button>
       </div>
 
-      {/* 3. Tabela com Rolagem Customizada e Coluna de Código */}
+      {/* 3. Tabela */}
       <div className="flex-1 border rounded-md overflow-hidden bg-background relative flex flex-col shadow-sm">
-        {/* Container da Tabela com Scroll Customizado */}
         <div className={`flex-1 ${customScrollbarClass}`}>
           <Table>
             <TableHeader className="sticky top-0 bg-background z-20 shadow-sm">
               <TableRow>
-                {/* NOVA COLUNA: Código */}
                 <TableHead className="w-30">Código</TableHead>
                 <TableHead className="w-auto">Produto</TableHead>
                 <TableHead className="text-right">Qtd.</TableHead>
@@ -223,18 +260,14 @@ export default function NovoEventoPage() {
               {itemsList.length > 0 ? (
                 itemsList.map((entry) => (
                   <TableRow key={entry.tempId} className="hover:bg-muted/50">
-                    {/* Célula do Código */}
                     <TableCell className="py-2 font-mono text-xs text-muted-foreground">
                       {entry.item.codigoInterno}
                     </TableCell>
-
-                    {/* Célula do Nome (Limpa) */}
                     <TableCell className="py-2">
                       <span className="font-medium text-sm">
                         {entry.item.nome}
                       </span>
                     </TableCell>
-
                     <TableCell className="text-right py-2 font-medium">
                       {entry.quantidade}{" "}
                       <span className="text-[10px] text-muted-foreground">
@@ -291,7 +324,6 @@ export default function NovoEventoPage() {
           </Table>
         </div>
 
-        {/* Footer da Tabela (Fixo embaixo) */}
         {itemsList.length > 0 && (
           <div className="p-3 bg-muted/20 border-t flex justify-end gap-3 shrink-0">
             <Button
@@ -309,23 +341,27 @@ export default function NovoEventoPage() {
               disabled={isSubmitting}
               className="px-8 font-semibold"
             >
-              <Send className="mr-2 h-3 w-3" />
-              Finalizar
+              {isSubmitting ? (
+                "Salvando..."
+              ) : (
+                <>
+                  <Send className="mr-2 h-3 w-3" /> Finalizar
+                </>
+              )}
             </Button>
           </div>
         )}
       </div>
 
-      {/* Success Dialog */}
       <Dialog open={showSuccess} onOpenChange={setShowSuccess}>
         <DialogContent className="sm:max-w-xs text-center">
           <DialogHeader>
             <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
               <CheckCircle2 className="h-5 w-5 text-primary" />
             </div>
-            <DialogTitle className="text-center">Registrado!</DialogTitle>
+            <DialogTitle className="text-center">Sucesso!</DialogTitle>
             <DialogDescription className="text-center text-xs">
-              Os itens foram salvos com sucesso.
+              As perdas foram registradas e enviadas para aprovação.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="sm:justify-center">

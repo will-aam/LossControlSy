@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -7,12 +8,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
+// MANTENHA ChartContainer e ChartTooltipContent
+import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 import {
   Area,
   AreaChart,
@@ -21,63 +18,147 @@ import {
   CartesianGrid,
   XAxis,
   YAxis,
-  ResponsiveContainer,
   Cell,
+  ResponsiveContainer,
+  Tooltip, // <--- IMPORTANTE: Importar Tooltip do Recharts aqui
 } from "recharts";
-import {
-  TrendingDown,
-  AlertTriangle,
-  Clock,
-  DollarSign,
-  Package,
-  ArrowRight,
-} from "lucide-react";
+import { TrendingDown, AlertTriangle, DollarSign, Package } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { dashboardStats, formatCurrency, mockItems } from "@/lib/mock-data";
+import { formatCurrency, Evento, Item } from "@/lib/mock-data";
 import { useAuth } from "@/lib/auth-context";
+import { StorageService } from "@/lib/storage";
 
 const chartConfig = {
   custo: {
     label: "Custo",
-    color: "var(--chart-1)",
+    color: "hsl(var(--chart-1))",
   },
   precoVenda: {
     label: "Preço Venda",
-    color: "var(--chart-2)",
+    color: "hsl(var(--chart-2))",
   },
 };
 
 const categoryColors = [
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
-  "var(--chart-5)",
-  "var(--chart-1)",
+  "hsl(var(--chart-1))",
+  "hsl(var(--chart-2))",
+  "hsl(var(--chart-3))",
+  "hsl(var(--chart-4))",
+  "hsl(var(--chart-5))",
 ];
 
 export default function DashboardPage() {
-  const { user, hasPermission } = useAuth();
+  const { hasPermission } = useAuth();
+
+  const [eventos, setEventos] = useState<Evento[]>([]);
+
+  // Carrega dados
+  useEffect(() => {
+    setEventos(StorageService.getEventos());
+  }, []);
+
+  // --- CÁLCULOS (Mantidos iguais) ---
+  const stats = useMemo(() => {
+    const hoje = new Date();
+    const inicioHoje = new Date(hoje.setHours(0, 0, 0, 0));
+    const inicioSemana = new Date(hoje);
+    inicioSemana.setDate(hoje.getDate() - 7);
+    const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+
+    let perdasHoje = { qtd: 0, custo: 0 };
+    let perdasSemana = { qtd: 0, custo: 0 };
+    let perdasMes = { qtd: 0, custo: 0, venda: 0 };
+
+    const perdasPorCatMap: Record<string, number> = {};
+    const topItensMap: Record<
+      string,
+      { item: Item; qtd: number; custo: number }
+    > = {};
+    const tendenciaMap: Record<string, { custo: number; venda: number }> = {};
+
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const diaKey = d.toLocaleDateString("pt-BR", { weekday: "short" });
+      tendenciaMap[diaKey] = { custo: 0, venda: 0 };
+    }
+
+    eventos.forEach((ev) => {
+      if (ev.status === "rascunho" || ev.status === "rejeitado") return;
+
+      const dataEv = new Date(ev.dataHora);
+      const custoTotal = (ev.custoSnapshot || 0) * ev.quantidade;
+      const vendaTotal = (ev.precoVendaSnapshot || 0) * ev.quantidade;
+
+      if (dataEv >= inicioHoje) {
+        perdasHoje.qtd += 1;
+        perdasHoje.custo += custoTotal;
+      }
+      if (dataEv >= inicioSemana) {
+        perdasSemana.qtd += 1;
+        perdasSemana.custo += custoTotal;
+        const diaKey = dataEv.toLocaleDateString("pt-BR", { weekday: "short" });
+        if (tendenciaMap[diaKey]) {
+          tendenciaMap[diaKey].custo += custoTotal;
+          tendenciaMap[diaKey].venda += vendaTotal;
+        }
+      }
+      if (dataEv >= inicioMes) {
+        perdasMes.qtd += 1;
+        perdasMes.custo += custoTotal;
+        perdasMes.venda += vendaTotal;
+
+        const cat = ev.item?.categoria || "Outros";
+        perdasPorCatMap[cat] = (perdasPorCatMap[cat] || 0) + custoTotal;
+
+        if (ev.item) {
+          if (!topItensMap[ev.item.id]) {
+            topItensMap[ev.item.id] = { item: ev.item, qtd: 0, custo: 0 };
+          }
+          topItensMap[ev.item.id].qtd += ev.quantidade;
+          topItensMap[ev.item.id].custo += custoTotal;
+        }
+      }
+    });
+
+    const perdasPorCategoria = Object.entries(perdasPorCatMap)
+      .map(([cat, val]) => ({ categoria: cat, custo: val }))
+      .sort((a, b) => b.custo - a.custo)
+      .slice(0, 5);
+
+    const topItens = Object.values(topItensMap)
+      .sort((a, b) => b.custo - a.custo)
+      .slice(0, 5);
+
+    const tendenciaSemanal = Object.entries(tendenciaMap).map(
+      ([dia, vals]) => ({
+        dia,
+        ...vals,
+      }),
+    );
+
+    return {
+      perdasHoje,
+      perdasSemana,
+      perdasMes,
+      perdasPorCategoria,
+      topItens,
+      tendenciaSemanal,
+    };
+  }, [eventos]);
 
   if (!hasPermission("dashboard:ver")) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <AlertTriangle className="h-12 w-12 text-muted-foreground" />
         <h2 className="text-xl font-semibold">Acesso Restrito</h2>
-        <p className="text-muted-foreground">
-          Você não tem permissão para visualizar o dashboard.
-        </p>
-        <Button asChild>
-          <Link href="/eventos/novo">Registrar Perda</Link>
-        </Button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-6 pb-8">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
@@ -87,38 +168,31 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Perdas Hoje</CardTitle>
             <TrendingDown className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {dashboardStats.perdasHoje.quantidade}
-            </div>
+            <div className="text-2xl font-bold">{stats.perdasHoje.qtd}</div>
             <p className="text-xs text-muted-foreground">
-              {formatCurrency(dashboardStats.perdasHoje.custo)} em custo
+              {formatCurrency(stats.perdasHoje.custo)} em custo
             </p>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Perdas Semana</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {dashboardStats.perdasSemana.quantidade}
-            </div>
+            <div className="text-2xl font-bold">{stats.perdasSemana.qtd}</div>
             <p className="text-xs text-muted-foreground">
-              {formatCurrency(dashboardStats.perdasSemana.custo)} em custo
+              {formatCurrency(stats.perdasSemana.custo)} em custo
             </p>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Custo Mensal</CardTitle>
@@ -126,24 +200,23 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {formatCurrency(dashboardStats.perdasMes.custo)}
+              {formatCurrency(stats.perdasMes.custo)}
             </div>
             <p className="text-xs text-muted-foreground">
-              {dashboardStats.perdasMes.quantidade} eventos
+              {stats.perdasMes.qtd} eventos aprovados/enviados
             </p>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">
-              Perda em Venda
+              Perda em Venda (Mês)
             </CardTitle>
             <AlertTriangle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-destructive">
-              {formatCurrency(dashboardStats.perdasMes.precoVenda)}
+              {formatCurrency(stats.perdasMes.venda)}
             </div>
             <p className="text-xs text-muted-foreground">
               potencial não realizado
@@ -152,40 +225,44 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Charts Row */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* Tendência Semanal */}
-        <Card>
+      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+        {/* Gráfico 1: Tendência */}
+        <Card className="col-span-1">
           <CardHeader>
             <CardTitle>Tendência Semanal</CardTitle>
-            <CardDescription>
-              Comparativo de custo vs. preço de venda
-            </CardDescription>
+            <CardDescription>Custo vs. Preço de Venda</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={chartConfig} className="h-75">
-              <AreaChart data={dashboardStats.tendenciaSemanal}>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  className="stroke-border"
+            <ChartContainer config={chartConfig} className="h-75 w-full">
+              <AreaChart data={stats.tendenciaSemanal}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis
+                  dataKey="dia"
+                  tickLine={false}
+                  axisLine={false}
+                  tickMargin={8}
                 />
-                <XAxis dataKey="dia" className="text-xs" />
-                <YAxis className="text-xs" tickFormatter={(v) => `R$${v}`} />
-                <ChartTooltip content={<ChartTooltipContent />} />
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(v) => `R$${v}`}
+                />
+                {/* AQUI ESTAVA O ERRO: Use Tooltip do Recharts com o conteúdo customizado */}
+                <Tooltip content={<ChartTooltipContent />} />
                 <Area
                   type="monotone"
                   dataKey="custo"
-                  stroke="var(--chart-1)"
-                  fill="var(--chart-1)"
-                  fillOpacity={0.3}
+                  stroke="var(--color-custo)"
+                  fill="var(--color-custo)"
+                  fillOpacity={0.2}
                   strokeWidth={2}
                 />
                 <Area
                   type="monotone"
-                  dataKey="precoVenda"
-                  stroke="var(--chart-2)"
-                  fill="var(--chart-2)"
-                  fillOpacity={0.3}
+                  dataKey="venda"
+                  stroke="var(--color-precoVenda)"
+                  fill="var(--color-precoVenda)"
+                  fillOpacity={0.2}
                   strokeWidth={2}
                 />
               </AreaChart>
@@ -193,39 +270,32 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Perdas por Categoria */}
-        <Card>
+        {/* Gráfico 2: Categorias */}
+        <Card className="col-span-1">
           <CardHeader>
-            <CardTitle>Perdas por Categoria</CardTitle>
-            <CardDescription>
-              Distribuição de custos por categoria
-            </CardDescription>
+            <CardTitle>Top Categorias (Mês)</CardTitle>
+            <CardDescription>Onde estamos perdendo mais?</CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={chartConfig} className="h-75">
+            <ChartContainer config={chartConfig} className="h-75 w-full">
               <BarChart
-                data={dashboardStats.perdasPorCategoria}
+                data={stats.perdasPorCategoria}
                 layout="vertical"
+                margin={{ left: 0 }}
               >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  className="stroke-border"
-                  horizontal={false}
-                />
-                <XAxis
-                  type="number"
-                  className="text-xs"
-                  tickFormatter={(v) => `R$${v}`}
-                />
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} />
                 <YAxis
                   dataKey="categoria"
                   type="category"
-                  className="text-xs"
-                  width={80}
+                  tickLine={false}
+                  axisLine={false}
+                  width={100}
+                  className="text-xs font-medium"
                 />
-                <ChartTooltip content={<ChartTooltipContent />} />
+                <XAxis type="number" hide />
+                <Tooltip content={<ChartTooltipContent />} />
                 <Bar dataKey="custo" radius={4}>
-                  {dashboardStats.perdasPorCategoria.map((_, index) => (
+                  {stats.perdasPorCategoria.map((_, index) => (
                     <Cell
                       key={`cell-${index}`}
                       fill={categoryColors[index % categoryColors.length]}
@@ -238,47 +308,56 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Top Items Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Top 5 Itens com Maior Perda</CardTitle>
-          <CardDescription>
-            Itens que mais geraram perdas no período
-          </CardDescription>
+          <CardTitle>Top 5 Itens Críticos (Mês)</CardTitle>
+          <CardDescription>Itens que mais geraram prejuízo</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {dashboardStats.topItens.map((entry, index) => (
-              <div
-                key={entry.item.id}
-                className="flex items-center gap-4 rounded-lg border p-3"
-              >
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-sm font-medium">
-                  #{index + 1}
+            {stats.topItens.length > 0 ? (
+              stats.topItens.map((entry, index) => (
+                <div
+                  key={entry.item.id}
+                  className="flex flex-col sm:flex-row sm:items-center gap-4 rounded-lg border p-3"
+                >
+                  <div className="flex items-center gap-4 flex-1">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-sm font-medium shrink-0">
+                      #{index + 1}
+                    </div>
+                    {entry.item.imagemUrl ? (
+                      <img
+                        src={entry.item.imagemUrl}
+                        alt={entry.item.nome}
+                        className="h-10 w-10 rounded-lg object-cover shrink-0"
+                      />
+                    ) : (
+                      <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                        <Package className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium truncate">{entry.item.nome}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {entry.item.codigoInterno}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex justify-between sm:block sm:text-right pl-14 sm:pl-0">
+                    <p className="font-medium">
+                      {entry.qtd} {entry.item.unidade}
+                    </p>
+                    <p className="text-sm text-destructive font-bold">
+                      {formatCurrency(entry.custo)}
+                    </p>
+                  </div>
                 </div>
-                {entry.item.imagemUrl && (
-                  <img
-                    src={entry.item.imagemUrl || "/placeholder.svg"}
-                    alt={entry.item.nome}
-                    className="h-10 w-10 rounded-lg object-cover"
-                  />
-                )}
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{entry.item.nome}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {entry.item.codigoInterno} - {entry.item.categoria}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="font-medium">
-                    {entry.quantidade} {entry.item.unidade}
-                  </p>
-                  <p className="text-sm text-destructive">
-                    {formatCurrency(entry.custo)}
-                  </p>
-                </div>
+              ))
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                Nenhuma perda registrada neste mês.
               </div>
-            ))}
+            )}
           </div>
         </CardContent>
       </Card>
