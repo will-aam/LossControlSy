@@ -13,7 +13,7 @@ import {
   Images,
   BarChart3,
   Settings,
-  AlertTriangle,
+  Tags,
   ChevronDown,
   LogOut,
 } from "lucide-react";
@@ -52,6 +52,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Images,
   BarChart3,
   Settings,
+  Tags,
 };
 
 const roleColors: Record<UserRole, string> = {

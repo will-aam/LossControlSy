@@ -1,24 +1,24 @@
-'use client'
+"use client";
 
-import { useState, useMemo } from 'react'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
+import { useState, useMemo } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select'
+} from "@/components/ui/select";
 import {
   mockEventos,
   mockEvidencias,
@@ -28,8 +28,8 @@ import {
   formatDateTime,
   getStatusLabel,
   getStatusColor,
-} from '@/lib/mock-data'
-import { useAuth } from '@/lib/auth-context'
+} from "@/lib/mock-data";
+import { useAuth } from "@/lib/auth-context";
 import {
   Search,
   Calendar,
@@ -40,101 +40,113 @@ import {
   Download,
   Package,
   X,
-} from 'lucide-react'
+} from "lucide-react";
 
 interface EvidenciaWithEvento extends Evidencia {
-  evento?: Evento
+  evento?: Evento;
 }
 
 export default function GaleriaPage() {
-  const { hasPermission } = useAuth()
-  const [selectedDate, setSelectedDate] = useState<string>('todas')
-  const [searchQuery, setSearchQuery] = useState('')
-  const [selectedPhoto, setSelectedPhoto] = useState<EvidenciaWithEvento | null>(null)
-  const [photoIndex, setPhotoIndex] = useState(0)
+  const { hasPermission } = useAuth();
+  const [selectedDate, setSelectedDate] = useState<string>("todas");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedPhoto, setSelectedPhoto] =
+    useState<EvidenciaWithEvento | null>(null);
+  const [photoIndex, setPhotoIndex] = useState(0);
 
   // Build evidencias with evento references
   const evidenciasWithEventos: EvidenciaWithEvento[] = useMemo(() => {
-    const result: EvidenciaWithEvento[] = []
-    
-    mockEventos.forEach(evento => {
-      evento.evidencias.forEach(ev => {
+    const result: EvidenciaWithEvento[] = [];
+
+    mockEventos.forEach((evento) => {
+      evento.evidencias.forEach((ev) => {
         result.push({
           ...ev,
           evento,
-        })
-      })
-    })
-    
+        });
+      });
+    });
+
     // Add orphan evidencias
-    mockEvidencias.forEach(ev => {
-      if (!result.find(e => e.id === ev.id)) {
-        result.push(ev)
+    mockEvidencias.forEach((ev) => {
+      if (!result.find((e) => e.id === ev.id)) {
+        result.push(ev);
       }
-    })
-    
-    return result.sort((a, b) => 
-      new Date(b.dataUpload).getTime() - new Date(a.dataUpload).getTime()
-    )
-  }, [])
+    });
+
+    return result.sort(
+      (a, b) =>
+        new Date(b.dataUpload).getTime() - new Date(a.dataUpload).getTime(),
+    );
+  }, []);
 
   // Get unique dates for filter
   const uniqueDates = useMemo(() => {
-    const dates = new Set<string>()
-    evidenciasWithEventos.forEach(ev => {
-      dates.add(formatDate(ev.dataUpload))
-    })
+    const dates = new Set<string>();
+    evidenciasWithEventos.forEach((ev) => {
+      dates.add(formatDate(ev.dataUpload));
+    });
     return Array.from(dates).sort((a, b) => {
-      const [da, ma, ya] = a.split('/')
-      const [db, mb, yb] = b.split('/')
-      return new Date(`${yb}-${mb}-${db}`).getTime() - new Date(`${ya}-${ma}-${da}`).getTime()
-    })
-  }, [evidenciasWithEventos])
+      const [da, ma, ya] = a.split("/");
+      const [db, mb, yb] = b.split("/");
+      return (
+        new Date(`${yb}-${mb}-${db}`).getTime() -
+        new Date(`${ya}-${ma}-${da}`).getTime()
+      );
+    });
+  }, [evidenciasWithEventos]);
 
   const filteredEvidencias = useMemo(() => {
-    let filtered = evidenciasWithEventos
+    let filtered = evidenciasWithEventos;
 
-    if (selectedDate !== 'todas') {
-      filtered = filtered.filter(ev => formatDate(ev.dataUpload) === selectedDate)
+    if (selectedDate !== "todas") {
+      filtered = filtered.filter(
+        (ev) => formatDate(ev.dataUpload) === selectedDate,
+      );
     }
 
     if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(ev =>
-        ev.evento?.item?.nome.toLowerCase().includes(query) ||
-        ev.evento?.item?.codigoInterno.toLowerCase().includes(query) ||
-        ev.evento?.motivo?.toLowerCase().includes(query)
-      )
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (ev) =>
+          ev.evento?.item?.nome.toLowerCase().includes(query) ||
+          ev.evento?.item?.codigoInterno.toLowerCase().includes(query) ||
+          ev.evento?.motivo?.toLowerCase().includes(query),
+      );
     }
 
-    return filtered
-  }, [evidenciasWithEventos, selectedDate, searchQuery])
+    return filtered;
+  }, [evidenciasWithEventos, selectedDate, searchQuery]);
 
   const handlePhotoClick = (photo: EvidenciaWithEvento, index: number) => {
-    setSelectedPhoto(photo)
-    setPhotoIndex(index)
-  }
+    setSelectedPhoto(photo);
+    setPhotoIndex(index);
+  };
 
   const handlePrevPhoto = () => {
-    const newIndex = photoIndex > 0 ? photoIndex - 1 : filteredEvidencias.length - 1
-    setSelectedPhoto(filteredEvidencias[newIndex])
-    setPhotoIndex(newIndex)
-  }
+    const newIndex =
+      photoIndex > 0 ? photoIndex - 1 : filteredEvidencias.length - 1;
+    setSelectedPhoto(filteredEvidencias[newIndex]);
+    setPhotoIndex(newIndex);
+  };
 
   const handleNextPhoto = () => {
-    const newIndex = photoIndex < filteredEvidencias.length - 1 ? photoIndex + 1 : 0
-    setSelectedPhoto(filteredEvidencias[newIndex])
-    setPhotoIndex(newIndex)
-  }
+    const newIndex =
+      photoIndex < filteredEvidencias.length - 1 ? photoIndex + 1 : 0;
+    setSelectedPhoto(filteredEvidencias[newIndex]);
+    setPhotoIndex(newIndex);
+  };
 
-  if (!hasPermission('galeria:ver')) {
+  if (!hasPermission("galeria:ver")) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <AlertTriangle className="h-12 w-12 text-muted-foreground" />
         <h2 className="text-xl font-semibold">Acesso Restrito</h2>
-        <p className="text-muted-foreground">Você não tem permissão para ver a galeria.</p>
+        <p className="text-muted-foreground">
+          Você não tem permissão para ver a galeria.
+        </p>
       </div>
-    )
+    );
   }
 
   return (
@@ -142,7 +154,7 @@ export default function GaleriaPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Galeria de Evidências</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Galeria</h1>
           <p className="text-muted-foreground">
             Visualize todas as fotos de evidência registradas
           </p>
@@ -171,8 +183,10 @@ export default function GaleriaPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="todas">Todas as datas</SelectItem>
-            {uniqueDates.map(date => (
-              <SelectItem key={date} value={date}>{date}</SelectItem>
+            {uniqueDates.map((date) => (
+              <SelectItem key={date} value={date}>
+                {date}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -195,10 +209,10 @@ export default function GaleriaPage() {
                     className="h-full w-full object-cover transition-transform group-hover:scale-105"
                   />
                 </div>
-                <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                <div className="absolute inset-0 bg-linear-to-trom-background/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
                   <div className="absolute bottom-0 left-0 right-0 p-2">
                     <p className="text-xs font-medium truncate">
-                      {evidencia.evento?.item?.nome || 'Sem item'}
+                      {evidencia.evento?.item?.nome || "Sem item"}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {formatDate(evidencia.dataUpload)}
@@ -225,7 +239,10 @@ export default function GaleriaPage() {
       )}
 
       {/* Photo Viewer Dialog */}
-      <Dialog open={!!selectedPhoto} onOpenChange={(open) => !open && setSelectedPhoto(null)}>
+      <Dialog
+        open={!!selectedPhoto}
+        onOpenChange={(open) => !open && setSelectedPhoto(null)}
+      >
         <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden">
           <div className="relative">
             {/* Close button */}
@@ -279,7 +296,10 @@ export default function GaleriaPage() {
                     <div className="flex items-center gap-3">
                       {selectedPhoto.evento.item?.imagemUrl ? (
                         <img
-                          src={selectedPhoto.evento.item.imagemUrl || "/placeholder.svg"}
+                          src={
+                            selectedPhoto.evento.item.imagemUrl ||
+                            "/placeholder.svg"
+                          }
                           alt={selectedPhoto.evento.item.nome}
                           className="h-12 w-12 rounded object-cover"
                         />
@@ -290,20 +310,28 @@ export default function GaleriaPage() {
                       )}
                       <div>
                         <p className="font-medium">
-                          {selectedPhoto.evento.item?.nome || 'Item não vinculado'}
+                          {selectedPhoto.evento.item?.nome ||
+                            "Item não vinculado"}
                         </p>
                         <div className="flex items-center gap-2 mt-1">
-                          <Badge className={getStatusColor(selectedPhoto.evento.status)}>
+                          <Badge
+                            className={getStatusColor(
+                              selectedPhoto.evento.status,
+                            )}
+                          >
                             {getStatusLabel(selectedPhoto.evento.status)}
                           </Badge>
                           <span className="text-sm text-muted-foreground">
-                            {selectedPhoto.evento.quantidade} {selectedPhoto.evento.unidade}
+                            {selectedPhoto.evento.quantidade}{" "}
+                            {selectedPhoto.evento.unidade}
                           </span>
                         </div>
                       </div>
                     </div>
                   ) : (
-                    <p className="text-muted-foreground">Foto sem evento vinculado</p>
+                    <p className="text-muted-foreground">
+                      Foto sem evento vinculado
+                    </p>
                   )}
                 </div>
                 <div className="text-right">
@@ -317,7 +345,8 @@ export default function GaleriaPage() {
               </div>
               {selectedPhoto.evento?.motivo && (
                 <p className="text-sm text-muted-foreground mt-3 pt-3 border-t">
-                  <span className="font-medium text-foreground">Motivo:</span> {selectedPhoto.evento.motivo}
+                  <span className="font-medium text-foreground">Motivo:</span>{" "}
+                  {selectedPhoto.evento.motivo}
                 </p>
               )}
             </div>
@@ -325,5 +354,5 @@ export default function GaleriaPage() {
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

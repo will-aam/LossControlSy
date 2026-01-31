@@ -8,6 +8,7 @@ export type Permission =
   | "eventos:editar"
   | "eventos:exportar"
   | "catalogo:ver"
+  | "categorias:ver"
   | "catalogo:criar"
   | "catalogo:editar"
   | "galeria:ver"
@@ -25,6 +26,7 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     "eventos:editar",
     "catalogo:ver",
     "catalogo:criar",
+    "categorias:ver",
     "catalogo:editar",
     "galeria:ver",
     "relatorios:ver",
@@ -34,6 +36,7 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     "eventos:ver_todos",
     "eventos:exportar",
     "catalogo:ver",
+    "categorias:ver",
     "galeria:ver",
     "relatorios:ver",
     "dashboard:ver",
@@ -95,6 +98,19 @@ export const navItems: NavItem[] = [
     href: "/catalogo",
     icon: "Package",
     permission: "catalogo:ver",
+  },
+  {
+    title: "Catálogo",
+    href: "/catalogo",
+    icon: "Package",
+    permission: "catalogo:ver",
+  },
+  // ADICIONE ISTO AQUI:
+  {
+    title: "Categorias",
+    href: "/categorias",
+    icon: "Tags",
+    permission: "categorias:ver", // Ou use 'catalogo:criar' se não criou a permissão nova
   },
   {
     title: "Galeria",
