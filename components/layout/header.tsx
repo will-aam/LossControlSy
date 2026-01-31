@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react"; // Import necessário para usar React.Fragment
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -37,17 +38,20 @@ export function Header() {
             const href = "/" + pathSegments.slice(0, index + 1).join("/");
             const title = pathTitles[segment] || segment;
 
+            // Correção: Usamos React.Fragment para colocar o Item e o Separador como irmãos,
+            // evitando que um <li> fique dentro de outro <li>.
             return (
-              <BreadcrumbItem key={href}>
-                {!isLast ? (
-                  <>
+              <React.Fragment key={href}>
+                <BreadcrumbItem>
+                  {!isLast ? (
                     <BreadcrumbLink href={href}>{title}</BreadcrumbLink>
-                    <BreadcrumbSeparator />
-                  </>
-                ) : (
-                  <BreadcrumbPage>{title}</BreadcrumbPage>
-                )}
-              </BreadcrumbItem>
+                  ) : (
+                    <BreadcrumbPage>{title}</BreadcrumbPage>
+                  )}
+                </BreadcrumbItem>
+                {/* O separador agora fica fora do BreadcrumbItem */}
+                {!isLast && <BreadcrumbSeparator />}
+              </React.Fragment>
             );
           })}
         </BreadcrumbList>
