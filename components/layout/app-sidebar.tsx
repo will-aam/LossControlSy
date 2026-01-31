@@ -1,9 +1,8 @@
 "use client";
 
 import React from "react";
-
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   PlusCircle,
@@ -14,8 +13,10 @@ import {
   BarChart3,
   Settings,
   Tags,
-  ChevronDown,
+  ChevronsUpDown,
   LogOut,
+  ShieldCheck, // Ícone para o Logo
+  Sparkles,
 } from "lucide-react";
 import {
   Sidebar,
@@ -29,6 +30,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarSeparator,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import {
   DropdownMenu,
@@ -38,8 +40,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth-context";
 import { getRoleLabel, UserRole } from "@/lib/mock-data";
 
@@ -55,16 +56,19 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Tags,
 };
 
+// Cores mais suaves e modernas para os avatares
 const roleColors: Record<UserRole, string> = {
-  funcionario: "bg-chart-1",
-  gestor: "bg-chart-2",
-  fiscal: "bg-chart-3",
-  dono: "bg-chart-4",
+  funcionario: "bg-blue-500 text-white",
+  gestor: "bg-purple-500 text-white",
+  fiscal: "bg-orange-500 text-white",
+  dono: "bg-emerald-600 text-white",
 };
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { user, navItems, switchRole } = useAuth();
+  const router = useRouter();
+  const { user, navItems, setUser } = useAuth();
+  const { isMobile } = useSidebar();
 
   if (!user) return null;
 
@@ -75,20 +79,38 @@ export function AppSidebar() {
     .toUpperCase()
     .slice(0, 2);
 
+  const handleLogout = () => {
+    // Limpa o estado e redireciona (Simples)
+    setUser(null);
+    localStorage.removeItem("losscontrol_active_user_id");
+    router.push("/login");
+  };
+
   return (
-    <Sidebar>
-      <SidebarHeader className="p-4">
-        <div className="flex flex-col">
-          <span className="text-sm font-semibold">Controle de Perdas</span>
-          <span className="text-xs text-muted-foreground">
-            Sistema Operacional
-          </span>
-        </div>
+    <Sidebar collapsible="icon">
+      {/* --- CABEÇALHO (LOGO) --- */}
+      <SidebarHeader>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              size="lg"
+              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+            >
+              <div className="grid flex-1 text-left text-sm leading-tight">
+                <span className="truncate font-semibold">Loss Control</span>
+                <span className="truncate text-xs text-muted-foreground">
+                  Enterprise
+                </span>
+              </div>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarHeader>
-      <SidebarSeparator className="" />
+
       <SidebarContent>
+        {/* --- MENU PRINCIPAL --- */}
         <SidebarGroup>
-          <SidebarGroupLabel>Menu Principal</SidebarGroupLabel>
+          <SidebarGroupLabel>Plataforma</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map((item) => {
@@ -99,7 +121,12 @@ export function AppSidebar() {
 
                 return (
                   <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton asChild isActive={isActive}>
+                    <SidebarMenuButton
+                      asChild
+                      tooltip={item.title}
+                      isActive={isActive}
+                      className="transition-all duration-200"
+                    >
                       <Link href={item.href}>
                         <Icon className="h-4 w-4" />
                         <span>{item.title}</span>
@@ -111,9 +138,27 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* --- MENU SECUNDÁRIO (Ex: Suporte ou Planos - Opcional, apenas visual) --- */}
+        <SidebarGroup className="mt-auto">
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  size="sm"
+                  className="text-muted-foreground hover:text-foreground"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  <span>Novidades v1.0</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-2">
+      {/* --- RODAPÉ (PERFIL) --- */}
+      <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
@@ -122,29 +167,57 @@ export function AppSidebar() {
                   size="lg"
                   className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                 >
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className={roleColors[user.role]}>
+                  <Avatar className="h-8 w-8 rounded-lg">
+                    {user.avatar ? (
+                      <AvatarImage src={user.avatar} alt={user.nome} />
+                    ) : null}
+                    <AvatarFallback
+                      className={`rounded-lg ${roleColors[user.role]}`}
+                    >
                       {initials}
                     </AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-medium">{user.nome}</span>
-                    <span className="truncate text-xs text-muted-foreground">
+                    <span className="truncate font-semibold">{user.nome}</span>
+                    <span className="truncate text-xs text-muted-foreground capitalize">
                       {getRoleLabel(user.role)}
                     </span>
                   </div>
-                  <ChevronDown className="ml-auto h-4 w-4" />
+                  <ChevronsUpDown className="ml-auto size-4" />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
               <DropdownMenuContent
-                className="w-(--radix-dropdown-menu-trigger-width) min-w-56"
-                side="top"
-                align="start"
+                className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
+                side={isMobile ? "bottom" : "right"}
+                align="end"
                 sideOffset={4}
               >
-                <DropdownMenuItem className="cursor-pointer text-destructive">
+                <DropdownMenuLabel className="p-0 font-normal">
+                  <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
+                    <Avatar className="h-8 w-8 rounded-lg">
+                      <AvatarFallback
+                        className={`rounded-lg ${roleColors[user.role]}`}
+                      >
+                        {initials}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="grid flex-1 text-left text-sm leading-tight">
+                      <span className="truncate font-semibold">
+                        {user.nome}
+                      </span>
+                      <span className="truncate text-xs text-muted-foreground">
+                        {user.email}
+                      </span>
+                    </div>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={handleLogout}
+                  className="text-destructive focus:text-destructive cursor-pointer"
+                >
                   <LogOut className="mr-2 h-4 w-4" />
-                  Sair
+                  Sair do Sistema
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
