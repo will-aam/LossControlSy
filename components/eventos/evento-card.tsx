@@ -1,10 +1,10 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Dialog,
   DialogContent,
@@ -12,14 +12,14 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+} from "@/components/ui/dropdown-menu";
 import {
   Check,
   X,
@@ -30,40 +30,47 @@ import {
   Clock,
   User,
   ImageIcon,
-} from 'lucide-react'
+} from "lucide-react";
 import {
   Evento,
   formatCurrency,
   formatDateTime,
   getStatusColor,
   getStatusLabel,
-} from '@/lib/mock-data'
+} from "@/lib/mock-data";
 
 interface EventoCardProps {
-  evento: Evento
-  showActions?: boolean
-  onApprove?: (id: string) => void
-  onReject?: (id: string) => void
+  evento: Evento;
+  showActions?: boolean;
+  onApprove?: (id: string) => void;
+  onReject?: (id: string) => void;
 }
 
-export function EventoCard({ evento, showActions = false, onApprove, onReject }: EventoCardProps) {
-  const [showDetails, setShowDetails] = useState(false)
-  const [showPhotos, setShowPhotos] = useState(false)
-  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0)
+export function EventoCard({
+  evento,
+  showActions = false,
+  onApprove,
+  onReject,
+}: EventoCardProps) {
+  const [showDetails, setShowDetails] = useState(false);
+  const [showPhotos, setShowPhotos] = useState(false);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState(0);
 
-  const custoTotal = evento.custoSnapshot && evento.quantidade
-    ? evento.custoSnapshot * evento.quantidade
-    : 0
-  const precoVendaTotal = evento.precoVendaSnapshot && evento.quantidade
-    ? evento.precoVendaSnapshot * evento.quantidade
-    : 0
+  const custoTotal =
+    evento.custoSnapshot && evento.quantidade
+      ? evento.custoSnapshot * evento.quantidade
+      : 0;
+  const precoVendaTotal =
+    evento.precoVendaSnapshot && evento.quantidade
+      ? evento.precoVendaSnapshot * evento.quantidade
+      : 0;
 
   const initials = evento.criadoPor.nome
-    .split(' ')
-    .map(n => n[0])
-    .join('')
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
     .toUpperCase()
-    .slice(0, 2)
+    .slice(0, 2);
 
   return (
     <>
@@ -71,7 +78,7 @@ export function EventoCard({ evento, showActions = false, onApprove, onReject }:
         <CardContent className="p-0">
           <div className="flex flex-col sm:flex-row">
             {/* Image/Icon */}
-            <div className="relative w-full sm:w-32 h-32 sm:h-auto flex-shrink-0 bg-muted">
+            <div className="relative w-full sm:w-32 h-32 sm:h-auto shrink-0 bg-muted">
               {evento.item?.imagemUrl ? (
                 <img
                   src={evento.item.imagemUrl || "/placeholder.svg"}
@@ -100,7 +107,7 @@ export function EventoCard({ evento, showActions = false, onApprove, onReject }:
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-semibold truncate">
-                      {evento.item?.nome || 'Item não vinculado'}
+                      {evento.item?.nome || "Item não vinculado"}
                     </h3>
                     <Badge className={getStatusColor(evento.status)}>
                       {getStatusLabel(evento.status)}
@@ -124,7 +131,7 @@ export function EventoCard({ evento, showActions = false, onApprove, onReject }:
                       <Eye className="mr-2 h-4 w-4" />
                       Ver Detalhes
                     </DropdownMenuItem>
-                    {showActions && evento.status === 'enviado' && (
+                    {showActions && evento.status === "enviado" && (
                       <>
                         <DropdownMenuItem>
                           <Edit className="mr-2 h-4 w-4" />
@@ -170,7 +177,7 @@ export function EventoCard({ evento, showActions = false, onApprove, onReject }:
                     {evento.quantidade} {evento.unidade}
                   </span>
                   {evento.motivo && (
-                    <p className="text-sm text-muted-foreground truncate max-w-[200px]">
+                    <p className="text-sm text-muted-foreground truncate max-w-50">
                       {evento.motivo}
                     </p>
                   )}
@@ -188,7 +195,7 @@ export function EventoCard({ evento, showActions = false, onApprove, onReject }:
               </div>
 
               {/* Quick Actions */}
-              {showActions && evento.status === 'enviado' && (
+              {showActions && evento.status === "enviado" && (
                 <div className="mt-4 flex gap-2">
                   <Button
                     size="sm"
@@ -249,7 +256,9 @@ export function EventoCard({ evento, showActions = false, onApprove, onReject }:
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <p className="text-muted-foreground">Quantidade</p>
-                <p className="font-medium">{evento.quantidade} {evento.unidade}</p>
+                <p className="font-medium">
+                  {evento.quantidade} {evento.unidade}
+                </p>
               </div>
               <div>
                 <p className="text-muted-foreground">Status</p>
@@ -266,7 +275,9 @@ export function EventoCard({ evento, showActions = false, onApprove, onReject }:
               {evento.precoVendaSnapshot && (
                 <div>
                   <p className="text-muted-foreground">Perda em Venda</p>
-                  <p className="font-medium text-destructive">{formatCurrency(precoVendaTotal)}</p>
+                  <p className="font-medium text-destructive">
+                    {formatCurrency(precoVendaTotal)}
+                  </p>
                 </div>
               )}
             </div>
@@ -284,7 +295,9 @@ export function EventoCard({ evento, showActions = false, onApprove, onReject }:
               </Avatar>
               <div>
                 <p className="text-sm font-medium">{evento.criadoPor.nome}</p>
-                <p className="text-xs text-muted-foreground">{evento.criadoPor.email}</p>
+                <p className="text-xs text-muted-foreground">
+                  {evento.criadoPor.email}
+                </p>
               </div>
             </div>
           </div>
@@ -303,7 +316,10 @@ export function EventoCard({ evento, showActions = false, onApprove, onReject }:
           {evento.evidencias.length > 0 && (
             <div className="space-y-4">
               <img
-                src={evento.evidencias[selectedPhotoIndex].url || "/placeholder.svg"}
+                src={
+                  evento.evidencias[selectedPhotoIndex].url ||
+                  "/placeholder.svg"
+                }
                 alt={`Evidência ${selectedPhotoIndex + 1}`}
                 className="w-full rounded-lg object-cover aspect-video"
               />
@@ -313,10 +329,10 @@ export function EventoCard({ evento, showActions = false, onApprove, onReject }:
                     <button
                       key={ev.id}
                       onClick={() => setSelectedPhotoIndex(index)}
-                      className={`flex-shrink-0 rounded-md overflow-hidden ring-2 ${
+                      className={`shrink-0 rounded-md overflow-hidden ring-2 ${
                         index === selectedPhotoIndex
-                          ? 'ring-primary'
-                          : 'ring-transparent'
+                          ? "ring-primary"
+                          : "ring-transparent"
                       }`}
                     >
                       <img
@@ -333,5 +349,5 @@ export function EventoCard({ evento, showActions = false, onApprove, onReject }:
         </DialogContent>
       </Dialog>
     </>
-  )
+  );
 }

@@ -6,7 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Item, mockItems } from "@/lib/mock-data";
+import { Item } from "@/lib/mock-data"; // Removemos mockItems daqui
+import { StorageService } from "@/lib/storage"; // Importamos o Storage
 import { cn } from "@/lib/utils";
 
 interface ItemSearchProps {
@@ -15,7 +16,6 @@ interface ItemSearchProps {
   className?: string;
 }
 
-// Busca tolerante a falhas (typos)
 function fuzzyMatch(text: string, query: string): boolean {
   const lowerText = text.toLowerCase();
   const lowerQuery = query.toLowerCase();
@@ -41,7 +41,14 @@ export function ItemSearch({
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Fecha o dropdown se clicar fora
+  // Estado para armazenar itens carregados do Storage
+  const [items, setItems] = useState<Item[]>([]);
+
+  // Carrega os itens reais do Storage ao montar o componente
+  useEffect(() => {
+    setItems(StorageService.getItems());
+  }, []);
+
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (
@@ -56,10 +63,11 @@ export function ItemSearch({
   }, []);
 
   const filteredItems = useMemo(() => {
+    // Se não tiver busca, mostra os primeiros 5 ativos
     if (!query.trim())
-      return mockItems.filter((i) => i.status === "ativo").slice(0, 5);
+      return items.filter((i) => i.status === "ativo").slice(0, 5);
 
-    return mockItems
+    return items
       .filter((item) => {
         if (item.status !== "ativo") return false;
         return (
@@ -69,7 +77,7 @@ export function ItemSearch({
         );
       })
       .slice(0, 8);
-  }, [query]);
+  }, [query, items]); // Adicionado 'items' nas dependências
 
   const handleSelect = (item: Item) => {
     onSelect(item);
@@ -82,8 +90,6 @@ export function ItemSearch({
     setQuery("");
   };
 
-  // MODO VISUALIZAÇÃO (ITEM SELECIONADO)
-  // Agora é compacto, parece um Input, não um Card gigante
   if (selectedItem) {
     return (
       <div className={cn("relative flex items-center", className)}>
@@ -110,7 +116,6 @@ export function ItemSearch({
     );
   }
 
-  // MODO BUSCA
   return (
     <div className={cn("relative", className)} ref={containerRef}>
       <div className="relative">

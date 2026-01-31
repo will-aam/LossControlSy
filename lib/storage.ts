@@ -1,7 +1,5 @@
-// lib/storage.ts
-import { Item, CategoriaData, User, Evento, UserRole } from "./mock-data";
+import { Item, CategoriaData, User, Evento } from "./mock-data";
 
-// Chaves para salvar no navegador
 const KEYS = {
   USERS: "losscontrol_users",
   ITEMS: "losscontrol_items",
@@ -9,7 +7,6 @@ const KEYS = {
   EVENTS: "losscontrol_events",
 };
 
-// === GENERIC HELPERS ===
 const get = <T>(key: string, defaultValue: T): T => {
   if (typeof window === "undefined") return defaultValue;
   const stored = localStorage.getItem(key);
@@ -22,13 +19,10 @@ const set = (key: string, value: any) => {
   }
 };
 
-// === API DE DADOS ===
-
 export const StorageService = {
   // --- USUÁRIOS ---
   getUsers: (): User[] => {
     const users = get<User[]>(KEYS.USERS, []);
-    // Se não tiver usuário, cria o Admin padrão para você não ficar trancado fora
     if (users.length === 0) {
       const defaultUser: User = {
         id: "1",
@@ -79,6 +73,12 @@ export const StorageService = {
     set(KEYS.ITEMS, list);
   },
 
+  // ADICIONADO: Função para deletar item
+  deleteItem: (id: string) => {
+    const list = StorageService.getItems().filter((i) => i.id !== id);
+    set(KEYS.ITEMS, list);
+  },
+
   // --- EVENTOS ---
   getEventos: (): Evento[] => get<Evento[]>(KEYS.EVENTS, []),
 
@@ -90,6 +90,5 @@ export const StorageService = {
     set(KEYS.EVENTS, list);
   },
 
-  // Limpar tudo (para testes)
   clearAll: () => localStorage.clear(),
 };

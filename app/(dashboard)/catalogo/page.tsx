@@ -25,11 +25,23 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+// --- NOVAS IMPORTAÇÕES DO ALERT DIALOG ---
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+// -----------------------------------------
 import { Item, categorias, formatCurrency } from "@/lib/mock-data";
 import { parseItemsCSV } from "@/lib/csv-parser";
 import { useAuth } from "@/lib/auth-context";
 import { ItemFormDialog } from "@/components/catalogo/item-form-dialog";
-import { StorageService } from "@/lib/storage"; // <-- Importar
+import { StorageService } from "@/lib/storage";
 import {
   Search,
   Plus,
@@ -44,10 +56,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Grid3X3,
+  Trash2,
 } from "lucide-react";
 import { toast } from "sonner";
 
-// Apenas Lista agora, paginação fixa
 const ITEMS_PER_PAGE = 15;
 
 const hideScrollClass =
@@ -55,44 +67,35 @@ const hideScrollClass =
 
 export default function CatalogoPage() {
   const { hasPermission } = useAuth();
-
-  // Estado de Dados (Começa vazio)
   const [items, setItems] = useState<Item[]>([]);
-
-  // Filtros
   const [searchQuery, setSearchQuery] = useState("");
   const [categoriaFilter, setCategoriaFilter] = useState<string>("todas");
   const [statusFilter, setStatusFilter] = useState<
     "todos" | "ativo" | "inativo"
   >("ativo");
 
-  // Controle do Modal
   const [showNewItemDialog, setShowNewItemDialog] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
 
-  // Paginação
+  // Estado para controlar o ID do item a ser excluído
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+
   const [currentPage, setCurrentPage] = useState(1);
   const [isImporting, setIsImporting] = useState(false);
-
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // --- CARREGAR DADOS DO STORAGE ---
   useEffect(() => {
     setItems(StorageService.getItems());
   }, []);
 
-  // --- LÓGICA DE FILTRAGEM ---
   const filteredItems = useMemo(() => {
     let filtered = items;
-
     if (statusFilter !== "todos") {
       filtered = filtered.filter((i) => i.status === statusFilter);
     }
-
     if (categoriaFilter !== "todas") {
       filtered = filtered.filter((i) => i.categoria === categoriaFilter);
     }
-
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
@@ -102,11 +105,9 @@ export default function CatalogoPage() {
           (i.codigoBarras && i.codigoBarras.includes(query)),
       );
     }
-
     return filtered;
   }, [items, statusFilter, categoriaFilter, searchQuery]);
 
-  // --- LÓGICA DE PAGINAÇÃO ---
   const totalPages = Math.ceil(filteredItems.length / ITEMS_PER_PAGE);
   const paginatedItems = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -117,7 +118,6 @@ export default function CatalogoPage() {
     if (currentPage > totalPages && totalPages > 0) setCurrentPage(1);
   }, [totalPages, currentPage]);
 
-  // --- STATS ---
   const stats = useMemo(
     () => ({
       total: items.length,
@@ -128,23 +128,17 @@ export default function CatalogoPage() {
     [items],
   );
 
-  // --- AÇÕES ---
   const handleFileUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = event.target.files?.[0];
     if (!file) return;
-
     setIsImporting(true);
     try {
       const newItems = await parseItemsCSV(file);
       if (newItems.length > 0) {
-        // Salva cada item novo no Storage
         newItems.forEach((item) => StorageService.saveItem(item));
-
-        // Atualiza estado local
         setItems(StorageService.getItems());
-
         toast.success(`${newItems.length} itens importados!`);
       } else {
         toast.warning("Arquivo inválido ou vazio.");
@@ -158,29 +152,30 @@ export default function CatalogoPage() {
     }
   };
 
-  // Função chamada quando o modal salva (Novo ou Edição)
   const handleSaveItem = (itemData: Partial<Item>) => {
     if (editingItem) {
-      // Editar existente
       const updatedItem = { ...editingItem, ...itemData } as Item;
-
-      // Salva no Storage
       StorageService.saveItem(updatedItem);
       setItems(StorageService.getItems());
-
       toast.success("Item atualizado!");
     } else {
-      // Criar novo
       const newItem: Item = {
         id: Math.random().toString(36).substr(2, 9),
         ...itemData,
       } as Item;
-
-      // Salva no Storage
       StorageService.saveItem(newItem);
       setItems(StorageService.getItems());
-
       toast.success("Item criado com sucesso!");
+    }
+  };
+
+  // Executa a exclusão após confirmação no modal
+  const confirmDelete = () => {
+    if (itemToDelete) {
+      StorageService.deleteItem(itemToDelete);
+      setItems(StorageService.getItems());
+      toast.success("Item removido com sucesso");
+      setItemToDelete(null); // Fecha o modal e limpa o estado
     }
   };
 
@@ -197,7 +192,6 @@ export default function CatalogoPage() {
     <div
       className={`flex flex-col h-[calc(100vh-2rem)] space-y-4 overflow-hidden ${hideScrollClass}`}
     >
-      {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between shrink-0">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
@@ -222,19 +216,17 @@ export default function CatalogoPage() {
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isImporting}
               >
-                <Upload className="mr-2 h-4 w-4" />
+                <Upload className="mr-2 h-4 w-4" />{" "}
                 {isImporting ? "Importando..." : "Importar CSV"}
               </Button>
               <Button onClick={() => setShowNewItemDialog(true)}>
-                <Plus className="mr-2 h-4 w-4" />
-                Novo Item
+                <Plus className="mr-2 h-4 w-4" /> Novo Item
               </Button>
             </>
           )}
         </div>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid gap-3 sm:grid-cols-4 shrink-0">
         <div className="border rounded-lg p-3 bg-card shadow-sm flex items-center justify-between">
           <div>
@@ -276,7 +268,6 @@ export default function CatalogoPage() {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between shrink-0 bg-background/95 backdrop-blur z-10 py-1">
         <div className="flex flex-col gap-3 sm:flex-row flex-1">
           <div className="relative flex-1 max-w-md">
@@ -329,7 +320,6 @@ export default function CatalogoPage() {
         </div>
       </div>
 
-      {/* TABLE AREA (Scroll Interno) */}
       <div className="flex-1 overflow-hidden border rounded-md relative bg-card shadow-sm">
         <div className="absolute inset-0 overflow-y-auto">
           <Table>
@@ -420,6 +410,13 @@ export default function CatalogoPage() {
                             >
                               <Edit className="mr-2 h-4 w-4" /> Editar
                             </DropdownMenuItem>
+                            {/* BOTAO DE EXCLUIR AGORA ABRE O MODAL */}
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => setItemToDelete(item.id)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                            </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       )}
@@ -443,12 +440,10 @@ export default function CatalogoPage() {
         </div>
       </div>
 
-      {/* Pagination (Fixo no Rodapé) */}
       <div className="flex items-center justify-between shrink-0 pt-2 border-t mt-auto">
         <p className="text-xs text-muted-foreground">
           {paginatedItems.length} de {filteredItems.length} itens
         </p>
-
         <div className="flex items-center space-x-2">
           <Button
             variant="outline"
@@ -474,7 +469,6 @@ export default function CatalogoPage() {
         </div>
       </div>
 
-      {/* Modal - AGORA UM COMPONENTE SEPARADO */}
       <ItemFormDialog
         open={showNewItemDialog || !!editingItem}
         onOpenChange={(open) => {
@@ -486,6 +480,31 @@ export default function CatalogoPage() {
         item={editingItem}
         onSave={handleSaveItem}
       />
+
+      {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO */}
+      <AlertDialog
+        open={!!itemToDelete}
+        onOpenChange={(open) => !open && setItemToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Essa ação excluirá permanentemente o item do catálogo e não poderá
+              ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Excluir Item
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
