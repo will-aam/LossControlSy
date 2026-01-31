@@ -5,7 +5,7 @@ const KEYS = {
   ITEMS: "losscontrol_items",
   CATEGORIES: "losscontrol_categories",
   EVENTS: "losscontrol_events",
-  GALLERY: "losscontrol_gallery", // Nova chave para fotos avulsas
+  GALLERY: "losscontrol_gallery",
 };
 
 const get = <T>(key: string, defaultValue: T): T => {
@@ -58,6 +58,33 @@ export const StorageService = {
     set(KEYS.CATEGORIES, list);
   },
 
+  // NOVA FUNÇÃO: Sincronizar categorias via importação CSV
+  syncCategories: (categoryNames: string[]) => {
+    const current = StorageService.getCategorias();
+    // Cria um Set com nomes existentes (uppercase para evitar duplicatas "Bebidas" vs "BEBIDAS")
+    const existingNames = new Set(current.map((c) => c.nome.toUpperCase()));
+    const newCats: CategoriaData[] = [];
+
+    categoryNames.forEach((name) => {
+      if (!name) return;
+      const cleanName = name.trim();
+      // Se não existe, cria
+      if (!existingNames.has(cleanName.toUpperCase())) {
+        newCats.push({
+          id: Math.random().toString(36).substr(2, 9),
+          nome: cleanName,
+          status: "ativa",
+          itemCount: 0,
+        });
+        existingNames.add(cleanName.toUpperCase());
+      }
+    });
+
+    if (newCats.length > 0) {
+      set(KEYS.CATEGORIES, [...current, ...newCats]);
+    }
+  },
+
   deleteCategoria: (id: string) => {
     const list = StorageService.getCategorias().filter((c) => c.id !== id);
     set(KEYS.CATEGORIES, list);
@@ -90,7 +117,7 @@ export const StorageService = {
     set(KEYS.EVENTS, list);
   },
 
-  // --- GALERIA (FOTOS AVULSAS) ---
+  // --- GALERIA ---
   getEvidenciasAvulsas: (): Evidencia[] => get<Evidencia[]>(KEYS.GALLERY, []),
 
   saveEvidenciaAvulsa: (evidencia: Evidencia) => {
@@ -108,17 +135,14 @@ export const StorageService = {
     set(KEYS.GALLERY, list);
   },
 
-  // Helper para pegar TUDO (Eventos + Avulsas) unificado
   getAllEvidencias: (): any[] => {
     const eventos = StorageService.getEventos();
     const avulsas = StorageService.getEvidenciasAvulsas();
 
-    // Mapeia evidências de eventos para incluir o objeto 'evento' dentro delas
     const doEventos = eventos.flatMap((evt) =>
       evt.evidencias.map((ev) => ({ ...ev, evento: evt })),
     );
 
-    // Junta com as avulsas e ordena por data (mais recente primeiro)
     return [...doEventos, ...avulsas].sort(
       (a, b) =>
         new Date(b.dataUpload).getTime() - new Date(a.dataUpload).getTime(),

@@ -99,7 +99,7 @@ export function AppSidebar() {
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">Loss Control</span>
                 <span className="truncate text-xs text-muted-foreground">
-                  Enterprise
+                  Controle de Perdas
                 </span>
               </div>
             </SidebarMenuButton>

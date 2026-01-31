@@ -1,4 +1,3 @@
-// app/(dashboard)/catalogo/page.tsx
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
@@ -6,13 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+  TableHead,
+  TableBody,
+  TableCell,
+} from "@/components/ui/table"; // REMOVIDO: "Table" da importação
 import {
   Select,
   SelectContent,
@@ -38,7 +36,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 // -----------------------------------------
-import { Item, categorias, formatCurrency } from "@/lib/mock-data";
+import {
+  Item,
+  categorias as mockCategorias,
+  formatCurrency,
+} from "@/lib/mock-data";
 import { parseItemsCSV } from "@/lib/csv-parser";
 import { useAuth } from "@/lib/auth-context";
 import { ItemFormDialog } from "@/components/catalogo/item-form-dialog";
@@ -69,6 +71,11 @@ const hideScrollClass =
 export default function CatalogoPage() {
   const { hasPermission } = useAuth();
   const [items, setItems] = useState<Item[]>([]);
+
+  // Lista de categorias dinâmica
+  const [categoriasList, setCategoriasList] =
+    useState<string[]>(mockCategorias);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [categoriaFilter, setCategoriaFilter] = useState<string>("todas");
   const [statusFilter, setStatusFilter] = useState<
@@ -85,9 +92,17 @@ export default function CatalogoPage() {
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Carrega Itens e Categorias ao iniciar
   useEffect(() => {
-    setItems(StorageService.getItems());
+    loadData();
   }, []);
+
+  const loadData = () => {
+    setItems(StorageService.getItems());
+    // Atualiza a lista de categorias do filtro baseada no Storage
+    const cats = StorageService.getCategorias().map((c) => c.nome);
+    if (cats.length > 0) setCategoriasList(cats);
+  };
 
   const filteredItems = useMemo(() => {
     let filtered = items;
@@ -138,9 +153,21 @@ export default function CatalogoPage() {
     try {
       const newItems = await parseItemsCSV(file);
       if (newItems.length > 0) {
+        // 1. Salva os Itens
         newItems.forEach((item) => StorageService.saveItem(item));
-        setItems(StorageService.getItems());
-        toast.success(`${newItems.length} itens importados!`);
+
+        // 2. Extrai e Salva as Categorias Novas automaticamente (NOVO)
+        const uniqueCategories = Array.from(
+          new Set(newItems.map((i) => i.categoria)),
+        );
+        StorageService.syncCategories(uniqueCategories);
+
+        // 3. Recarrega tudo
+        loadData();
+
+        toast.success(
+          `${newItems.length} itens importados e categorias sincronizadas!`,
+        );
       } else {
         toast.warning("Arquivo inválido ou vazio.");
       }
@@ -157,7 +184,11 @@ export default function CatalogoPage() {
     if (editingItem) {
       const updatedItem = { ...editingItem, ...itemData } as Item;
       StorageService.saveItem(updatedItem);
-      setItems(StorageService.getItems());
+      // Sincroniza categoria se editou
+      if (updatedItem.categoria)
+        StorageService.syncCategories([updatedItem.categoria]);
+
+      loadData();
       toast.success("Item atualizado!");
     } else {
       const newItem: Item = {
@@ -165,7 +196,10 @@ export default function CatalogoPage() {
         ...itemData,
       } as Item;
       StorageService.saveItem(newItem);
-      setItems(StorageService.getItems());
+      // Sincroniza categoria se criou
+      if (newItem.categoria) StorageService.syncCategories([newItem.categoria]);
+
+      loadData();
       toast.success("Item criado com sucesso!");
     }
   };
@@ -174,9 +208,9 @@ export default function CatalogoPage() {
   const confirmDelete = () => {
     if (itemToDelete) {
       StorageService.deleteItem(itemToDelete);
-      setItems(StorageService.getItems());
+      loadData();
       toast.success("Item removido com sucesso");
-      setItemToDelete(null); // Fecha o modal e limpa o estado
+      setItemToDelete(null);
     }
   };
 
@@ -295,7 +329,7 @@ export default function CatalogoPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todas">Todas</SelectItem>
-              {categorias.map((cat) => (
+              {categoriasList.map((cat) => (
                 <SelectItem key={cat} value={cat}>
                   {cat}
                 </SelectItem>
@@ -321,19 +355,23 @@ export default function CatalogoPage() {
         </div>
       </div>
 
+      {/* TABLE AREA - CORRIGIDO PARA STICKY HEADER */}
       <div className="flex-1 overflow-hidden border rounded-md relative bg-card shadow-sm">
         <div className="absolute inset-0 overflow-y-auto">
-          <Table>
-            <TableHeader className="sticky top-0 bg-card z-10 shadow-sm">
+          {/* MUDANÇA AQUI: Trocamos <Table> por <table> nativa para evitar wrapper extra */}
+          <table className="w-full caption-bottom text-sm">
+            <TableHeader className="sticky top-0 z-20 bg-card shadow-sm">
               <TableRow>
-                <TableHead className="w-[40%]">Item</TableHead>
-                <TableHead>Código</TableHead>
-                <TableHead>Categoria</TableHead>
-                <TableHead>Unidade</TableHead>
-                <TableHead className="text-right">Custo</TableHead>
-                <TableHead className="text-right">Venda</TableHead>
-                <TableHead className="w-25 text-center">Status</TableHead>
-                <TableHead className="w-12.5"></TableHead>
+                <TableHead className="w-[40%] bg-card">Item</TableHead>
+                <TableHead className="bg-card">Código</TableHead>
+                <TableHead className="bg-card">Categoria</TableHead>
+                <TableHead className="bg-card">Unidade</TableHead>
+                <TableHead className="text-right bg-card">Custo</TableHead>
+                <TableHead className="text-right bg-card">Venda</TableHead>
+                <TableHead className="w-25 text-center bg-card">
+                  Status
+                </TableHead>
+                <TableHead className="w-12.5 bg-card"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -411,7 +449,6 @@ export default function CatalogoPage() {
                             >
                               <Edit className="mr-2 h-4 w-4" /> Editar
                             </DropdownMenuItem>
-                            {/* BOTAO DE EXCLUIR AGORA ABRE O MODAL */}
                             <DropdownMenuItem
                               className="text-destructive focus:text-destructive"
                               onClick={() => setItemToDelete(item.id)}
@@ -437,7 +474,7 @@ export default function CatalogoPage() {
                 </TableRow>
               )}
             </TableBody>
-          </Table>
+          </table>
         </div>
       </div>
 
@@ -482,7 +519,6 @@ export default function CatalogoPage() {
         onSave={handleSaveItem}
       />
 
-      {/* MODAL DE CONFIRMAÇÃO DE EXCLUSÃO */}
       <AlertDialog
         open={!!itemToDelete}
         onOpenChange={(open) => !open && setItemToDelete(null)}
