@@ -49,7 +49,7 @@ export function Header() {
                     <BreadcrumbPage>{title}</BreadcrumbPage>
                   )}
                 </BreadcrumbItem>
-                {/* O separador agora fica fora do BreadcrumbItem */}
+
                 {!isLast && <BreadcrumbSeparator />}
               </React.Fragment>
             );
