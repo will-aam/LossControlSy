@@ -8,8 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
+  DialogTitle, // Importado DialogTitle
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -48,7 +47,6 @@ import {
   ChevronRight,
   Package,
   X,
-  Upload,
   Plus,
   Trash2,
   Camera,
@@ -313,7 +311,7 @@ export default function GaleriaPage() {
 
                 {/* Ícone de Zoom */}
                 <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="rounded-full bg-black/50 p-1.5 backdrop-blur-sm text-white">
+                  <div className="h-6 w-6 rounded-full bg-transparent hover:bg-black/70 p-1.5  text-white">
                     <ZoomIn className="h-3 w-3" />
                   </div>
                 </div>
@@ -330,7 +328,7 @@ export default function GaleriaPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-6 w-6 rounded-full bg-black/50 hover:bg-black/70 text-white"
+                        className="h-6 w-6 rounded-full bg-transparent hover:bg-black/70 text-white"
                       >
                         <MoreVertical className="h-3 w-3" />
                       </Button>
@@ -367,7 +365,14 @@ export default function GaleriaPage() {
         open={!!selectedPhoto}
         onOpenChange={(open) => !open && setSelectedPhoto(null)}
       >
-        <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden bg-black/95 border-none">
+        {/* CORREÇÃO: [&>button]:hidden remove o X padrão duplicado */}
+        <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden bg-black/95 border-none [&>button]:hidden">
+          {/* CORREÇÃO: DialogTitle Oculto para Acessibilidade */}
+          <DialogTitle className="sr-only">
+            Visualizar Evidência:{" "}
+            {selectedPhoto?.evento?.item?.nome || "Foto Avulsa"}
+          </DialogTitle>
+
           <div className="relative w-full h-full flex flex-col">
             {/* Header Flutuante */}
             <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-start z-50 bg-linear-to-b from-black/80 to-transparent">
@@ -382,7 +387,7 @@ export default function GaleriaPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="text-white hover:bg-white/20 rounded-full"
+                className="rounded-full"
                 onClick={() => setSelectedPhoto(null)}
               >
                 <X className="h-5 w-5" />
@@ -476,7 +481,6 @@ export default function GaleriaPage() {
                     size="sm"
                     onClick={() => {
                       setPhotoToDelete(selectedPhoto);
-                      // Fecha o viewer para mostrar o alerta
                       setSelectedPhoto(null);
                     }}
                   >
