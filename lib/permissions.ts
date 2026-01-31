@@ -99,13 +99,7 @@ export const navItems: NavItem[] = [
     icon: "Package",
     permission: "catalogo:ver",
   },
-  {
-    title: "Catálogo",
-    href: "/catalogo",
-    icon: "Package",
-    permission: "catalogo:ver",
-  },
-  // ADICIONE ISTO AQUI:
+
   {
     title: "Categorias",
     href: "/categorias",

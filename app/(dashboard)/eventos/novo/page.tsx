@@ -137,9 +137,7 @@ export default function NovoEventoPage() {
           </p>
         </div>
         <div className="text-right">
-          <span className="text-xs text-muted-foreground block">
-            Total Lote
-          </span>
+          <span className="text-xs text-muted-foreground block">Total</span>
           <span className="text-xl font-bold text-primary">
             {formatCurrency(
               itemsList.reduce(
@@ -201,7 +199,6 @@ export default function NovoEventoPage() {
           disabled={!selectedItem || !quantidade}
           className="h-10 w-full md:w-auto px-6"
         >
-          <Plus className="w-4 h-4 mr-2" />
           Adicionar
         </Button>
       </div>
@@ -313,7 +310,7 @@ export default function NovoEventoPage() {
               className="px-8 font-semibold"
             >
               <Send className="mr-2 h-3 w-3" />
-              Finalizar Lote
+              Finalizar
             </Button>
           </div>
         )}

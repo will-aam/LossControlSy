@@ -1,12 +1,18 @@
-'use client'
+"use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-} from '@/components/ui/chart'
+} from "@/components/ui/chart";
 import {
   Area,
   AreaChart,
@@ -17,7 +23,7 @@ import {
   YAxis,
   ResponsiveContainer,
   Cell,
-} from 'recharts'
+} from "recharts";
 import {
   TrendingDown,
   AlertTriangle,
@@ -25,46 +31,48 @@ import {
   DollarSign,
   Package,
   ArrowRight,
-} from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import Link from 'next/link'
-import { dashboardStats, formatCurrency, mockItems } from '@/lib/mock-data'
-import { useAuth } from '@/lib/auth-context'
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { dashboardStats, formatCurrency, mockItems } from "@/lib/mock-data";
+import { useAuth } from "@/lib/auth-context";
 
 const chartConfig = {
   custo: {
-    label: 'Custo',
-    color: 'var(--chart-1)',
+    label: "Custo",
+    color: "var(--chart-1)",
   },
   precoVenda: {
-    label: 'Preço Venda',
-    color: 'var(--chart-2)',
+    label: "Preço Venda",
+    color: "var(--chart-2)",
   },
-}
+};
 
 const categoryColors = [
-  'var(--chart-1)',
-  'var(--chart-2)',
-  'var(--chart-3)',
-  'var(--chart-4)',
-  'var(--chart-5)',
-  'var(--chart-1)',
-]
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+  "var(--chart-1)",
+];
 
 export default function DashboardPage() {
-  const { user, hasPermission } = useAuth()
+  const { user, hasPermission } = useAuth();
 
-  if (!hasPermission('dashboard:ver')) {
+  if (!hasPermission("dashboard:ver")) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <AlertTriangle className="h-12 w-12 text-muted-foreground" />
         <h2 className="text-xl font-semibold">Acesso Restrito</h2>
-        <p className="text-muted-foreground">Você não tem permissão para visualizar o dashboard.</p>
+        <p className="text-muted-foreground">
+          Você não tem permissão para visualizar o dashboard.
+        </p>
         <Button asChild>
           <Link href="/eventos/novo">Registrar Perda</Link>
         </Button>
       </div>
-    )
+    );
   }
 
   return (
@@ -77,15 +85,6 @@ export default function DashboardPage() {
             Visão geral das perdas e quebras
           </p>
         </div>
-        {hasPermission('eventos:aprovar') && dashboardStats.pendentesAprovacao > 0 && (
-          <Button asChild variant="outline" className="gap-2 bg-transparent">
-            <Link href="/eventos/aprovacoes">
-              <Clock className="h-4 w-4" />
-              {dashboardStats.pendentesAprovacao} pendentes
-              <ArrowRight className="h-4 w-4" />
-            </Link>
-          </Button>
-        )}
       </div>
 
       {/* Stats Cards */}
@@ -96,42 +95,50 @@ export default function DashboardPage() {
             <TrendingDown className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboardStats.perdasHoje.quantidade}</div>
+            <div className="text-2xl font-bold">
+              {dashboardStats.perdasHoje.quantidade}
+            </div>
             <p className="text-xs text-muted-foreground">
               {formatCurrency(dashboardStats.perdasHoje.custo)} em custo
             </p>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Perdas Semana</CardTitle>
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboardStats.perdasSemana.quantidade}</div>
+            <div className="text-2xl font-bold">
+              {dashboardStats.perdasSemana.quantidade}
+            </div>
             <p className="text-xs text-muted-foreground">
               {formatCurrency(dashboardStats.perdasSemana.custo)} em custo
             </p>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-sm font-medium">Custo Mensal</CardTitle>
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(dashboardStats.perdasMes.custo)}</div>
+            <div className="text-2xl font-bold">
+              {formatCurrency(dashboardStats.perdasMes.custo)}
+            </div>
             <p className="text-xs text-muted-foreground">
               {dashboardStats.perdasMes.quantidade} eventos
             </p>
           </CardContent>
         </Card>
-        
+
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Perda em Venda</CardTitle>
+            <CardTitle className="text-sm font-medium">
+              Perda em Venda
+            </CardTitle>
             <AlertTriangle className="h-4 w-4 text-destructive" />
           </CardHeader>
           <CardContent>
@@ -151,12 +158,17 @@ export default function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>Tendência Semanal</CardTitle>
-            <CardDescription>Comparativo de custo vs. preço de venda</CardDescription>
+            <CardDescription>
+              Comparativo de custo vs. preço de venda
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={chartConfig} className="h-[300px]">
+            <ChartContainer config={chartConfig} className="h-75">
               <AreaChart data={dashboardStats.tendenciaSemanal}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  className="stroke-border"
+                />
                 <XAxis dataKey="dia" className="text-xs" />
                 <YAxis className="text-xs" tickFormatter={(v) => `R$${v}`} />
                 <ChartTooltip content={<ChartTooltipContent />} />
@@ -185,18 +197,39 @@ export default function DashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle>Perdas por Categoria</CardTitle>
-            <CardDescription>Distribuição de custos por categoria</CardDescription>
+            <CardDescription>
+              Distribuição de custos por categoria
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={chartConfig} className="h-[300px]">
-              <BarChart data={dashboardStats.perdasPorCategoria} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" horizontal={false} />
-                <XAxis type="number" className="text-xs" tickFormatter={(v) => `R$${v}`} />
-                <YAxis dataKey="categoria" type="category" className="text-xs" width={80} />
+            <ChartContainer config={chartConfig} className="h-75">
+              <BarChart
+                data={dashboardStats.perdasPorCategoria}
+                layout="vertical"
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  className="stroke-border"
+                  horizontal={false}
+                />
+                <XAxis
+                  type="number"
+                  className="text-xs"
+                  tickFormatter={(v) => `R$${v}`}
+                />
+                <YAxis
+                  dataKey="categoria"
+                  type="category"
+                  className="text-xs"
+                  width={80}
+                />
                 <ChartTooltip content={<ChartTooltipContent />} />
                 <Bar dataKey="custo" radius={4}>
                   {dashboardStats.perdasPorCategoria.map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={categoryColors[index % categoryColors.length]} />
+                    <Cell
+                      key={`cell-${index}`}
+                      fill={categoryColors[index % categoryColors.length]}
+                    />
                   ))}
                 </Bar>
               </BarChart>
@@ -209,7 +242,9 @@ export default function DashboardPage() {
       <Card>
         <CardHeader>
           <CardTitle>Top 5 Itens com Maior Perda</CardTitle>
-          <CardDescription>Itens que mais geraram perdas no período</CardDescription>
+          <CardDescription>
+            Itens que mais geraram perdas no período
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -235,8 +270,12 @@ export default function DashboardPage() {
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="font-medium">{entry.quantidade} {entry.item.unidade}</p>
-                  <p className="text-sm text-destructive">{formatCurrency(entry.custo)}</p>
+                  <p className="font-medium">
+                    {entry.quantidade} {entry.item.unidade}
+                  </p>
+                  <p className="text-sm text-destructive">
+                    {formatCurrency(entry.custo)}
+                  </p>
                 </div>
               </div>
             ))}
@@ -244,5 +283,5 @@ export default function DashboardPage() {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

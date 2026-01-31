@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -37,7 +37,9 @@ import {
   Tags,
   AlertTriangle,
 } from "lucide-react";
-import { mockCategoriasList, CategoriaData } from "@/lib/mock-data";
+// Importamos apenas a Interface do mock, os dados vêm do Storage agora
+import { CategoriaData } from "@/lib/mock-data";
+import { StorageService } from "@/lib/storage"; // Importando o serviço de storage
 import { useAuth } from "@/lib/auth-context";
 import { toast } from "sonner";
 
@@ -48,9 +50,8 @@ const hideScrollClass =
 export default function CategoriasPage() {
   const { hasPermission } = useAuth();
 
-  // Estado local
-  const [categorias, setCategorias] =
-    useState<CategoriaData[]>(mockCategoriasList);
+  // Estado local (Começa vazio e carrega do Storage)
+  const [categorias, setCategorias] = useState<CategoriaData[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
   // Controle do Modal
@@ -58,6 +59,13 @@ export default function CategoriasPage() {
   const [editingCategoria, setEditingCategoria] =
     useState<CategoriaData | null>(null);
   const [nomeForm, setNomeForm] = useState("");
+
+  // Carregar dados ao iniciar a tela
+  useEffect(() => {
+    // Busca do LocalStorage
+    const dadosSalvos = StorageService.getCategorias();
+    setCategorias(dadosSalvos);
+  }, []);
 
   // Filtragem
   const filteredCategorias = categorias.filter((cat) =>
@@ -84,11 +92,14 @@ export default function CategoriasPage() {
 
     if (editingCategoria) {
       // Editar
-      setCategorias((prev) =>
-        prev.map((c) =>
-          c.id === editingCategoria.id ? { ...c, nome: nomeForm } : c,
-        ),
-      );
+      const updatedCategoria = { ...editingCategoria, nome: nomeForm };
+
+      // 1. Salva no Storage
+      StorageService.saveCategoria(updatedCategoria);
+
+      // 2. Atualiza estado visual
+      setCategorias(StorageService.getCategorias());
+
       toast.success("Categoria atualizada!");
     } else {
       // Criar Nova
@@ -98,34 +109,39 @@ export default function CategoriasPage() {
         status: "ativa",
         itemCount: 0,
       };
-      setCategorias((prev) => [...prev, nova]);
+
+      // 1. Salva no Storage
+      StorageService.saveCategoria(nova);
+
+      // 2. Atualiza estado visual
+      setCategorias(StorageService.getCategorias());
+
       toast.success("Categoria criada com sucesso!");
     }
     setIsDialogOpen(false);
   };
 
-  const handleToggleStatus = (id: string) => {
-    setCategorias((prev) =>
-      prev.map((c) => {
-        if (c.id === id) {
-          const novoStatus = c.status === "ativa" ? "inativa" : "ativa";
-          toast.info(
-            `Categoria ${novoStatus === "ativa" ? "ativada" : "desativada"}`,
-          );
-          return { ...c, status: novoStatus };
-        }
-        return c;
-      }),
+  const handleToggleStatus = (categoria: CategoriaData) => {
+    const novoStatus = categoria.status === "ativa" ? "inativa" : "ativa";
+    const updated = { ...categoria, status: novoStatus } as CategoriaData;
+
+    // Salva e Atualiza
+    StorageService.saveCategoria(updated);
+    setCategorias(StorageService.getCategorias());
+
+    toast.info(
+      `Categoria ${novoStatus === "ativa" ? "ativada" : "desativada"}`,
     );
   };
 
   const handleDelete = (id: string) => {
     // Em um sistema real, validaria se tem itens vinculados antes
-    setCategorias((prev) => prev.filter((c) => c.id !== id));
+    StorageService.deleteCategoria(id);
+    setCategorias(StorageService.getCategorias());
     toast.success("Categoria removida");
   };
 
-  // FIX: Usando permissão existente 'catalogo:criar' em vez de 'configuracoes:editar'
+  // Permissão
   if (!hasPermission("catalogo:criar")) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
@@ -218,7 +234,7 @@ export default function CategoriasPage() {
                             Editar
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            onClick={() => handleToggleStatus(cat.id)}
+                            onClick={() => handleToggleStatus(cat)}
                           >
                             <Power className="mr-2 h-4 w-4" />
                             {cat.status === "ativa" ? "Desativar" : "Ativar"}

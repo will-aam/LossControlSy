@@ -142,30 +142,6 @@ export function AppSidebar() {
                 align="start"
                 sideOffset={4}
               >
-                <DropdownMenuLabel className="text-xs text-muted-foreground">
-                  Trocar Perfil (Demo)
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {(
-                  ["funcionario", "gestor", "fiscal", "dono"] as UserRole[]
-                ).map((role) => (
-                  <DropdownMenuItem
-                    key={role}
-                    onClick={() => switchRole(role)}
-                    className="cursor-pointer"
-                  >
-                    <div
-                      className={`h-2 w-2 rounded-full ${roleColors[role]} mr-2`}
-                    />
-                    {getRoleLabel(role)}
-                    {user.role === role && (
-                      <Badge variant="secondary" className="ml-auto text-xs">
-                        Atual
-                      </Badge>
-                    )}
-                  </DropdownMenuItem>
-                ))}
-                <DropdownMenuSeparator />
                 <DropdownMenuItem className="cursor-pointer text-destructive">
                   <LogOut className="mr-2 h-4 w-4" />
                   Sair

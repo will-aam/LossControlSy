@@ -1,13 +1,19 @@
-'use client'
+"use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
-import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -15,10 +21,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { mockUsers, getRoleLabel, UserRole } from '@/lib/mock-data'
-import { useAuth } from '@/lib/auth-context'
+} from "@/components/ui/table";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { mockUsers, getRoleLabel, UserRole } from "@/lib/mock-data";
+import { useAuth } from "@/lib/auth-context";
 import {
   AlertTriangle,
   Building2,
@@ -31,26 +37,28 @@ import {
   Plus,
   Key,
   Link2,
-} from 'lucide-react'
+} from "lucide-react";
 
 const roleColors: Record<UserRole, string> = {
-  funcionario: 'bg-chart-1',
-  gestor: 'bg-chart-2',
-  fiscal: 'bg-chart-3',
-  dono: 'bg-chart-4',
-}
+  funcionario: "bg-chart-1",
+  gestor: "bg-chart-2",
+  fiscal: "bg-chart-3",
+  dono: "bg-chart-4",
+};
 
 export default function ConfiguracoesPage() {
-  const { hasPermission } = useAuth()
+  const { hasPermission } = useAuth();
 
-  if (!hasPermission('configuracoes:ver')) {
+  if (!hasPermission("configuracoes:ver")) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <AlertTriangle className="h-12 w-12 text-muted-foreground" />
         <h2 className="text-xl font-semibold">Acesso Restrito</h2>
-        <p className="text-muted-foreground">Você não tem permissão para ver as configurações.</p>
+        <p className="text-muted-foreground">
+          Você não tem permissão para ver as configurações.
+        </p>
       </div>
-    )
+    );
   }
 
   return (
@@ -87,7 +95,10 @@ export default function ConfiguracoesPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="empresa">Nome da Empresa</Label>
-                  <Input id="empresa" defaultValue="Supermercado Exemplo Ltda" />
+                  <Input
+                    id="empresa"
+                    defaultValue="Supermercado Exemplo Ltda"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="cnpj">CNPJ</Label>
@@ -97,7 +108,10 @@ export default function ConfiguracoesPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="endereco">Endereço</Label>
-                  <Input id="endereco" defaultValue="Rua das Flores, 123 - Centro" />
+                  <Input
+                    id="endereco"
+                    defaultValue="Rua das Flores, 123 - Centro"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="cidade">Cidade/Estado</Label>
@@ -180,18 +194,18 @@ export default function ConfiguracoesPage() {
                     <TableHead>Email</TableHead>
                     <TableHead>Perfil</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead className="w-[100px]">Ações</TableHead>
+                    <TableHead className="w-25">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {mockUsers.map((user) => {
                     const initials = user.nome
-                      .split(' ')
-                      .map(n => n[0])
-                      .join('')
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")
                       .toUpperCase()
-                      .slice(0, 2)
-                    
+                      .slice(0, 2);
+
                     return (
                       <TableRow key={user.id}>
                         <TableCell>
@@ -204,25 +218,37 @@ export default function ConfiguracoesPage() {
                             <span className="font-medium">{user.nome}</span>
                           </div>
                         </TableCell>
-                        <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {user.email}
+                        </TableCell>
                         <TableCell>
-                          <Badge variant="outline">{getRoleLabel(user.role)}</Badge>
+                          <Badge variant="outline">
+                            {getRoleLabel(user.role)}
+                          </Badge>
                         </TableCell>
                         <TableCell>
                           <Badge variant="default">Ativo</Badge>
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                            >
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-destructive"
+                            >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </TableCell>
                       </TableRow>
-                    )
+                    );
                   })}
                 </TableBody>
               </Table>
@@ -238,9 +264,7 @@ export default function ConfiguracoesPage() {
                 <Database className="h-5 w-5" />
                 Banco de Dados
               </CardTitle>
-              <CardDescription>
-                Configuração do Supabase
-              </CardDescription>
+              <CardDescription>Configuração do Supabase</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between p-4 rounded-lg border">
@@ -253,7 +277,10 @@ export default function ConfiguracoesPage() {
                     <p className="text-sm text-muted-foreground">Conectado</p>
                   </div>
                 </div>
-                <Badge variant="outline" className="text-success border-success">
+                <Badge
+                  variant="outline"
+                  className="text-success border-success"
+                >
                   Ativo
                 </Badge>
               </div>
@@ -265,7 +292,12 @@ export default function ConfiguracoesPage() {
                 <div className="space-y-2">
                   <Label>Chave Anon</Label>
                   <div className="flex gap-2">
-                    <Input type="password" defaultValue="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9" readOnly className="flex-1" />
+                    <Input
+                      type="password"
+                      defaultValue="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
+                      readOnly
+                      className="flex-1"
+                    />
                     <Button variant="outline" size="icon">
                       <Key className="h-4 w-4" />
                     </Button>
@@ -293,7 +325,9 @@ export default function ConfiguracoesPage() {
                   </div>
                   <div>
                     <p className="font-medium">ToDo Friendly</p>
-                    <p className="text-sm text-muted-foreground">Não configurado</p>
+                    <p className="text-sm text-muted-foreground">
+                      Não configurado
+                    </p>
                   </div>
                 </div>
                 <Button variant="outline">Configurar</Button>
@@ -316,7 +350,9 @@ export default function ConfiguracoesPage() {
                   </div>
                   <div>
                     <p className="font-medium">Adicionar Integração</p>
-                    <p className="text-sm text-muted-foreground">Conecte seu ERP ou sistema de NF</p>
+                    <p className="text-sm text-muted-foreground">
+                      Conecte seu ERP ou sistema de NF
+                    </p>
                   </div>
                 </div>
                 <Button variant="outline">Adicionar</Button>
@@ -379,12 +415,17 @@ export default function ConfiguracoesPage() {
               </div>
               <div className="pt-2">
                 <Label htmlFor="limite">Limite diário de perda (R$)</Label>
-                <Input id="limite" type="number" defaultValue="500" className="mt-2 max-w-[200px]" />
+                <Input
+                  id="limite"
+                  type="number"
+                  defaultValue="500"
+                  className="mt-2 max-w-50"
+                />
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
     </div>
-  )
+  );
 }
