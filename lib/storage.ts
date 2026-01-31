@@ -6,6 +6,23 @@ const KEYS = {
   CATEGORIES: "losscontrol_categories",
   EVENTS: "losscontrol_events",
   GALLERY: "losscontrol_gallery",
+  SETTINGS: "losscontrol_settings", // Nova chave
+};
+
+// Interface para as Configurações Gerais
+export interface AppSettings {
+  empresaNome: string;
+  exigirFoto: boolean;
+  bloquearAprovados: boolean;
+  limiteDiario: number;
+}
+
+// Configuração Padrão
+const DEFAULT_SETTINGS: AppSettings = {
+  empresaNome: "Minha Empresa",
+  exigirFoto: false,
+  bloquearAprovados: true,
+  limiteDiario: 1000,
 };
 
 const get = <T>(key: string, defaultValue: T): T => {
@@ -21,6 +38,17 @@ const set = (key: string, value: any) => {
 };
 
 export const StorageService = {
+  // --- CONFIGURAÇÕES GERAIS ---
+  getSettings: (): AppSettings => {
+    return get<AppSettings>(KEYS.SETTINGS, DEFAULT_SETTINGS);
+  },
+
+  saveSettings: (settings: Partial<AppSettings>) => {
+    const current = StorageService.getSettings();
+    const newSettings = { ...current, ...settings };
+    set(KEYS.SETTINGS, newSettings);
+  },
+
   // --- USUÁRIOS ---
   getUsers: (): User[] => {
     const users = get<User[]>(KEYS.USERS, []);
@@ -41,9 +69,19 @@ export const StorageService = {
   saveUser: (user: User) => {
     const users = StorageService.getUsers();
     const index = users.findIndex((u) => u.id === user.id);
-    if (index >= 0) users[index] = user;
-    else users.push(user);
+
+    // Se for edição, atualiza. Se for novo, adiciona.
+    if (index >= 0) {
+      users[index] = { ...users[index], ...user };
+    } else {
+      users.push(user);
+    }
     set(KEYS.USERS, users);
+  },
+
+  deleteUser: (id: string) => {
+    const list = StorageService.getUsers().filter((u) => u.id !== id);
+    set(KEYS.USERS, list);
   },
 
   // --- CATEGORIAS ---
@@ -58,17 +96,14 @@ export const StorageService = {
     set(KEYS.CATEGORIES, list);
   },
 
-  // NOVA FUNÇÃO: Sincronizar categorias via importação CSV
   syncCategories: (categoryNames: string[]) => {
     const current = StorageService.getCategorias();
-    // Cria um Set com nomes existentes (uppercase para evitar duplicatas "Bebidas" vs "BEBIDAS")
     const existingNames = new Set(current.map((c) => c.nome.toUpperCase()));
     const newCats: CategoriaData[] = [];
 
     categoryNames.forEach((name) => {
       if (!name) return;
       const cleanName = name.trim();
-      // Se não existe, cria
       if (!existingNames.has(cleanName.toUpperCase())) {
         newCats.push({
           id: Math.random().toString(36).substr(2, 9),

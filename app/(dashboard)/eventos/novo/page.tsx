@@ -2,7 +2,7 @@
 // Essa página é similar a app/(dashboard)/eventos/page.tsx, mas para criação de novos eventos
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,13 +55,22 @@ interface ItemLancamento {
 
 export default function NovoEventoPage() {
   const router = useRouter();
-  const { user, hasPermission } = useAuth(); // Pegar o usuário logado
+  const { user, hasPermission } = useAuth();
 
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [quantidade, setQuantidade] = useState("");
   const [itemsList, setItemsList] = useState<ItemLancamento[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+
+  // Estado para a configuração de exigir foto
+  const [exigirFoto, setExigirFoto] = useState(false);
+
+  // Carregar configurações ao iniciar
+  useEffect(() => {
+    const settings = StorageService.getSettings();
+    setExigirFoto(settings.exigirFoto);
+  }, []);
 
   const handleItemSelect = (item: Item | null) => {
     setSelectedItem(item);
@@ -95,8 +104,10 @@ export default function NovoEventoPage() {
 
   const handleAddPhoto = (tempId: string) => {
     // Em um app real, aqui abriria o input de arquivo ou câmera
+    // Simulando uma URL de foto para teste
     const mockPhoto =
       "https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=400";
+
     setItemsList(
       itemsList.map((entry) => {
         if (entry.tempId === tempId) return { ...entry, fotoUrl: mockPhoto };
@@ -108,6 +119,18 @@ export default function NovoEventoPage() {
 
   const handleSubmit = async () => {
     if (itemsList.length === 0 || !user) return;
+
+    // --- VALIDAÇÃO DA REGRA DE NEGÓCIO ---
+    if (exigirFoto) {
+      const itensSemFoto = itemsList.filter((i) => !i.fotoUrl);
+      if (itensSemFoto.length > 0) {
+        toast.error(
+          `A empresa exige foto para todos os itens. Faltam ${itensSemFoto.length} fotos.`,
+        );
+        return; // Interrompe o envio
+      }
+    }
+    // -------------------------------------
 
     setIsSubmitting(true);
 
@@ -123,11 +146,11 @@ export default function NovoEventoPage() {
           item: entry.item,
           quantidade: entry.quantidade,
           unidade: entry.unidade,
-          custoSnapshot: entry.item.custo, // Salva o custo no momento da perda
+          custoSnapshot: entry.item.custo,
           precoVendaSnapshot: entry.item.precoVenda,
-          motivo: "Perda Operacional", // Poderia ser um input extra
-          status: "enviado", // Status inicial padrão
-          criadoPor: user, // Usuário logado
+          motivo: "Perda Operacional",
+          status: "enviado",
+          criadoPor: user,
           evidencias: entry.fotoUrl
             ? [
                 {
@@ -154,8 +177,6 @@ export default function NovoEventoPage() {
   const handleSuccessClose = () => {
     setShowSuccess(false);
     setItemsList([]);
-    // Opcional: Redirecionar para a lista de eventos
-    // router.push('/eventos');
   };
 
   if (!hasPermission("eventos:criar")) {
@@ -281,8 +302,17 @@ export default function NovoEventoPage() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className={`h-8 w-8 ${entry.fotoUrl ? "text-primary" : "text-muted-foreground/30"}`}
+                        className={`h-8 w-8 ${
+                          entry.fotoUrl
+                            ? "text-primary bg-primary/10"
+                            : "text-muted-foreground/30 hover:text-primary"
+                        } ${exigirFoto && !entry.fotoUrl ? "animate-pulse text-orange-500" : ""}`}
                         onClick={() => handleAddPhoto(entry.tempId)}
+                        title={
+                          exigirFoto && !entry.fotoUrl
+                            ? "Foto Obrigatória"
+                            : "Adicionar Foto"
+                        }
                       >
                         {entry.fotoUrl ? (
                           <ImageIcon className="h-4 w-4" />
@@ -325,7 +355,14 @@ export default function NovoEventoPage() {
         </div>
 
         {itemsList.length > 0 && (
-          <div className="p-3 bg-muted/20 border-t flex justify-end gap-3 shrink-0">
+          <div className="p-3 bg-muted/20 border-t flex justify-end gap-3 shrink-0 items-center">
+            {exigirFoto && itemsList.some((i) => !i.fotoUrl) && (
+              <span className="text-xs text-orange-600 font-medium flex items-center mr-auto">
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                Fotos obrigatórias pendentes
+              </span>
+            )}
+
             <Button
               variant="ghost"
               size="sm"

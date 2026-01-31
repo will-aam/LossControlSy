@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -22,32 +23,103 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { mockUsers, getRoleLabel, UserRole } from "@/lib/mock-data";
+import { User, getRoleLabel, UserRole } from "@/lib/mock-data";
+import { StorageService, AppSettings } from "@/lib/storage";
 import { useAuth } from "@/lib/auth-context";
+import { UserFormDialog } from "@/components/configuracoes/user-form-dialog";
 import {
   AlertTriangle,
   Building2,
   Users,
   Bell,
-  Database,
   Shield,
   Edit,
   Trash2,
   Plus,
-  Key,
-  Link2,
 } from "lucide-react";
+import { toast } from "sonner";
 
 const roleColors: Record<UserRole, string> = {
-  funcionario: "bg-chart-1",
-  gestor: "bg-chart-2",
-  fiscal: "bg-chart-3",
-  dono: "bg-chart-4",
+  funcionario: "bg-blue-500 text-white",
+  gestor: "bg-purple-500 text-white",
+  fiscal: "bg-orange-500 text-white",
+  dono: "bg-emerald-600 text-white",
 };
 
 export default function ConfiguracoesPage() {
-  const { hasPermission } = useAuth();
+  const { hasPermission, user: currentUser } = useAuth();
+
+  // Estados de Dados
+  const [users, setUsers] = useState<User[]>([]);
+  const [settings, setSettings] = useState<AppSettings>({
+    empresaNome: "",
+    exigirFoto: false,
+    bloquearAprovados: true,
+    limiteDiario: 1000,
+  });
+
+  // Estados de Modais
+  const [showUserDialog, setShowUserDialog] = useState(false);
+  const [userToEdit, setUserToEdit] = useState<User | null>(null);
+  const [userToDelete, setUserToDelete] = useState<string | null>(null);
+
+  // Carregar dados ao iniciar
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = () => {
+    setUsers(StorageService.getUsers());
+    setSettings(StorageService.getSettings());
+  };
+
+  // --- AÇÕES DE CONFIGURAÇÃO GERAL ---
+  const handleSaveSettings = () => {
+    StorageService.saveSettings(settings);
+    toast.success("Configurações salvas com sucesso!");
+  };
+
+  // --- AÇÕES DE USUÁRIOS ---
+  const handleSaveUser = (user: User) => {
+    StorageService.saveUser(user);
+    loadData();
+    toast.success(
+      userToEdit ? "Usuário atualizado!" : "Usuário criado com sucesso!",
+    );
+    setUserToEdit(null);
+  };
+
+  const handleEditUser = (user: User) => {
+    setUserToEdit(user);
+    setShowUserDialog(true);
+  };
+
+  const handleDeleteUser = () => {
+    if (userToDelete) {
+      // Impede excluir a si mesmo
+      if (userToDelete === currentUser?.id) {
+        toast.error("Você não pode excluir sua própria conta.");
+        setUserToDelete(null);
+        return;
+      }
+
+      StorageService.deleteUser(userToDelete);
+      loadData();
+      toast.success("Usuário removido.");
+      setUserToDelete(null);
+    }
+  };
 
   if (!hasPermission("configuracoes:ver")) {
     return (
@@ -75,11 +147,10 @@ export default function ConfiguracoesPage() {
         <TabsList>
           <TabsTrigger value="geral">Geral</TabsTrigger>
           <TabsTrigger value="usuarios">Usuários</TabsTrigger>
-          <TabsTrigger value="integracoes">Integrações</TabsTrigger>
           <TabsTrigger value="notificacoes">Notificações</TabsTrigger>
         </TabsList>
 
-        {/* Geral Tab */}
+        {/* --- GERAL TAB --- */}
         <TabsContent value="geral" className="space-y-6">
           <Card>
             <CardHeader>
@@ -128,10 +199,10 @@ export default function ConfiguracoesPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Shield className="h-5 w-5" />
-                Configurações de Segurança
+                Políticas de Segurança
               </CardTitle>
               <CardDescription>
-                Controle de acesso e políticas de segurança
+                Regras para registro e edição de perdas
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -139,36 +210,41 @@ export default function ConfiguracoesPage() {
                 <div className="space-y-0.5">
                   <Label>Exigir foto em eventos</Label>
                   <p className="text-sm text-muted-foreground">
-                    Torna obrigatório anexar ao menos uma foto como evidência
+                    Impede finalizar uma perda se houver itens sem foto.
                   </p>
                 </div>
-                <Switch />
+                <Switch
+                  checked={settings.exigirFoto}
+                  onCheckedChange={(checked) =>
+                    setSettings({ ...settings, exigirFoto: checked })
+                  }
+                />
               </div>
               <Separator />
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label>Bloquear edição após aprovação</Label>
                   <p className="text-sm text-muted-foreground">
-                    Impede alterações em eventos já aprovados
+                    Impede alterações em eventos já aprovados.
                   </p>
                 </div>
-                <Switch defaultChecked />
+                <Switch
+                  checked={settings.bloquearAprovados}
+                  onCheckedChange={(checked) =>
+                    setSettings({ ...settings, bloquearAprovados: checked })
+                  }
+                />
               </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Autenticação em dois fatores</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Exigir 2FA para todos os usuários
-                  </p>
-                </div>
-                <Switch />
+              <div className="flex justify-end mt-4">
+                <Button variant="outline" onClick={handleSaveSettings}>
+                  Atualizar Políticas
+                </Button>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Usuários Tab */}
+        {/* --- USUÁRIOS TAB --- */}
         <TabsContent value="usuarios" className="space-y-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
@@ -178,10 +254,15 @@ export default function ConfiguracoesPage() {
                   Usuários do Sistema
                 </CardTitle>
                 <CardDescription>
-                  Gerencie os usuários e suas permissões
+                  Gerencie quem tem acesso e suas funções
                 </CardDescription>
               </div>
-              <Button>
+              <Button
+                onClick={() => {
+                  setUserToEdit(null);
+                  setShowUserDialog(true);
+                }}
+              >
                 <Plus className="mr-2 h-4 w-4" />
                 Novo Usuário
               </Button>
@@ -198,7 +279,7 @@ export default function ConfiguracoesPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {mockUsers.map((user) => {
+                  {users.map((user) => {
                     const initials = user.nome
                       .split(" ")
                       .map((n) => n[0])
@@ -235,13 +316,16 @@ export default function ConfiguracoesPage() {
                               variant="ghost"
                               size="icon"
                               className="h-8 w-8"
+                              onClick={() => handleEditUser(user)}
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-destructive"
+                              className="h-8 w-8 text-destructive hover:text-destructive"
+                              onClick={() => setUserToDelete(user.id)}
+                              disabled={user.id === currentUser?.id}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -256,112 +340,7 @@ export default function ConfiguracoesPage() {
           </Card>
         </TabsContent>
 
-        {/* Integrações Tab */}
-        <TabsContent value="integracoes" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Database className="h-5 w-5" />
-                Banco de Dados
-              </CardTitle>
-              <CardDescription>Configuração do Supabase</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-4 rounded-lg border">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success/20">
-                    <Database className="h-5 w-5 text-success" />
-                  </div>
-                  <div>
-                    <p className="font-medium">Supabase</p>
-                    <p className="text-sm text-muted-foreground">Conectado</p>
-                  </div>
-                </div>
-                <Badge
-                  variant="outline"
-                  className="text-success border-success"
-                >
-                  Ativo
-                </Badge>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>URL do Projeto</Label>
-                  <Input defaultValue="https://abc123.supabase.co" readOnly />
-                </div>
-                <div className="space-y-2">
-                  <Label>Chave Anon</Label>
-                  <div className="flex gap-2">
-                    <Input
-                      type="password"
-                      defaultValue="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
-                      readOnly
-                      className="flex-1"
-                    />
-                    <Button variant="outline" size="icon">
-                      <Key className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Link2 className="h-5 w-5" />
-                Armazenamento de Imagens
-              </CardTitle>
-              <CardDescription>
-                Configuração do ToDo Friendly para armazenamento de fotos
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-4 rounded-lg border">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                    <Link2 className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <p className="font-medium">ToDo Friendly</p>
-                    <p className="text-sm text-muted-foreground">
-                      Não configurado
-                    </p>
-                  </div>
-                </div>
-                <Button variant="outline">Configurar</Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Integrações Externas</CardTitle>
-              <CardDescription>
-                Conexões com sistemas ERP e outros
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-4 rounded-lg border border-dashed">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                    <Plus className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <p className="font-medium">Adicionar Integração</p>
-                    <p className="text-sm text-muted-foreground">
-                      Conecte seu ERP ou sistema de NF
-                    </p>
-                  </div>
-                </div>
-                <Button variant="outline">Adicionar</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Notificações Tab */}
+        {/* --- NOTIFICAÇÕES TAB (Visual apenas por enquanto) --- */}
         <TabsContent value="notificacoes" className="space-y-6">
           <Card>
             <CardHeader>
@@ -370,62 +349,71 @@ export default function ConfiguracoesPage() {
                 Preferências de Notificação
               </CardTitle>
               <CardDescription>
-                Configure quando e como receber alertas
+                Configure os alertas (Disponível em breve)
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-6 opacity-60 pointer-events-none">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label>Novos eventos de perda</Label>
                   <p className="text-sm text-muted-foreground">
-                    Notificar gestores sobre novos registros
+                    Notificar gestores via App
                   </p>
                 </div>
                 <Switch defaultChecked />
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Eventos pendentes há mais de 24h</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Alertar sobre eventos aguardando aprovação
-                  </p>
-                </div>
-                <Switch defaultChecked />
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Relatório semanal</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Enviar resumo semanal por email
-                  </p>
-                </div>
-                <Switch />
               </div>
               <Separator />
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label>Alerta de limite de perda</Label>
                   <p className="text-sm text-muted-foreground">
-                    Notificar quando perdas ultrapassarem limite diário
+                    Alertar quando ultrapassar o limite diário
                   </p>
                 </div>
                 <Switch defaultChecked />
-              </div>
-              <div className="pt-2">
-                <Label htmlFor="limite">Limite diário de perda (R$)</Label>
-                <Input
-                  id="limite"
-                  type="number"
-                  defaultValue="500"
-                  className="mt-2 max-w-50"
-                />
               </div>
             </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* MODAL DE USUÁRIO */}
+      <UserFormDialog
+        open={showUserDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            setShowUserDialog(false);
+            setUserToEdit(null);
+          }
+        }}
+        userToEdit={userToEdit}
+        onSave={handleSaveUser}
+      />
+
+      {/* ALERTA DE EXCLUSÃO */}
+      <AlertDialog
+        open={!!userToDelete}
+        onOpenChange={(open) => !open && setUserToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Essa ação removerá o usuário permanentemente e ele perderá o
+              acesso ao sistema.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteUser}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Excluir Usuário
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
