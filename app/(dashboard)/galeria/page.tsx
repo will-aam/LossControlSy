@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,6 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -20,8 +19,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  mockEventos,
-  mockEvidencias,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Evidencia,
   Evento,
   formatDate,
@@ -29,7 +36,9 @@ import {
   getStatusLabel,
   getStatusColor,
 } from "@/lib/mock-data";
+import { StorageService } from "@/lib/storage";
 import { useAuth } from "@/lib/auth-context";
+import { UploadDialog } from "@/components/galeria/upload-dialog";
 import {
   Search,
   Calendar,
@@ -37,55 +46,118 @@ import {
   ZoomIn,
   ChevronLeft,
   ChevronRight,
-  Download,
   Package,
   X,
+  Upload,
+  Plus,
+  Trash2,
+  Camera,
+  MoreVertical,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "sonner";
 
-interface EvidenciaWithEvento extends Evidencia {
+// Interface estendida para exibição
+interface EvidenciaDisplay extends Evidencia {
   evento?: Evento;
 }
 
 export default function GaleriaPage() {
   const { hasPermission } = useAuth();
+
+  // Dados
+  const [evidencias, setEvidencias] = useState<EvidenciaDisplay[]>([]);
+
+  // Filtros e Seleção
   const [selectedDate, setSelectedDate] = useState<string>("todas");
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedPhoto, setSelectedPhoto] =
-    useState<EvidenciaWithEvento | null>(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<EvidenciaDisplay | null>(
+    null,
+  );
   const [photoIndex, setPhotoIndex] = useState(0);
 
-  // Build evidencias with evento references
-  const evidenciasWithEventos: EvidenciaWithEvento[] = useMemo(() => {
-    const result: EvidenciaWithEvento[] = [];
+  // Modais e Upload
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [photoToDelete, setPhotoToDelete] = useState<EvidenciaDisplay | null>(
+    null,
+  );
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-    mockEventos.forEach((evento) => {
-      evento.evidencias.forEach((ev) => {
-        result.push({
-          ...ev,
-          evento,
-        });
-      });
-    });
-
-    // Add orphan evidencias
-    mockEvidencias.forEach((ev) => {
-      if (!result.find((e) => e.id === ev.id)) {
-        result.push(ev);
-      }
-    });
-
-    return result.sort(
-      (a, b) =>
-        new Date(b.dataUpload).getTime() - new Date(a.dataUpload).getTime(),
-    );
+  // Carregar dados
+  useEffect(() => {
+    loadData();
   }, []);
 
-  // Get unique dates for filter
+  const loadData = () => {
+    const allData = StorageService.getAllEvidencias();
+    setEvidencias(allData);
+  };
+
+  // --- AÇÕES DE UPLOAD ---
+
+  // 1. Upload Rápido (Apenas seleciona e salva com data)
+  const handleQuickUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const url = URL.createObjectURL(file); // Em prod, usaria upload real
+
+      const novaEvidencia: Evidencia = {
+        id: Math.random().toString(36).substr(2, 9),
+        url: url,
+        dataUpload: new Date().toISOString(),
+        motivo: "Upload Rápido",
+        // Sem item vinculado
+      };
+
+      StorageService.saveEvidenciaAvulsa(novaEvidencia);
+      loadData();
+      toast.success("Foto adicionada à galeria");
+    }
+    // Limpa input
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  // 2. Upload Detalhado (Vem do Modal)
+  const handleDetailedSave = (data: Partial<Evidencia>) => {
+    const novaEvidencia: Evidencia = {
+      id: Math.random().toString(36).substr(2, 9),
+      url: data.url || "",
+      dataUpload: data.dataUpload || new Date().toISOString(),
+      motivo: data.motivo,
+      itemId: data.itemId,
+    };
+
+    StorageService.saveEvidenciaAvulsa(novaEvidencia);
+    loadData();
+    toast.success("Foto registrada com detalhes!");
+  };
+
+  // --- AÇÃO DE EXCLUSÃO ---
+  const confirmDelete = () => {
+    if (!photoToDelete) return;
+
+    if (photoToDelete.evento) {
+      toast.error(
+        "Não é possível excluir fotos vinculadas a eventos auditados aqui.",
+      );
+    } else {
+      StorageService.deleteEvidenciaAvulsa(photoToDelete.id);
+      loadData();
+      toast.success("Foto removida.");
+      if (selectedPhoto?.id === photoToDelete.id) setSelectedPhoto(null);
+    }
+    setPhotoToDelete(null);
+  };
+
+  // --- FILTROS ---
   const uniqueDates = useMemo(() => {
     const dates = new Set<string>();
-    evidenciasWithEventos.forEach((ev) => {
-      dates.add(formatDate(ev.dataUpload));
-    });
+    evidencias.forEach((ev) => dates.add(formatDate(ev.dataUpload)));
     return Array.from(dates).sort((a, b) => {
       const [da, ma, ya] = a.split("/");
       const [db, mb, yb] = b.split("/");
@@ -94,10 +166,10 @@ export default function GaleriaPage() {
         new Date(`${ya}-${ma}-${da}`).getTime()
       );
     });
-  }, [evidenciasWithEventos]);
+  }, [evidencias]);
 
   const filteredEvidencias = useMemo(() => {
-    let filtered = evidenciasWithEventos;
+    let filtered = evidencias;
 
     if (selectedDate !== "todas") {
       filtered = filtered.filter(
@@ -111,14 +183,15 @@ export default function GaleriaPage() {
         (ev) =>
           ev.evento?.item?.nome.toLowerCase().includes(query) ||
           ev.evento?.item?.codigoInterno.toLowerCase().includes(query) ||
-          ev.evento?.motivo?.toLowerCase().includes(query),
+          ev.motivo?.toLowerCase().includes(query),
       );
     }
 
     return filtered;
-  }, [evidenciasWithEventos, selectedDate, searchQuery]);
+  }, [evidencias, selectedDate, searchQuery]);
 
-  const handlePhotoClick = (photo: EvidenciaWithEvento, index: number) => {
+  // --- NAVEGAÇÃO DO VIEWER ---
+  const handlePhotoClick = (photo: EvidenciaDisplay, index: number) => {
     setSelectedPhoto(photo);
     setPhotoIndex(index);
   };
@@ -142,31 +215,49 @@ export default function GaleriaPage() {
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <AlertTriangle className="h-12 w-12 text-muted-foreground" />
         <h2 className="text-xl font-semibold">Acesso Restrito</h2>
-        <p className="text-muted-foreground">
-          Você não tem permissão para ver a galeria.
-        </p>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header e Ações */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Galeria</h1>
           <p className="text-muted-foreground">
-            Visualize todas as fotos de evidência registradas
+            Visualize evidências de eventos e fotos avulsas.
           </p>
         </div>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Calendar className="h-4 w-4" />
-          {filteredEvidencias.length} fotos
+
+        {/* BOTÕES DE UPLOAD */}
+        <div className="flex gap-2">
+          {/* Input Oculto para Upload Rápido */}
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            ref={fileInputRef}
+            onChange={handleQuickUpload}
+          />
+
+          <Button
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Camera className="mr-2 h-4 w-4" />
+            Foto Rápida
+          </Button>
+
+          <Button onClick={() => setShowUploadDialog(true)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Adicionar Detalhado
+          </Button>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col gap-4 sm:flex-row">
+      {/* Filtros */}
+      <div className="flex flex-col gap-4 sm:flex-row bg-background/95 backdrop-blur z-10 py-1">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -192,167 +283,242 @@ export default function GaleriaPage() {
         </Select>
       </div>
 
-      {/* Gallery Grid */}
+      {/* Grid de Fotos */}
       {filteredEvidencias.length > 0 ? (
-        <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+        <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 pb-10">
           {filteredEvidencias.map((evidencia, index) => (
             <Card
               key={evidencia.id}
-              className="group cursor-pointer overflow-hidden"
-              onClick={() => handlePhotoClick(evidencia, index)}
+              className="group relative overflow-hidden border-0 shadow-sm ring-1 ring-border/50"
             >
-              <CardContent className="p-0 relative">
-                <div className="aspect-square">
-                  <img
-                    src={evidencia.url || "/placeholder.svg"}
-                    alt={`Evidência ${index + 1}`}
-                    className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                  />
+              <CardContent
+                className="p-0 aspect-square relative cursor-pointer"
+                onClick={() => handlePhotoClick(evidencia, index)}
+              >
+                <img
+                  src={evidencia.url || "/placeholder.svg"}
+                  alt={`Evidência ${index + 1}`}
+                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                />
+
+                {/* Overlay Gradiente */}
+                <div className="absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
+                  <p className="text-white text-xs font-medium truncate">
+                    {evidencia.evento?.item?.nome || "Foto Avulsa"}
+                  </p>
+                  <p className="text-white/70 text-[10px]">
+                    {formatDate(evidencia.dataUpload)}
+                  </p>
                 </div>
-                <div className="absolute inset-0 bg-linear-to-trom-background/90 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="absolute bottom-0 left-0 right-0 p-2">
-                    <p className="text-xs font-medium truncate">
-                      {evidencia.evento?.item?.nome || "Sem item"}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDate(evidencia.dataUpload)}
-                    </p>
-                  </div>
-                </div>
+
+                {/* Ícone de Zoom */}
                 <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="rounded-full bg-background/80 p-1.5 backdrop-blur-sm">
-                    <ZoomIn className="h-4 w-4" />
+                  <div className="rounded-full bg-black/50 p-1.5 backdrop-blur-sm text-white">
+                    <ZoomIn className="h-3 w-3" />
                   </div>
                 </div>
               </CardContent>
+
+              {/* Botão de Menu/Excluir (Só aparece se não for de evento auditado ou se for admin) */}
+              {!evidencia.evento && (
+                <div
+                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-6 w-6 rounded-full bg-black/50 hover:bg-black/70 text-white"
+                      >
+                        <MoreVertical className="h-3 w-3" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        className="text-destructive focus:text-destructive text-xs"
+                        onClick={() => setPhotoToDelete(evidencia)}
+                      >
+                        <Trash2 className="mr-2 h-3 w-3" /> Excluir Foto
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )}
             </Card>
           ))}
         </div>
       ) : (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-          <Search className="h-12 w-12 text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold">Nenhuma foto encontrada</h3>
-          <p className="text-muted-foreground mt-1">
-            Tente ajustar os filtros de busca.
+        <div className="flex flex-col items-center justify-center py-16 text-center border-2 border-dashed rounded-lg bg-muted/5">
+          <div className="bg-muted/50 p-4 rounded-full mb-4">
+            <Search className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h3 className="text-lg font-medium">Nenhuma foto encontrada</h3>
+          <p className="text-muted-foreground text-sm mt-1 max-w-xs">
+            Tente ajustar os filtros ou adicione novas fotos usando os botões
+            acima.
           </p>
         </div>
       )}
 
-      {/* Photo Viewer Dialog */}
+      {/* Modal Visualizador */}
       <Dialog
         open={!!selectedPhoto}
         onOpenChange={(open) => !open && setSelectedPhoto(null)}
       >
-        <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden">
-          <div className="relative">
-            {/* Close button */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-2 right-2 z-10 bg-background/80 backdrop-blur-sm"
-              onClick={() => setSelectedPhoto(null)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-
-            {/* Navigation */}
-            {filteredEvidencias.length > 1 && (
-              <>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-background/80 backdrop-blur-sm"
-                  onClick={handlePrevPhoto}
-                >
-                  <ChevronLeft className="h-6 w-6" />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-background/80 backdrop-blur-sm"
-                  onClick={handleNextPhoto}
-                >
-                  <ChevronRight className="h-6 w-6" />
-                </Button>
-              </>
-            )}
-
-            {/* Image */}
-            {selectedPhoto && (
-              <img
-                src={selectedPhoto.url || "/placeholder.svg"}
-                alt="Evidência"
-                className="w-full max-h-[70vh] object-contain bg-muted"
-              />
-            )}
-          </div>
-
-          {/* Details */}
-          {selectedPhoto && (
-            <div className="p-4 border-t">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  {selectedPhoto.evento ? (
-                    <div className="flex items-center gap-3">
-                      {selectedPhoto.evento.item?.imagemUrl ? (
-                        <img
-                          src={
-                            selectedPhoto.evento.item.imagemUrl ||
-                            "/placeholder.svg"
-                          }
-                          alt={selectedPhoto.evento.item.nome}
-                          className="h-12 w-12 rounded object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-12 w-12 items-center justify-center rounded bg-muted">
-                          <Package className="h-6 w-6 text-muted-foreground" />
-                        </div>
-                      )}
-                      <div>
-                        <p className="font-medium">
-                          {selectedPhoto.evento.item?.nome ||
-                            "Item não vinculado"}
-                        </p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Badge
-                            className={getStatusColor(
-                              selectedPhoto.evento.status,
-                            )}
-                          >
-                            {getStatusLabel(selectedPhoto.evento.status)}
-                          </Badge>
-                          <span className="text-sm text-muted-foreground">
-                            {selectedPhoto.evento.quantidade}{" "}
-                            {selectedPhoto.evento.unidade}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-muted-foreground">
-                      Foto sem evento vinculado
-                    </p>
-                  )}
-                </div>
-                <div className="text-right">
-                  <p className="text-sm text-muted-foreground">
-                    {formatDateTime(selectedPhoto.dataUpload)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {photoIndex + 1} de {filteredEvidencias.length}
-                  </p>
-                </div>
-              </div>
-              {selectedPhoto.evento?.motivo && (
-                <p className="text-sm text-muted-foreground mt-3 pt-3 border-t">
-                  <span className="font-medium text-foreground">Motivo:</span>{" "}
-                  {selectedPhoto.evento.motivo}
+        <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden bg-black/95 border-none">
+          <div className="relative w-full h-full flex flex-col">
+            {/* Header Flutuante */}
+            <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-start z-50 bg-linear-to-b from-black/80 to-transparent">
+              <div>
+                <h2 className="text-white font-medium text-sm">
+                  {selectedPhoto?.evento?.item?.nome || "Registro de Galeria"}
+                </h2>
+                <p className="text-white/70 text-xs">
+                  {selectedPhoto && formatDateTime(selectedPhoto.dataUpload)}
                 </p>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-white hover:bg-white/20 rounded-full"
+                onClick={() => setSelectedPhoto(null)}
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            {/* Imagem Principal */}
+            <div className="relative flex-1 bg-black min-h-[50vh] max-h-[80vh] flex items-center justify-center">
+              {selectedPhoto && (
+                <img
+                  src={selectedPhoto.url || "/placeholder.svg"}
+                  alt="Evidência Detalhada"
+                  className="max-h-full max-w-full object-contain"
+                />
+              )}
+
+              {/* Navegação */}
+              {filteredEvidencias.length > 1 && (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute left-2 top-1/2 -translate-y-1/2 text-white hover:bg-white/10 rounded-full h-10 w-10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePrevPhoto();
+                    }}
+                  >
+                    <ChevronLeft className="h-6 w-6" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-white hover:bg-white/10 rounded-full h-10 w-10"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleNextPhoto();
+                    }}
+                  >
+                    <ChevronRight className="h-6 w-6" />
+                  </Button>
+                </>
               )}
             </div>
-          )}
+
+            {/* Footer com Detalhes */}
+            <div className="bg-background p-4 border-t">
+              <div className="flex items-start gap-4">
+                {selectedPhoto?.evento ? (
+                  // Se for vinculado a evento
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge variant="outline">
+                        {selectedPhoto.evento.item?.codigoInterno}
+                      </Badge>
+                      <Badge
+                        className={getStatusColor(selectedPhoto.evento.status)}
+                      >
+                        {getStatusLabel(selectedPhoto.evento.status)}
+                      </Badge>
+                    </div>
+                    <p className="text-sm">
+                      Quantidade:{" "}
+                      <strong>
+                        {selectedPhoto.evento.quantidade}{" "}
+                        {selectedPhoto.evento.unidade}
+                      </strong>
+                    </p>
+                    {selectedPhoto.evento.motivo && (
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Motivo: {selectedPhoto.evento.motivo}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  // Se for foto avulsa
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Badge variant="secondary">Avulso</Badge>
+                    </div>
+                    <p className="text-sm text-foreground">
+                      {selectedPhoto?.motivo || "Sem observações registradas."}
+                    </p>
+                  </div>
+                )}
+
+                {/* Botão de Excluir no Viewer (apenas avulsas) */}
+                {!selectedPhoto?.evento && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => {
+                      setPhotoToDelete(selectedPhoto);
+                      // Fecha o viewer para mostrar o alerta
+                      setSelectedPhoto(null);
+                    }}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de Upload Detalhado */}
+      <UploadDialog
+        open={showUploadDialog}
+        onOpenChange={setShowUploadDialog}
+        onSave={handleDetailedSave}
+      />
+
+      {/* Alerta de Exclusão */}
+      <AlertDialog
+        open={!!photoToDelete}
+        onOpenChange={(open) => !open && setPhotoToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir foto?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Essa ação removerá a foto da galeria permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

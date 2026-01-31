@@ -1,10 +1,11 @@
-import { Item, CategoriaData, User, Evento } from "./mock-data";
+import { Item, CategoriaData, User, Evento, Evidencia } from "./mock-data";
 
 const KEYS = {
   USERS: "losscontrol_users",
   ITEMS: "losscontrol_items",
   CATEGORIES: "losscontrol_categories",
   EVENTS: "losscontrol_events",
+  GALLERY: "losscontrol_gallery", // Nova chave para fotos avulsas
 };
 
 const get = <T>(key: string, defaultValue: T): T => {
@@ -73,7 +74,6 @@ export const StorageService = {
     set(KEYS.ITEMS, list);
   },
 
-  // ADICIONADO: Função para deletar item
   deleteItem: (id: string) => {
     const list = StorageService.getItems().filter((i) => i.id !== id);
     set(KEYS.ITEMS, list);
@@ -88,6 +88,41 @@ export const StorageService = {
     if (index >= 0) list[index] = evento;
     else list.push(evento);
     set(KEYS.EVENTS, list);
+  },
+
+  // --- GALERIA (FOTOS AVULSAS) ---
+  getEvidenciasAvulsas: (): Evidencia[] => get<Evidencia[]>(KEYS.GALLERY, []),
+
+  saveEvidenciaAvulsa: (evidencia: Evidencia) => {
+    const list = StorageService.getEvidenciasAvulsas();
+    const index = list.findIndex((e) => e.id === evidencia.id);
+    if (index >= 0) list[index] = evidencia;
+    else list.push(evidencia);
+    set(KEYS.GALLERY, list);
+  },
+
+  deleteEvidenciaAvulsa: (id: string) => {
+    const list = StorageService.getEvidenciasAvulsas().filter(
+      (e) => e.id !== id,
+    );
+    set(KEYS.GALLERY, list);
+  },
+
+  // Helper para pegar TUDO (Eventos + Avulsas) unificado
+  getAllEvidencias: (): any[] => {
+    const eventos = StorageService.getEventos();
+    const avulsas = StorageService.getEvidenciasAvulsas();
+
+    // Mapeia evidências de eventos para incluir o objeto 'evento' dentro delas
+    const doEventos = eventos.flatMap((evt) =>
+      evt.evidencias.map((ev) => ({ ...ev, evento: evt })),
+    );
+
+    // Junta com as avulsas e ordena por data (mais recente primeiro)
+    return [...doEventos, ...avulsas].sort(
+      (a, b) =>
+        new Date(b.dataUpload).getTime() - new Date(a.dataUpload).getTime(),
+    );
   },
 
   clearAll: () => localStorage.clear(),

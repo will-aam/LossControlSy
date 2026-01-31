@@ -51,6 +51,8 @@ export interface Evidencia {
   url: string;
   dataUpload: string;
   eventoId?: string;
+  motivo?: string;
+  itemId?: string; // Para vincular a um produto sem criar um evento completo de perda
 }
 // Adicione esta Interface
 export interface CategoriaData {
