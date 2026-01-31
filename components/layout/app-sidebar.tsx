@@ -1,9 +1,9 @@
-'use client'
+"use client";
 
-import React from "react"
+import React from "react";
 
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   PlusCircle,
@@ -16,7 +16,7 @@ import {
   AlertTriangle,
   ChevronDown,
   LogOut,
-} from 'lucide-react'
+} from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -29,7 +29,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarSeparator,
-} from '@/components/ui/sidebar'
+} from "@/components/ui/sidebar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,11 +37,11 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
-import { useAuth } from '@/lib/auth-context'
-import { getRoleLabel, UserRole } from '@/lib/mock-data'
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/lib/auth-context";
+import { getRoleLabel, UserRole } from "@/lib/mock-data";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   LayoutDashboard,
@@ -52,53 +52,50 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Images,
   BarChart3,
   Settings,
-}
+};
 
 const roleColors: Record<UserRole, string> = {
-  funcionario: 'bg-chart-1',
-  gestor: 'bg-chart-2',
-  fiscal: 'bg-chart-3',
-  dono: 'bg-chart-4',
-}
+  funcionario: "bg-chart-1",
+  gestor: "bg-chart-2",
+  fiscal: "bg-chart-3",
+  dono: "bg-chart-4",
+};
 
 export function AppSidebar() {
-  const pathname = usePathname()
-  const { user, navItems, switchRole } = useAuth()
+  const pathname = usePathname();
+  const { user, navItems, switchRole } = useAuth();
 
-  if (!user) return null
+  if (!user) return null;
 
   const initials = user.nome
-    .split(' ')
-    .map(n => n[0])
-    .join('')
+    .split(" ")
+    .map((n) => n[0])
+    .join("")
     .toUpperCase()
-    .slice(0, 2)
+    .slice(0, 2);
 
   return (
     <Sidebar>
       <SidebarHeader className="p-4">
-        <Link href="/dashboard" className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-foreground">
-            <AlertTriangle className="h-6 w-6 text-background" />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold">Controle de Perdas</span>
-            <span className="text-xs text-muted-foreground">Sistema Operacional</span>
-          </div>
-        </Link>
+        <div className="flex flex-col">
+          <span className="text-sm font-semibold">Controle de Perdas</span>
+          <span className="text-xs text-muted-foreground">
+            Sistema Operacional
+          </span>
+        </div>
       </SidebarHeader>
-
-      <SidebarSeparator />
-
+      <SidebarSeparator className="" />
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupLabel>Menu Principal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {navItems.map((item) => {
-                const Icon = iconMap[item.icon] || LayoutDashboard
-                const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
-                
+                const Icon = iconMap[item.icon] || LayoutDashboard;
+                const isActive =
+                  pathname === item.href ||
+                  pathname.startsWith(item.href + "/");
+
                 return (
                   <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton asChild isActive={isActive}>
@@ -108,7 +105,7 @@ export function AppSidebar() {
                       </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
-                )
+                );
               })}
             </SidebarMenu>
           </SidebarGroupContent>
@@ -148,13 +145,17 @@ export function AppSidebar() {
                   Trocar Perfil (Demo)
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {(['funcionario', 'gestor', 'fiscal', 'dono'] as UserRole[]).map((role) => (
+                {(
+                  ["funcionario", "gestor", "fiscal", "dono"] as UserRole[]
+                ).map((role) => (
                   <DropdownMenuItem
                     key={role}
                     onClick={() => switchRole(role)}
                     className="cursor-pointer"
                   >
-                    <div className={`h-2 w-2 rounded-full ${roleColors[role]} mr-2`} />
+                    <div
+                      className={`h-2 w-2 rounded-full ${roleColors[role]} mr-2`}
+                    />
                     {getRoleLabel(role)}
                     {user.role === role && (
                       <Badge variant="secondary" className="ml-auto text-xs">
@@ -174,5 +175,5 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
-  )
+  );
 }
