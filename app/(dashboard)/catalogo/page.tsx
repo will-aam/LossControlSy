@@ -1,3 +1,4 @@
+// app/(dashboard)/catalogo/page.tsx
 "use client";
 
 import { useState, useMemo, useRef, useEffect } from "react";
@@ -25,7 +26,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-// --- NOVAS IMPORTAÇÕES DO ALERT DIALOG ---
+
 import {
   AlertDialog,
   AlertDialogAction,
