@@ -8,7 +8,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-// MANTENHA ChartContainer e ChartTooltipContent
 import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 import {
   Area,
@@ -19,38 +18,35 @@ import {
   XAxis,
   YAxis,
   Cell,
-  ResponsiveContainer,
-  Tooltip, // <--- IMPORTANTE: Importar Tooltip do Recharts aqui
+  Tooltip,
 } from "recharts";
 import { TrendingDown, AlertTriangle, DollarSign, Package } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
 import { formatCurrency, Evento, Item } from "@/lib/mock-data";
 import { useAuth } from "@/lib/auth-context";
 import { StorageService } from "@/lib/storage";
 
+// CORREÇÃO: Usar var() direta para compatibilidade com o tema
 const chartConfig = {
   custo: {
     label: "Custo",
-    color: "hsl(var(--chart-1))",
+    color: "var(--chart-1)",
   },
   precoVenda: {
     label: "Preço Venda",
-    color: "hsl(var(--chart-2))",
+    color: "var(--chart-2)",
   },
 };
 
 const categoryColors = [
-  "hsl(var(--chart-1))",
-  "hsl(var(--chart-2))",
-  "hsl(var(--chart-3))",
-  "hsl(var(--chart-4))",
-  "hsl(var(--chart-5))",
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
 ];
 
 export default function DashboardPage() {
   const { hasPermission } = useAuth();
-
   const [eventos, setEventos] = useState<Evento[]>([]);
 
   // Carrega dados
@@ -58,7 +54,7 @@ export default function DashboardPage() {
     setEventos(StorageService.getEventos());
   }, []);
 
-  // --- CÁLCULOS (Mantidos iguais) ---
+  // --- CÁLCULOS ---
   const stats = useMemo(() => {
     const hoje = new Date();
     const inicioHoje = new Date(hoje.setHours(0, 0, 0, 0));
@@ -77,6 +73,7 @@ export default function DashboardPage() {
     > = {};
     const tendenciaMap: Record<string, { custo: number; venda: number }> = {};
 
+    // Inicializa últimos 7 dias para o gráfico
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
@@ -98,10 +95,19 @@ export default function DashboardPage() {
       if (dataEv >= inicioSemana) {
         perdasSemana.qtd += 1;
         perdasSemana.custo += custoTotal;
-        const diaKey = dataEv.toLocaleDateString("pt-BR", { weekday: "short" });
-        if (tendenciaMap[diaKey]) {
-          tendenciaMap[diaKey].custo += custoTotal;
-          tendenciaMap[diaKey].venda += vendaTotal;
+
+        // Verifica se o dia está no range dos últimos 7 dias para o gráfico
+        const diffDays = Math.floor(
+          (new Date().getTime() - dataEv.getTime()) / (1000 * 3600 * 24),
+        );
+        if (diffDays <= 7) {
+          const diaKey = dataEv.toLocaleDateString("pt-BR", {
+            weekday: "short",
+          });
+          if (tendenciaMap[diaKey]) {
+            tendenciaMap[diaKey].custo += custoTotal;
+            tendenciaMap[diaKey].venda += vendaTotal;
+          }
         }
       }
       if (dataEv >= inicioMes) {
@@ -247,7 +253,6 @@ export default function DashboardPage() {
                   axisLine={false}
                   tickFormatter={(v) => `R$${v}`}
                 />
-                {/* AQUI ESTAVA O ERRO: Use Tooltip do Recharts com o conteúdo customizado */}
                 <Tooltip content={<ChartTooltipContent />} />
                 <Area
                   type="monotone"
