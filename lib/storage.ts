@@ -6,7 +6,7 @@ const KEYS = {
   CATEGORIES: "losscontrol_categories",
   EVENTS: "losscontrol_events",
   GALLERY: "losscontrol_gallery",
-  SETTINGS: "losscontrol_settings", // Nova chave
+  SETTINGS: "losscontrol_settings",
 };
 
 // Interface para as Configurações Gerais
@@ -15,6 +15,7 @@ export interface AppSettings {
   exigirFoto: boolean;
   bloquearAprovados: boolean;
   limiteDiario: number;
+  permitirFuncionarioGaleria: boolean; // NOVA CONFIGURAÇÃO
 }
 
 // Configuração Padrão
@@ -23,6 +24,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   exigirFoto: false,
   bloquearAprovados: true,
   limiteDiario: 1000,
+  permitirFuncionarioGaleria: false, // Padrão é desativado
 };
 
 const get = <T>(key: string, defaultValue: T): T => {
@@ -70,7 +72,6 @@ export const StorageService = {
     const users = StorageService.getUsers();
     const index = users.findIndex((u) => u.id === user.id);
 
-    // Se for edição, atualiza. Se for novo, adiciona.
     if (index >= 0) {
       users[index] = { ...users[index], ...user };
     } else {

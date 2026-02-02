@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { User, NavItem } from "@/lib/mock-data";
-import { StorageService } from "@/lib/storage"; // Importar Storage
+import { StorageService } from "@/lib/storage";
 import {
   LayoutDashboard,
   ClipboardCheck,
@@ -11,24 +11,47 @@ import {
   BarChart3,
   Settings,
   Tags,
-  ShieldAlert,
+  PlusCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 
-// Definição das Permissões por Cargo
+// Definição Granular das Permissões
 type Permission =
+  // Dashboard
   | "dashboard:ver"
-  | "eventos:ver_todos" // Alterado para bater com o arquivo de eventos
-  | "eventos:criar"
-  | "eventos:editar"
-  | "eventos:excluir" // Adicionado
+
+  // Eventos (Perdas)
+  | "eventos:ver_todos" // Ver a lista/audit
+  | "eventos:criar" // Registrar nova perda
+  | "eventos:editar" // Editar registro existente
+  | "eventos:excluir" // Excluir registro
+  | "eventos:aprovar" // Aprovar/Rejeitar lotes
+  | "eventos:exportar" // Botão exportar
+
+  // Catálogo (Itens)
   | "catalogo:ver"
-  | "catalogo:criar"
-  | "catalogo:editar"
+  | "catalogo:criar" // Criar um a um
+  | "catalogo:importar" // Importar CSV (Bloqueado para funcionário)
+  | "catalogo:editar" // Editar dados completos
+  | "catalogo:status" // Apenas ativar/desativar (Para funcionário)
+  | "catalogo:excluir"
+
+  // Categorias
+  | "categorias:ver"
+  | "categorias:criar"
+  | "categorias:editar"
+  | "categorias:excluir"
+
+  // Galeria
   | "galeria:ver"
+  | "galeria:upload" // Adicionar foto na galeria (não no evento)
+  | "galeria:excluir"
+
+  // Outros
   | "relatorios:ver"
   | "configuracoes:ver";
 
+// Matriz de Permissões por Cargo
 const ROLE_PERMISSIONS: Record<string, Permission[]> = {
   dono: [
     "dashboard:ver",
@@ -36,10 +59,21 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "eventos:criar",
     "eventos:editar",
     "eventos:excluir",
+    "eventos:aprovar",
+    "eventos:exportar",
     "catalogo:ver",
     "catalogo:criar",
+    "catalogo:importar",
     "catalogo:editar",
+    "catalogo:status",
+    "catalogo:excluir",
+    "categorias:ver",
+    "categorias:criar",
+    "categorias:editar",
+    "categorias:excluir",
     "galeria:ver",
+    "galeria:upload",
+    "galeria:excluir",
     "relatorios:ver",
     "configuracoes:ver",
   ],
@@ -48,22 +82,52 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "eventos:ver_todos",
     "eventos:criar",
     "eventos:editar",
+    "eventos:excluir",
+    "eventos:aprovar",
+    "eventos:exportar",
     "catalogo:ver",
     "catalogo:criar",
+    "catalogo:importar",
     "catalogo:editar",
+    "catalogo:status",
+    "catalogo:excluir",
+    "categorias:ver",
+    "categorias:criar",
+    "categorias:editar",
+    "categorias:excluir",
     "galeria:ver",
+    "galeria:upload",
+    "galeria:excluir",
     "relatorios:ver",
+    "configuracoes:ver", // Gestor pode ver configs (exceto deletar dono, tratado na UI)
   ],
   fiscal: [
     "dashboard:ver",
     "eventos:ver_todos",
-    "eventos:criar",
+    "eventos:exportar", // Vê tudo e exporta, mas NÃO cria/edita/aprova
     "catalogo:ver",
-    "galeria:ver",
+    "catalogo:criar",
+    "catalogo:importar",
+    "catalogo:editar",
+    "catalogo:status",
+    "catalogo:excluir",
+    "categorias:ver",
+    "categorias:criar",
+    "categorias:editar",
+    "categorias:excluir",
+    "galeria:ver", // Vê galeria mas não sobe foto lá
+    "relatorios:ver",
+    "configuracoes:ver",
   ],
   funcionario: [
-    "eventos:criar", // Funcionário foca em registrar
+    "eventos:criar", // Só cria evento
     "catalogo:ver",
+    "catalogo:criar",
+    "catalogo:status", // Cria e muda status, não edita dados full nem exclui
+    "categorias:ver",
+    "categorias:criar",
+    "categorias:editar", // Categorias: cria/edita, não exclui
+    // Galeria: A permissão 'galeria:ver' será dinâmica baseada na config
   ],
 };
 
@@ -82,75 +146,74 @@ const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [settings, setSettings] = useState(StorageService.getSettings());
 
-  // Verifica se já tem usuário logado ao abrir o app
+  // Atualiza settings periodicamente ou quando foca a janela (simples)
+  useEffect(() => {
+    setSettings(StorageService.getSettings());
+  }, [user]); // Atualiza settings sempre que user muda (login)
+
   useEffect(() => {
     const checkAuth = () => {
       const storedUserId = localStorage.getItem("losscontrol_active_user_id");
       if (storedUserId) {
-        // Busca o usuário atualizado do Storage
         const allUsers = StorageService.getUsers();
         const foundUser = allUsers.find((u) => u.id === storedUserId);
-
         if (foundUser) {
           setUser(foundUser);
         } else {
-          // Se o usuário foi excluído mas o ID estava no cache, limpa
           localStorage.removeItem("losscontrol_active_user_id");
         }
       }
       setIsLoading(false);
     };
-
     checkAuth();
   }, []);
 
   const login = async (email: string, password?: string) => {
     setIsLoading(true);
-
-    // Simula delay de rede
     await new Promise((resolve) => setTimeout(resolve, 800));
-
-    // 1. Busca usuários reais do sistema
     const users = StorageService.getUsers();
-
-    // 2. Tenta encontrar pelo email (case insensitive)
     const foundUser = users.find(
       (u) => u.email.toLowerCase() === email.toLowerCase(),
     );
 
     if (foundUser) {
-      // SUCESSO
       setUser(foundUser);
       localStorage.setItem("losscontrol_active_user_id", foundUser.id);
-      toast.success(`Bem-vindo de volta, ${foundUser.nome.split(" ")[0]}!`);
+      toast.success(`Bem-vindo, ${foundUser.nome.split(" ")[0]}!`);
     } else {
-      // ERRO
-      toast.error("Usuário não encontrado.", {
-        description: "Verifique o e-mail ou contate o administrador.",
-      });
+      toast.error("Usuário não encontrado.");
       throw new Error("Credenciais inválidas");
     }
-
     setIsLoading(false);
   };
 
   const logout = () => {
     setUser(null);
     localStorage.removeItem("losscontrol_active_user_id");
-    // Redirecionamento é feito pelo componente que consome, ou useRouter aqui se preferir
   };
 
   const hasPermission = (permission: Permission): boolean => {
     if (!user) return false;
+
+    // Regra Dinâmica: Funcionário e Galeria
+    if (
+      user.role === "funcionario" &&
+      (permission === "galeria:ver" || permission === "galeria:upload")
+    ) {
+      return settings.permitirFuncionarioGaleria;
+    }
+
     const permissions = ROLE_PERMISSIONS[user.role] || [];
     return permissions.includes(permission);
   };
 
-  // Gera o menu dinamicamente com base nas permissões
+  // Gera o menu dinamicamente
   const navItems = React.useMemo(() => {
     const items: NavItem[] = [];
 
+    // Dashboard
     if (hasPermission("dashboard:ver")) {
       items.push({
         title: "Dashboard",
@@ -159,22 +222,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
     }
 
-    // Todos podem ver a área de eventos (ou registrar ou ver todos)
-    items.push({ title: "Eventos", href: "/eventos", icon: "ClipboardCheck" });
+    // Lógica Especial para Eventos vs Registrar Novo
+    if (user?.role === "funcionario") {
+      // Funcionário vê "Registrar Perda" direto
+      items.push({
+        title: "Registrar Perda",
+        href: "/eventos/novo",
+        icon: "PlusCircle",
+      });
+    } else {
+      // Outros veem a lista de auditoria (Eventos)
+      if (hasPermission("eventos:ver_todos")) {
+        items.push({
+          title: "Eventos",
+          href: "/eventos",
+          icon: "ClipboardCheck",
+        });
+      }
+    }
 
+    // Catálogo
     if (hasPermission("catalogo:ver")) {
       items.push({ title: "Catálogo", href: "/catalogo", icon: "Package" });
     }
 
-    // Categorias (Apenas Gestor/Dono - Regra implícita ou criar permissão específica)
-    if (user?.role === "dono" || user?.role === "gestor") {
+    // Categorias
+    if (hasPermission("categorias:ver")) {
       items.push({ title: "Categorias", href: "/categorias", icon: "Tags" });
     }
 
+    // Galeria (Depende da config para funcionário)
     if (hasPermission("galeria:ver")) {
       items.push({ title: "Galeria", href: "/galeria", icon: "Images" });
     }
 
+    // Relatórios
     if (hasPermission("relatorios:ver")) {
       items.push({
         title: "Relatórios",
@@ -183,6 +265,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
     }
 
+    // Configurações
     if (hasPermission("configuracoes:ver")) {
       items.push({
         title: "Configurações",
@@ -192,7 +275,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     return items;
-  }, [user]);
+  }, [user, settings]); // Recalcula se settings mudar
 
   return (
     <AuthContext.Provider

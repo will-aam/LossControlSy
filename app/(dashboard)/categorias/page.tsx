@@ -1,16 +1,23 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
   TableHeader,
   TableRow,
+  TableHead,
+  TableBody,
+  TableCell,
 } from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -20,104 +27,105 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/lib/auth-context";
+import { StorageService } from "@/lib/storage";
+import { CategoriaData } from "@/lib/mock-data";
 import {
-  Plus,
   Search,
+  Plus,
   MoreVertical,
   Edit,
-  Power,
   Trash2,
-  Tags,
   AlertTriangle,
+  Power,
+  Tags,
 } from "lucide-react";
-// Importamos apenas a Interface do mock, os dados vêm do Storage agora
-import { CategoriaData } from "@/lib/mock-data";
-import { StorageService } from "@/lib/storage"; // Importando o serviço de storage
-import { useAuth } from "@/lib/auth-context";
 import { toast } from "sonner";
 
-// Classe para esconder scrollbar
 const hideScrollClass =
   "[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]";
 
 export default function CategoriasPage() {
   const { hasPermission } = useAuth();
-
-  // Estado local (Começa vazio e carrega do Storage)
   const [categorias, setCategorias] = useState<CategoriaData[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Controle do Modal
+  // Estados para Dialog de Criar/Editar
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingCategoria, setEditingCategoria] =
-    useState<CategoriaData | null>(null);
-  const [nomeForm, setNomeForm] = useState("");
+  const [editingCategory, setEditingCategory] = useState<CategoriaData | null>(
+    null,
+  );
+  const [formData, setFormData] = useState({ nome: "" });
 
-  // Carregar dados ao iniciar a tela
+  // Estado para Exclusão
+  const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
+
+  // Carregar dados
   useEffect(() => {
-    // Busca do LocalStorage
-    const dadosSalvos = StorageService.getCategorias();
-    setCategorias(dadosSalvos);
+    loadData();
   }, []);
 
-  // Filtragem
-  const filteredCategorias = categorias.filter((cat) =>
-    cat.nome.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  const loadData = () => {
+    setCategorias(StorageService.getCategorias());
+  };
 
-  // Ações
+  const filteredCategorias = useMemo(() => {
+    if (!searchQuery) return categorias;
+    return categorias.filter((c) =>
+      c.nome.toLowerCase().includes(searchQuery.toLowerCase()),
+    );
+  }, [categorias, searchQuery]);
+
+  // --- Handlers ---
+
   const handleOpenDialog = (categoria?: CategoriaData) => {
     if (categoria) {
-      setEditingCategoria(categoria);
-      setNomeForm(categoria.nome);
+      setEditingCategory(categoria);
+      setFormData({ nome: categoria.nome });
     } else {
-      setEditingCategoria(null);
-      setNomeForm("");
+      setEditingCategory(null);
+      setFormData({ nome: "" });
     }
     setIsDialogOpen(true);
   };
 
   const handleSave = () => {
-    if (!nomeForm.trim()) {
-      toast.warning("O nome da categoria é obrigatório");
+    if (!formData.nome.trim()) {
+      toast.error("O nome da categoria é obrigatório.");
       return;
     }
 
-    if (editingCategoria) {
+    if (editingCategory) {
       // Editar
-      const updatedCategoria = { ...editingCategoria, nome: nomeForm };
-
-      // 1. Salva no Storage
-      StorageService.saveCategoria(updatedCategoria);
-
-      // 2. Atualiza estado visual
-      setCategorias(StorageService.getCategorias());
-
+      const updated: CategoriaData = {
+        ...editingCategory,
+        nome: formData.nome.trim(),
+      };
+      StorageService.saveCategoria(updated);
       toast.success("Categoria atualizada!");
     } else {
-      // Criar Nova
+      // Criar
       const nova: CategoriaData = {
         id: Math.random().toString(36).substr(2, 9),
-        nome: nomeForm,
+        nome: formData.nome.trim(),
         status: "ativa",
         itemCount: 0,
       };
-
-      // 1. Salva no Storage
       StorageService.saveCategoria(nova);
-
-      // 2. Atualiza estado visual
-      setCategorias(StorageService.getCategorias());
-
       toast.success("Categoria criada com sucesso!");
     }
+
+    loadData();
     setIsDialogOpen(false);
   };
 
@@ -125,24 +133,28 @@ export default function CategoriasPage() {
     const novoStatus = categoria.status === "ativa" ? "inativa" : "ativa";
     const updated = { ...categoria, status: novoStatus } as CategoriaData;
 
-    // Salva e Atualiza
     StorageService.saveCategoria(updated);
-    setCategorias(StorageService.getCategorias());
 
-    toast.info(
-      `Categoria ${novoStatus === "ativa" ? "ativada" : "desativada"}`,
+    // Atualização otimista local
+    setCategorias((prev) =>
+      prev.map((c) => (c.id === categoria.id ? updated : c)),
+    );
+
+    toast.success(
+      `Categoria ${novoStatus === "ativa" ? "ativada" : "desativada"}.`,
     );
   };
 
-  const handleDelete = (id: string) => {
-    // Em um sistema real, validaria se tem itens vinculados antes
-    StorageService.deleteCategoria(id);
-    setCategorias(StorageService.getCategorias());
-    toast.success("Categoria removida");
+  const handleDelete = () => {
+    if (categoryToDelete) {
+      StorageService.deleteCategoria(categoryToDelete);
+      loadData();
+      toast.success("Categoria excluída.");
+      setCategoryToDelete(null);
+    }
   };
 
-  // Permissão
-  if (!hasPermission("catalogo:criar")) {
+  if (!hasPermission("categorias:ver")) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <AlertTriangle className="h-12 w-12 text-muted-foreground" />
@@ -152,100 +164,120 @@ export default function CategoriasPage() {
   }
 
   return (
-    // Container Principal sem Scroll (travado)
     <div
-      className={`flex flex-col h-[calc(100vh-8rem)] space-y-4 max-w-5xl mx-auto w-full ${hideScrollClass}`}
+      className={`flex flex-col h-[calc(100vh-2rem)] space-y-4 overflow-hidden ${hideScrollClass}`}
     >
-      {/* Header Fixo */}
-      <div className="flex items-center justify-between shrink-0">
+      {/* Header */}
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between shrink-0">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Categorias</h1>
           <p className="text-muted-foreground">
-            Gerencie as classificações dos produtos.
+            Organize os itens do catálogo.
           </p>
         </div>
-        <Button onClick={() => handleOpenDialog()}>
-          <Plus className="mr-2 h-4 w-4" /> Nova Categoria
-        </Button>
+        <div className="flex gap-2">
+          {hasPermission("categorias:criar") && (
+            <Button onClick={() => handleOpenDialog()}>
+              <Plus className="mr-2 h-4 w-4" /> Nova Categoria
+            </Button>
+          )}
+        </div>
       </div>
 
-      {/* Busca Fixa */}
-      <div className="flex items-center py-2 shrink-0">
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+      {/* Filtros */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between shrink-0 bg-background/95 backdrop-blur z-10 py-1">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Buscar categoria..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-8"
+            className="pl-9"
           />
         </div>
       </div>
 
-      {/* Tabela com Scroll Interno */}
-      <div className="flex-1 min-h-0 border rounded-md bg-card relative overflow-hidden shadow-sm">
-        {" "}
+      {/* Tabela */}
+      <div className="flex-1 overflow-hidden border rounded-md relative bg-card shadow-sm">
         <div className="absolute inset-0 overflow-y-auto">
-          <Table>
-            <TableHeader className="sticky top-0 bg-card z-10 ">
+          <table className="w-full caption-bottom text-sm">
+            <TableHeader className="sticky top-0 z-20 bg-card shadow-sm">
               <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Qtd. Itens</TableHead>
-                <TableHead className="w-25"></TableHead>
+                <TableHead className="w-[50%] bg-card">Nome</TableHead>
+                <TableHead className="bg-card text-center">Status</TableHead>
+                <TableHead className="bg-card text-right">Itens</TableHead>
+                <TableHead className="w-12 bg-card"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredCategorias.length > 0 ? (
                 filteredCategorias.map((cat) => (
-                  <TableRow key={cat.id}>
-                    <TableCell className="font-medium">
+                  <TableRow
+                    key={cat.id}
+                    className={cat.status === "inativa" ? "opacity-60" : ""}
+                  >
+                    <TableCell className="font-medium py-3">
                       <div className="flex items-center gap-2">
-                        <div className="p-2 bg-primary/10 rounded-md">
-                          <Tags className="h-4 w-4 text-primary" />
+                        <div className="h-8 w-8 rounded bg-muted flex items-center justify-center text-muted-foreground">
+                          <Tags className="h-4 w-4" />
                         </div>
                         {cat.nome}
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="text-center py-3">
                       <Badge
                         variant={
                           cat.status === "ativa" ? "outline" : "secondary"
                         }
+                        className="text-[10px]"
                       >
                         {cat.status === "ativa" ? "Ativa" : "Inativa"}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right py-3 text-muted-foreground">
                       {cat.itemCount || 0}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="py-3">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                          >
                             <MoreVertical className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => handleOpenDialog(cat)}
-                          >
-                            <Edit className="mr-2 h-4 w-4" />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => handleToggleStatus(cat)}
-                          >
-                            <Power className="mr-2 h-4 w-4" />
-                            {cat.status === "ativa" ? "Desativar" : "Ativar"}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={() => handleDelete(cat.id)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Excluir
-                          </DropdownMenuItem>
+                          {hasPermission("categorias:editar") && (
+                            <>
+                              <DropdownMenuItem
+                                onClick={() => handleOpenDialog(cat)}
+                              >
+                                <Edit className="mr-2 h-4 w-4" /> Editar Nome
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => handleToggleStatus(cat)}
+                              >
+                                <Power className="mr-2 h-4 w-4" />
+                                {cat.status === "ativa"
+                                  ? "Desativar"
+                                  : "Ativar"}
+                              </DropdownMenuItem>
+                            </>
+                          )}
+
+                          {hasPermission("categorias:excluir") && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => setCategoryToDelete(cat.id)}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -253,39 +285,39 @@ export default function CategoriasPage() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell
-                    colSpan={4}
-                    className="h-24 text-center text-muted-foreground"
-                  >
+                  <TableCell colSpan={4} className="h-24 text-center">
                     Nenhuma categoria encontrada.
                   </TableCell>
                 </TableRow>
               )}
             </TableBody>
-          </Table>
+          </table>
         </div>
       </div>
 
-      {/* Modal de Criação/Edição */}
+      {/* Dialog Criar/Editar */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {editingCategoria ? "Editar Categoria" : "Nova Categoria"}
+              {editingCategory ? "Editar Categoria" : "Nova Categoria"}
             </DialogTitle>
             <DialogDescription>
-              Crie categorias para organizar o catálogo de produtos.
+              {editingCategory
+                ? "Altere o nome da categoria abaixo."
+                : "Crie uma nova categoria para organizar seus itens."}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid gap-2">
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
               <Label htmlFor="name">Nome da Categoria</Label>
               <Input
                 id="name"
-                value={nomeForm}
-                onChange={(e) => setNomeForm(e.target.value)}
-                placeholder="Ex: Frutas, Limpeza..."
-                autoFocus
+                value={formData.nome}
+                onChange={(e) =>
+                  setFormData({ ...formData, nome: e.target.value })
+                }
+                placeholder="Ex: Laticínios"
                 onKeyDown={(e) => e.key === "Enter" && handleSave()}
               />
             </div>
@@ -298,6 +330,31 @@ export default function CategoriasPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Alerta de Exclusão */}
+      <AlertDialog
+        open={!!categoryToDelete}
+        onOpenChange={(open) => !open && setCategoryToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir categoria?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Isso excluirá a categoria permanentemente. Itens associados a ela
+              poderão ficar sem categoria.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

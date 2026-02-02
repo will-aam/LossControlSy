@@ -5,11 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle, // Importado DialogTitle
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -228,30 +224,32 @@ export default function GaleriaPage() {
           </p>
         </div>
 
-        {/* BOTÕES DE UPLOAD */}
-        <div className="flex gap-2">
-          {/* Input Oculto para Upload Rápido */}
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            ref={fileInputRef}
-            onChange={handleQuickUpload}
-          />
+        {/* BOTÕES DE UPLOAD (Protegidos por permissão) */}
+        {hasPermission("galeria:upload") && (
+          <div className="flex gap-2">
+            {/* Input Oculto para Upload Rápido */}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              ref={fileInputRef}
+              onChange={handleQuickUpload}
+            />
 
-          <Button
-            variant="outline"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <Camera className="mr-2 h-4 w-4" />
-            Foto Rápida
-          </Button>
+            <Button
+              variant="outline"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Camera className="mr-2 h-4 w-4" />
+              Foto Rápida
+            </Button>
 
-          <Button onClick={() => setShowUploadDialog(true)}>
-            <Plus className="mr-2 h-4 w-4" />
-            Adicionar Detalhado
-          </Button>
-        </div>
+            <Button onClick={() => setShowUploadDialog(true)}>
+              <Plus className="mr-2 h-4 w-4" />
+              Adicionar Detalhado
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Filtros */}
@@ -317,8 +315,8 @@ export default function GaleriaPage() {
                 </div>
               </CardContent>
 
-              {/* Botão de Menu/Excluir (Só aparece se não for de evento auditado ou se for admin) */}
-              {!evidencia.evento && (
+              {/* Botão de Menu/Excluir (Protegido por Permissão) */}
+              {!evidencia.evento && hasPermission("galeria:excluir") && (
                 <div
                   className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10"
                   onClick={(e) => e.stopPropagation()}
@@ -365,9 +363,7 @@ export default function GaleriaPage() {
         open={!!selectedPhoto}
         onOpenChange={(open) => !open && setSelectedPhoto(null)}
       >
-        {/* CORREÇÃO: [&>button]:hidden remove o X padrão duplicado */}
         <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden bg-black/95 border-none [&>button]:hidden">
-          {/* CORREÇÃO: DialogTitle Oculto para Acessibilidade */}
           <DialogTitle className="sr-only">
             Visualizar Evidência:{" "}
             {selectedPhoto?.evento?.item?.nome || "Foto Avulsa"}
@@ -387,7 +383,7 @@ export default function GaleriaPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="rounded-full"
+                className="rounded-full text-white hover:bg-white/20"
                 onClick={() => setSelectedPhoto(null)}
               >
                 <X className="h-5 w-5" />
@@ -474,8 +470,8 @@ export default function GaleriaPage() {
                   </div>
                 )}
 
-                {/* Botão de Excluir no Viewer (apenas avulsas) */}
-                {!selectedPhoto?.evento && (
+                {/* Botão de Excluir no Viewer (apenas avulsas e com permissão) */}
+                {!selectedPhoto?.evento && hasPermission("galeria:excluir") && (
                   <Button
                     variant="destructive"
                     size="sm"

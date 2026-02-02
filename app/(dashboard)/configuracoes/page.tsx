@@ -47,6 +47,7 @@ import {
   Edit,
   Trash2,
   Plus,
+  Images,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -67,6 +68,7 @@ export default function ConfiguracoesPage() {
     exigirFoto: false,
     bloquearAprovados: true,
     limiteDiario: 1000,
+    permitirFuncionarioGaleria: false, // Inicializa com false (será sobrescrito pelo loadData)
   });
 
   // Estados de Modais
@@ -87,7 +89,10 @@ export default function ConfiguracoesPage() {
   // --- AÇÕES DE CONFIGURAÇÃO GERAL ---
   const handleSaveSettings = () => {
     StorageService.saveSettings(settings);
+    // Força um reload suave ou notifica contexto se necessário, mas o toast já avisa
     toast.success("Configurações salvas com sucesso!");
+    // O AuthContext vai pegar a mudança na próxima renderização/navegação
+    // ou podemos forçar reload da página se for crítico, mas aqui é SPA
   };
 
   // --- AÇÕES DE USUÁRIOS ---
@@ -168,29 +173,20 @@ export default function ConfiguracoesPage() {
                   <Label htmlFor="empresa">Nome da Empresa</Label>
                   <Input
                     id="empresa"
-                    defaultValue="Supermercado Exemplo Ltda"
+                    value={settings.empresaNome}
+                    onChange={(e) =>
+                      setSettings({ ...settings, empresaNome: e.target.value })
+                    }
+                    placeholder="Supermercado Exemplo Ltda"
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="cnpj">CNPJ</Label>
-                  <Input id="cnpj" defaultValue="12.345.678/0001-90" />
-                </div>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="endereco">Endereço</Label>
-                  <Input
-                    id="endereco"
-                    defaultValue="Rua das Flores, 123 - Centro"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cidade">Cidade/Estado</Label>
-                  <Input id="cidade" defaultValue="São Paulo - SP" />
+                  <Label htmlFor="cnpj">CNPJ (Opcional)</Label>
+                  <Input id="cnpj" placeholder="00.000.000/0000-00" />
                 </div>
               </div>
               <div className="flex justify-end">
-                <Button>Salvar Alterações</Button>
+                <Button onClick={handleSaveSettings}>Salvar Alterações</Button>
               </div>
             </CardContent>
           </Card>
@@ -199,16 +195,17 @@ export default function ConfiguracoesPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Shield className="h-5 w-5" />
-                Políticas de Segurança
+                Políticas de Segurança e Operação
               </CardTitle>
               <CardDescription>
-                Regras para registro e edição de perdas
+                Regras para registro, edição e acesso de funcionários
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Regra 1: Foto Obrigatória */}
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label>Exigir foto em eventos</Label>
+                  <Label>Exigir foto em eventos de perda</Label>
                   <p className="text-sm text-muted-foreground">
                     Impede finalizar uma perda se houver itens sem foto.
                   </p>
@@ -221,11 +218,13 @@ export default function ConfiguracoesPage() {
                 />
               </div>
               <Separator />
+
+              {/* Regra 2: Bloqueio de Edição */}
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label>Bloquear edição após aprovação</Label>
                   <p className="text-sm text-muted-foreground">
-                    Impede alterações em eventos já aprovados.
+                    Impede alterações em eventos já aprovados por gestores.
                   </p>
                 </div>
                 <Switch
@@ -235,6 +234,30 @@ export default function ConfiguracoesPage() {
                   }
                 />
               </div>
+              <Separator />
+
+              {/* Regra 3: Acesso Galeria Funcionário (NOVO) */}
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <Label>Permitir funcionários na Galeria</Label>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Se ativo, funcionários poderão acessar a aba Galeria e
+                    adicionar fotos avulsas.
+                  </p>
+                </div>
+                <Switch
+                  checked={settings.permitirFuncionarioGaleria}
+                  onCheckedChange={(checked) =>
+                    setSettings({
+                      ...settings,
+                      permitirFuncionarioGaleria: checked,
+                    })
+                  }
+                />
+              </div>
+
               <div className="flex justify-end mt-4">
                 <Button variant="outline" onClick={handleSaveSettings}>
                   Atualizar Políticas

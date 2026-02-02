@@ -10,7 +10,7 @@ import {
   TableHead,
   TableBody,
   TableCell,
-} from "@/components/ui/table"; // REMOVIDO: "Table" da importação
+} from "@/components/ui/table";
 import {
   Select,
   SelectContent,
@@ -23,8 +23,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,7 +35,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-// -----------------------------------------
 import {
   Item,
   categorias as mockCategorias,
@@ -60,6 +59,7 @@ import {
   ChevronRight,
   Grid3X3,
   Trash2,
+  Power,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -156,7 +156,7 @@ export default function CatalogoPage() {
         // 1. Salva os Itens
         newItems.forEach((item) => StorageService.saveItem(item));
 
-        // 2. Extrai e Salva as Categorias Novas automaticamente (NOVO)
+        // 2. Extrai e Salva as Categorias Novas automaticamente
         const uniqueCategories = Array.from(
           new Set(newItems.map((i) => i.categoria)),
         );
@@ -184,7 +184,6 @@ export default function CatalogoPage() {
     if (editingItem) {
       const updatedItem = { ...editingItem, ...itemData } as Item;
       StorageService.saveItem(updatedItem);
-      // Sincroniza categoria se editou
       if (updatedItem.categoria)
         StorageService.syncCategories([updatedItem.categoria]);
 
@@ -196,7 +195,6 @@ export default function CatalogoPage() {
         ...itemData,
       } as Item;
       StorageService.saveItem(newItem);
-      // Sincroniza categoria se criou
       if (newItem.categoria) StorageService.syncCategories([newItem.categoria]);
 
       loadData();
@@ -204,7 +202,19 @@ export default function CatalogoPage() {
     }
   };
 
-  // Executa a exclusão após confirmação no modal
+  const handleToggleStatus = (item: Item) => {
+    const novoStatus = item.status === "ativo" ? "inativo" : "ativo";
+    const updatedItem = { ...item, status: novoStatus } as Item;
+    StorageService.saveItem(updatedItem);
+
+    // Atualiza a lista localmente para refletir na hora sem reload pesado
+    setItems((prev) => prev.map((i) => (i.id === item.id ? updatedItem : i)));
+
+    toast.success(
+      `Item ${novoStatus === "ativo" ? "ativado" : "desativado"} com sucesso.`,
+    );
+  };
+
   const confirmDelete = () => {
     if (itemToDelete) {
       StorageService.deleteItem(itemToDelete);
@@ -225,7 +235,7 @@ export default function CatalogoPage() {
 
   return (
     <div
-      className={`flex flex-col h-[calc(100vh-2rem)] space-y-4 overflow-hidden ${hideScrollClass}`} // Certifique-se que hideScrollClass está aqui
+      className={`flex flex-col h-[calc(100vh-2rem)] space-y-4 overflow-hidden ${hideScrollClass}`}
     >
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between shrink-0">
         <div>
@@ -237,7 +247,8 @@ export default function CatalogoPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          {hasPermission("catalogo:criar") && (
+          {/* BOTÃO IMPORTAR - Apenas quem tem permissão explícita (Não funcionário) */}
+          {hasPermission("catalogo:importar") && (
             <>
               <input
                 type="file"
@@ -254,10 +265,14 @@ export default function CatalogoPage() {
                 <Upload className="mr-2 h-4 w-4" />{" "}
                 {isImporting ? "Importando..." : "Importar CSV"}
               </Button>
-              <Button onClick={() => setShowNewItemDialog(true)}>
-                <Plus className="mr-2 h-4 w-4" /> Novo Item
-              </Button>
             </>
+          )}
+
+          {/* BOTÃO NOVO ITEM - Funcionário, Fiscal, Gestor, Dono */}
+          {hasPermission("catalogo:criar") && (
+            <Button onClick={() => setShowNewItemDialog(true)}>
+              <Plus className="mr-2 h-4 w-4" /> Novo Item
+            </Button>
           )}
         </div>
       </div>
@@ -355,10 +370,8 @@ export default function CatalogoPage() {
         </div>
       </div>
 
-      {/* TABLE AREA - CORRIGIDO PARA STICKY HEADER */}
       <div className="flex-1 overflow-hidden border rounded-md relative bg-card shadow-sm">
         <div className="absolute inset-0 overflow-y-auto">
-          {/* MUDANÇA AQUI: Trocamos <Table> por <table> nativa para evitar wrapper extra */}
           <table className="w-full caption-bottom text-sm">
             <TableHeader className="sticky top-0 z-20 bg-card shadow-sm">
               <TableRow>
@@ -432,32 +445,50 @@ export default function CatalogoPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="py-2">
-                      {hasPermission("catalogo:editar") && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                            >
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {/* AÇÃO DE EDITAR - Apenas quem tem permissão completa */}
+                          {hasPermission("catalogo:editar") && (
                             <DropdownMenuItem
                               onClick={() => setEditingItem(item)}
                             >
                               <Edit className="mr-2 h-4 w-4" /> Editar
                             </DropdownMenuItem>
+                          )}
+
+                          {/* AÇÃO DE ATIVAR/DESATIVAR - Para Funcionário e todos */}
+                          {hasPermission("catalogo:status") && (
                             <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={() => setItemToDelete(item.id)}
+                              onClick={() => handleToggleStatus(item)}
                             >
-                              <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                              <Power className="mr-2 h-4 w-4" />
+                              {item.status === "ativo" ? "Desativar" : "Ativar"}
                             </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
+                          )}
+
+                          {/* AÇÃO DE EXCLUIR - Restrita */}
+                          {hasPermission("catalogo:excluir") && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => setItemToDelete(item.id)}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))

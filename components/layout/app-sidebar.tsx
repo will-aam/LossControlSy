@@ -15,7 +15,7 @@ import {
   Tags,
   ChevronsUpDown,
   LogOut,
-  ShieldCheck, // Ícone para o Logo
+  ShieldCheck,
   Sparkles,
 } from "lucide-react";
 import {
@@ -29,7 +29,6 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar";
 import {
@@ -96,6 +95,9 @@ export function AppSidebar() {
               size="lg"
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
+              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                <ShieldCheck className="size-4" />
+              </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">Loss Control</span>
                 <span className="truncate text-xs text-muted-foreground">
@@ -139,7 +141,7 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* --- MENU SECUNDÁRIO (Ex: Suporte ou Planos - Opcional, apenas visual) --- */}
+        {/* --- MENU SECUNDÁRIO --- */}
         <SidebarGroup className="mt-auto">
           <SidebarGroupContent>
             <SidebarMenu>
