@@ -2,9 +2,9 @@
 
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -21,6 +21,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -36,29 +41,72 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandSeparator,
+} from "@/components/ui/command";
 import {
   Evento,
-  formatDate,
   formatCurrency,
-  getStatusLabel,
+  formatDate,
   getStatusColor,
+  EventoStatus,
 } from "@/lib/mock-data";
-import { StorageService, AppSettings } from "@/lib/storage";
+import { StorageService } from "@/lib/storage"; // Importar Storage
 import { useAuth } from "@/lib/auth-context";
 import {
+  FileText,
   Search,
-  Filter,
+  ArrowLeft,
+  CheckCircle2,
+  XCircle,
+  LayoutList,
+  LayoutGrid,
+  CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+  ChevronRightSquare,
+  Download,
+  AlertTriangle,
   MoreVertical,
   Eye,
   Edit,
   Trash2,
   Plus,
-  AlertTriangle,
   Lock,
 } from "lucide-react";
 import { toast } from "sonner";
+import { DateRange } from "react-day-picker";
+import {
+  isWithinInterval,
+  startOfDay,
+  endOfDay,
+  subMonths,
+  startOfMonth,
+  endOfMonth,
+  format,
+} from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
-const ITEMS_PER_PAGE = 15;
+// Tipos
+type ViewMode = "pastas" | "lista-completa";
+type BatchStatus = "pendente" | "aprovado" | "rejeitado";
+
+interface LoteDiario {
+  data: string;
+  dataOriginal: Date;
+  eventos: Evento[];
+  totalCusto: number;
+  status: BatchStatus;
+  autor: string;
+}
 
 const hideScrollClass =
   "[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]";
@@ -66,66 +114,219 @@ const hideScrollClass =
 export default function EventosPage() {
   const { hasPermission } = useAuth();
 
-  // Dados
-  const [eventos, setEventos] = useState<Evento[]>([]);
-  const [settings, setSettings] = useState<AppSettings | null>(null);
+  // Estados de Navegação e Filtro
+  const [viewMode, setViewMode] = useState<ViewMode>("pastas");
+  const [loteSelecionado, setLoteSelecionado] = useState<LoteDiario | null>(
+    null,
+  );
 
   // Filtros
-  const [searchQuery, setSearchQuery] = useState("");
+  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [globalSearch, setGlobalSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
-  const [dateFilter, setDateFilter] = useState<string>("todos"); // Mantido para expansão futura
+
+  // Paginação
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Dados Locais (Inicialmente vazio)
+  const [eventosLocais, setEventosLocais] = useState<Evento[]>([]);
+
+  // Configurações de Segurança
+  const [settings, setSettings] = useState<any>({ bloquearAprovados: false });
 
   // Ações
   const [eventoToDelete, setEventoToDelete] = useState<string | null>(null);
 
-  const [currentPage, setCurrentPage] = useState(1);
-
-  // Carregar dados e configurações
+  // Carregar dados do Storage
   useEffect(() => {
-    loadData();
+    setEventosLocais(StorageService.getEventos());
+    setSettings(StorageService.getSettings());
   }, []);
 
-  const loadData = () => {
-    setEventos(StorageService.getEventos());
-    setSettings(StorageService.getSettings());
+  // Resetar página quando mudar filtros
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [viewMode, dateRange, globalSearch, statusFilter, loteSelecionado]);
+
+  // Lógica de Filtragem
+  const eventosFiltradosGlobalmente = useMemo(() => {
+    return eventosLocais.filter((evento) => {
+      // 1. Data
+      if (dateRange?.from) {
+        const eventoDate = new Date(evento.dataHora);
+        const start = startOfDay(dateRange.from);
+        const end = endOfDay(dateRange.to || dateRange.from);
+        if (!isWithinInterval(eventoDate, { start, end })) return false;
+      }
+      // 2. Busca Texto (Nome ou Código)
+      if (globalSearch) {
+        const s = globalSearch.toLowerCase();
+        const matches =
+          (evento.item?.nome || "").toLowerCase().includes(s) ||
+          (evento.item?.codigoInterno || "").toLowerCase().includes(s) ||
+          evento.criadoPor.nome.toLowerCase().includes(s);
+        if (!matches) return false;
+      }
+      // 3. Status (Agora aplica em AMBOS os modos se selecionado)
+      if (statusFilter !== "todos") {
+        // Mapeamento visual: 'pendente' na UI = 'enviado' no banco
+        const targetStatus =
+          statusFilter === "pendente" ? "enviado" : statusFilter;
+        if (evento.status !== targetStatus) return false;
+      }
+      return true;
+    });
+  }, [eventosLocais, dateRange, globalSearch, statusFilter]);
+
+  // Lógica de Agrupamento (Lotes)
+  const lotesDiarios = useMemo(() => {
+    if (viewMode === "lista-completa") return [];
+
+    const grupos: Record<string, Evento[]> = {};
+
+    eventosFiltradosGlobalmente.forEach((evento) => {
+      const dataFormatada = formatDate(evento.dataHora);
+      if (!grupos[dataFormatada]) grupos[dataFormatada] = [];
+      grupos[dataFormatada].push(evento);
+    });
+
+    return Object.entries(grupos)
+      .map(([data, eventos]) => {
+        let status: BatchStatus = "pendente";
+        const todosOk = eventos.every((e) =>
+          ["aprovado", "exportado"].includes(e.status),
+        );
+        const temRejeitado = eventos.some((e) => e.status === "rejeitado");
+
+        if (todosOk) status = "aprovado";
+        else if (temRejeitado) status = "rejeitado";
+
+        return {
+          data,
+          dataOriginal: new Date(eventos[0].dataHora),
+          eventos,
+          totalCusto: eventos.reduce(
+            (acc, e) => acc + (e.custoSnapshot || 0) * e.quantidade,
+            0,
+          ),
+          status,
+          autor: eventos[0].criadoPor.nome,
+        } as LoteDiario;
+      })
+      .sort((a, b) => b.dataOriginal.getTime() - a.dataOriginal.getTime());
+  }, [eventosFiltradosGlobalmente, viewMode]);
+
+  // Paginação
+  const dadosPaginados = useMemo(() => {
+    let dados: any[] = [];
+    const itemsPerPage = viewMode === "pastas" && !loteSelecionado ? 10 : 15; // Mais itens na lista
+
+    if (loteSelecionado) {
+      dados = loteSelecionado.eventos.filter((e) => {
+        if (!globalSearch) return true;
+        const s = globalSearch.toLowerCase();
+        return (
+          (e.item?.nome || "").toLowerCase().includes(s) ||
+          (e.item?.codigoInterno || "").toLowerCase().includes(s)
+        );
+      });
+    } else if (viewMode === "pastas") {
+      dados = lotesDiarios;
+    } else {
+      dados = eventosFiltradosGlobalmente;
+    }
+
+    const totalItems = dados.length;
+    const totalPages = Math.ceil(totalItems / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    const currentItems = dados.slice(startIndex, endIndex);
+
+    return { currentItems, totalPages, totalItems, itemsPerPage };
+  }, [
+    loteSelecionado,
+    viewMode,
+    lotesDiarios,
+    eventosFiltradosGlobalmente,
+    currentPage,
+    globalSearch,
+  ]);
+
+  // Ações
+  const handleStatusChange = (eventoId: string, novoStatus: string) => {
+    const statusTyped = novoStatus as EventoStatus;
+
+    // Atualiza estado local
+    const novosEventos = eventosLocais.map((ev) =>
+      ev.id === eventoId ? { ...ev, status: statusTyped } : ev,
+    );
+    setEventosLocais(novosEventos);
+
+    // Salva no Storage
+    const eventoAlterado = novosEventos.find((ev) => ev.id === eventoId);
+    if (eventoAlterado) StorageService.saveEvento(eventoAlterado);
+
+    // Atualiza lote selecionado se existir
+    if (loteSelecionado) {
+      setLoteSelecionado((prev) => {
+        if (!prev) return null;
+        const eventosLote = prev.eventos.map((ev) =>
+          ev.id === eventoId ? { ...ev, status: statusTyped } : ev,
+        );
+
+        const todosOk = eventosLote.every((e) =>
+          ["aprovado", "exportado"].includes(e.status),
+        );
+        const temRejeitado = eventosLote.some((e) => e.status === "rejeitado");
+        const status = todosOk
+          ? "aprovado"
+          : temRejeitado
+            ? "rejeitado"
+            : "pendente";
+
+        return { ...prev, eventos: eventosLote, status };
+      });
+    }
+    toast.success("Status atualizado");
   };
 
-  // --- Lógica de Filtro ---
-  const filteredEventos = useMemo(() => {
-    let filtered = eventos;
+  const handleAprovarLoteInteiro = () => {
+    if (!loteSelecionado) return;
 
-    if (statusFilter !== "todos") {
-      filtered = filtered.filter((e) => e.status === statusFilter);
-    }
+    const novosEventos = eventosLocais.map((ev) => {
+      if (loteSelecionado.eventos.some((le) => le.id === ev.id)) {
+        const atualizado = { ...ev, status: "aprovado" as EventoStatus };
+        // Salva cada um no storage
+        StorageService.saveEvento(atualizado);
+        return atualizado;
+      }
+      return ev;
+    });
 
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (e) =>
-          (e.item?.nome || "").toLowerCase().includes(query) ||
-          (e.item?.codigoInterno || "").toLowerCase().includes(query) ||
-          e.criadoPor.nome.toLowerCase().includes(query),
-      );
-    }
-
-    // Ordenar por data (mais recente primeiro)
-    return filtered.sort(
-      (a, b) => new Date(b.dataHora).getTime() - new Date(a.dataHora).getTime(),
+    setEventosLocais(novosEventos);
+    setLoteSelecionado((prev) =>
+      prev
+        ? {
+            ...prev,
+            eventos: prev.eventos.map((e) => ({
+              ...e,
+              status: "aprovado" as EventoStatus,
+            })),
+            status: "aprovado",
+          }
+        : null,
     );
-  }, [eventos, statusFilter, searchQuery]);
+    toast.success("Lote aprovado!");
+  };
 
-  // --- Paginação ---
-  const totalPages = Math.ceil(filteredEventos.length / ITEMS_PER_PAGE);
-  const paginatedEventos = useMemo(() => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    return filteredEventos.slice(startIndex, startIndex + ITEMS_PER_PAGE);
-  }, [filteredEventos, currentPage]);
+  const handleExportar = () => {
+    toast.success("Funcionalidade de exportação em desenvolvimento.");
+  };
 
-  // --- Ações ---
   const confirmDelete = () => {
     if (eventoToDelete) {
       // Re-verificar se pode excluir (segurança extra)
-      const evento = eventos.find((e) => e.id === eventoToDelete);
+      const evento = eventosLocais.find((e) => e.id === eventoToDelete);
       if (
         evento &&
         settings?.bloquearAprovados &&
@@ -136,23 +337,31 @@ export default function EventosPage() {
         return;
       }
 
-      // Hack temporário: salvar a lista filtrada de volta no storage manualmente
-      // O ideal seria ter StorageService.deleteEvento(id)
-      const novosEventos = eventos.filter((e) => e.id !== eventoToDelete);
-      // Aqui simulamos a deleção salvando um por um (ineficiente, mas funciona com o que temos)
-      // Para produção, adicionaríamos deleteEvento no StorageService.
-      // Como é mock localstorage, vamos apenas recarregar para simular ou assumir deletado.
-      // CORREÇÃO: Vamos forçar a atualização visual
-      setEventos(novosEventos);
+      // Filtrar e atualizar estado local
+      const novosEventos = eventosLocais.filter((e) => e.id !== eventoToDelete);
+      setEventosLocais(novosEventos);
 
-      toast.success(
-        "Evento excluído visualmente (Adicionar deleteEvento no Storage para persistir)",
-      );
+      // Aqui idealmente chamariamos StorageService.deleteEvento(eventoToDelete)
+      // Como simulado:
+      // StorageService.saveEventos(novosEventos);
+
+      toast.success("Evento excluído");
       setEventoToDelete(null);
+
+      // Atualizar lote se necessário
+      if (loteSelecionado) {
+        setLoteSelecionado((prev) =>
+          prev
+            ? {
+                ...prev,
+                eventos: prev.eventos.filter((e) => e.id !== eventoToDelete),
+              }
+            : null,
+        );
+      }
     }
   };
 
-  // CORREÇÃO: Usar a permissão correta definida em lib/permissions.ts ("eventos:ver_todos")
   if (!hasPermission("eventos:ver_todos")) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
@@ -162,140 +371,232 @@ export default function EventosPage() {
     );
   }
 
-  return (
-    <div
-      className={`flex flex-col h-[calc(100vh-2rem)] space-y-4 overflow-hidden ${hideScrollClass}`}
-    >
-      {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between shrink-0">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Registro de Perdas
-          </h1>
-          <p className="text-muted-foreground">
-            Acompanhe e audite as perdas registradas.
-          </p>
+  // Componente de Paginação
+  const PaginationControls = () => (
+    <div className="flex items-center justify-between py-2 border-t mt-auto shrink-0">
+      <div className="text-xs text-muted-foreground">
+        Mostrando {dadosPaginados.currentItems.length} de{" "}
+        {dadosPaginados.totalItems} registros
+      </div>
+      <div className="space-x-2 flex items-center">
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 w-8 p-0"
+          onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+          disabled={currentPage === 1}
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
+        <div className="text-xs font-medium w-16 text-center">
+          {currentPage} / {Math.max(1, dadosPaginados.totalPages)}
         </div>
-        <div className="flex gap-2">
-          {hasPermission("eventos:criar") && (
-            <Link href="/eventos/novo">
-              <Button>
-                <Plus className="mr-2 h-4 w-4" /> Registrar Perda
-              </Button>
-            </Link>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 w-8 p-0"
+          onClick={() =>
+            setCurrentPage((p) => Math.min(dadosPaginados.totalPages, p + 1))
+          }
+          disabled={
+            currentPage === dadosPaginados.totalPages ||
+            dadosPaginados.totalPages === 0
+          }
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+
+  // Componente de Filtro de Data
+  const DateFilter = () => (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className={cn(
+            "h-9 border-dashed text-xs px-3",
+            !dateRange && "text-muted-foreground",
           )}
-        </div>
-      </div>
+        >
+          <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+          {dateRange?.from ? (
+            dateRange.to ? (
+              <>
+                {format(dateRange.from, "dd/MM/yy")} -{" "}
+                {format(dateRange.to, "dd/MM/yy")}
+              </>
+            ) : (
+              format(dateRange.from, "dd/MM/yyyy")
+            )
+          ) : (
+            <span>Período</span>
+          )}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Command>
+          <CommandInput placeholder="Buscar mês..." />
+          <CommandList className={hideScrollClass}>
+            <CommandEmpty>Nenhum período.</CommandEmpty>
+            <CommandGroup heading="Atalhos">
+              <CommandItem
+                onSelect={() =>
+                  setDateRange({
+                    from: startOfMonth(new Date()),
+                    to: endOfMonth(new Date()),
+                  })
+                }
+              >
+                Este Mês
+              </CommandItem>
+              <CommandItem
+                onSelect={() =>
+                  setDateRange({
+                    from: startOfMonth(subMonths(new Date(), 1)),
+                    to: endOfMonth(subMonths(new Date(), 1)),
+                  })
+                }
+              >
+                Mês Passado
+              </CommandItem>
+              <CommandItem onSelect={() => setDateRange(undefined)}>
+                Limpar Filtro
+              </CommandItem>
+            </CommandGroup>
+            <CommandSeparator />
+            <div className="p-2">
+              <Calendar
+                mode="range"
+                selected={dateRange}
+                onSelect={setDateRange}
+                initialFocus
+                locale={ptBR}
+              />
+            </div>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
 
-      {/* Filtros */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between shrink-0 bg-background/95 backdrop-blur z-10 py-1">
-        <div className="flex flex-col gap-3 sm:flex-row flex-1">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por item, código ou responsável..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
-            />
+  // RENDER DETALHE DO LOTE
+  if (loteSelecionado) {
+    return (
+      <div
+        className={`flex flex-col h-[calc(100vh-2rem)] space-y-4 ${hideScrollClass}`}
+      >
+        <div className="flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setLoteSelecionado(null)}
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div>
+              <h1 className="text-xl font-semibold flex items-center gap-3">
+                {loteSelecionado.data}
+                <Badge
+                  variant={
+                    loteSelecionado.status === "aprovado"
+                      ? "default"
+                      : loteSelecionado.status === "rejeitado"
+                        ? "destructive"
+                        : "secondary"
+                  }
+                >
+                  {loteSelecionado.status.toUpperCase()}
+                </Badge>
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Autor: {loteSelecionado.autor}
+              </p>
+            </div>
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full sm:w-40">
-              <Filter className="mr-2 h-4 w-4 text-muted-foreground" />
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos</SelectItem>
-              <SelectItem value="pendente">Pendente</SelectItem>
-              <SelectItem value="aprovado">Aprovado</SelectItem>
-              <SelectItem value="rejeitado">Rejeitado</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleExportar}>
+              <Download className="mr-2 h-4 w-4" /> Exportar
+            </Button>
+            {loteSelecionado.status === "pendente" && (
+              <Button
+                onClick={handleAprovarLoteInteiro}
+                className="bg-success hover:bg-success/90 text-white"
+              >
+                <CheckCircle2 className="mr-2 h-4 w-4" />
+                Aprovar Tudo
+              </Button>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Tabela com Sticky Header */}
-      <div className="flex-1 overflow-hidden border rounded-md relative bg-card shadow-sm">
-        <div className="absolute inset-0 overflow-y-auto">
-          <table className="w-full caption-bottom text-sm">
-            <TableHeader className="sticky top-0 z-20 bg-card shadow-sm">
-              <TableRow>
-                <TableHead className="bg-card">Data</TableHead>
-                <TableHead className="bg-card w-[30%]">Item</TableHead>
-                <TableHead className="bg-card text-right">Qtd</TableHead>
-                <TableHead className="bg-card text-right">
-                  Custo Total
-                </TableHead>
-                <TableHead className="bg-card">Motivo</TableHead>
-                <TableHead className="bg-card">Responsável</TableHead>
-                <TableHead className="bg-card text-center">Status</TableHead>
-                <TableHead className="bg-card w-12"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {paginatedEventos.length > 0 ? (
-                paginatedEventos.map((evento) => {
-                  // LÓGICA DE BLOQUEIO
+        <div className="flex-1 border rounded-md bg-card overflow-hidden relative shadow-sm">
+          <div
+            className={`absolute inset-0 overflow-y-auto ${hideScrollClass}`}
+          >
+            {/* CORREÇÃO DO STICKY HEADER AQUI */}
+            <table className="w-full caption-bottom text-sm">
+              <TableHeader className="sticky top-0 bg-card z-20 shadow-sm">
+                <TableRow>
+                  <TableHead>Código</TableHead>
+                  <TableHead>Produto</TableHead>
+                  <TableHead className="text-right">Qtd.</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="w-45">Status</TableHead>
+                  <TableHead className="w-12"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {dadosPaginados.currentItems.map((evento: Evento) => {
                   const isLocked =
                     settings?.bloquearAprovados && evento.status === "aprovado";
-
                   return (
                     <TableRow key={evento.id}>
-                      <TableCell className="py-3">
-                        <div className="flex flex-col">
-                          <span className="font-medium">
-                            {formatDate(evento.dataHora)}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground">
-                            {new Date(evento.dataHora).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </span>
-                        </div>
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {evento.item?.codigoInterno}
                       </TableCell>
-                      <TableCell className="py-3">
-                        <div className="flex flex-col">
-                          {/* CORREÇÃO: Optional Chaining e Fallback */}
-                          <span className="font-medium">
-                            {evento.item?.nome || "Item Excluído"}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground font-mono">
-                            {evento.item?.codigoInterno || "-"}
-                          </span>
-                        </div>
+                      <TableCell className="font-medium text-sm">
+                        {evento.item?.nome}
                       </TableCell>
-                      <TableCell className="text-right py-3">
-                        {evento.quantidade}{" "}
-                        <span className="text-xs text-muted-foreground">
-                          {evento.unidade}
-                        </span>
+                      <TableCell className="text-right text-sm">
+                        {evento.quantidade} {evento.unidade}
                       </TableCell>
-                      <TableCell className="text-right py-3 font-medium">
-                        {/* CORREÇÃO: Fallback para custoSnapshot */}
+                      <TableCell className="text-right text-sm font-medium">
                         {formatCurrency(
                           (evento.custoSnapshot || 0) * evento.quantidade,
                         )}
                       </TableCell>
-                      <TableCell className="py-3 text-muted-foreground truncate max-w-37.5">
-                        {evento.motivo}
+                      <TableCell>
+                        <Select
+                          value={
+                            evento.status === "enviado"
+                              ? "pendente"
+                              : evento.status
+                          }
+                          onValueChange={(v) =>
+                            handleStatusChange(
+                              evento.id,
+                              v === "pendente" ? "enviado" : v,
+                            )
+                          }
+                          disabled={isLocked}
+                        >
+                          <SelectTrigger
+                            className={`h-8 w-full ${getStatusColor(evento.status)} border-transparent text-xs ${isLocked ? "opacity-70 cursor-not-allowed" : ""}`}
+                          >
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="pendente">Pendente</SelectItem>
+                            <SelectItem value="aprovado">Aprovado</SelectItem>
+                            <SelectItem value="rejeitado">Rejeitado</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </TableCell>
-                      <TableCell className="py-3">
-                        <div className="flex items-center gap-2">
-                          <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-[10px]">
-                            {evento.criadoPor.nome.charAt(0)}
-                          </div>
-                          <span className="text-xs">
-                            {evento.criadoPor.nome}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center py-3">
-                        <Badge className={getStatusColor(evento.status)}>
-                          {getStatusLabel(evento.status)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="py-3">
+                      <TableCell>
+                        {/* BOTÕES DE AÇÃO COM BLOQUEIO */}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
@@ -310,16 +611,10 @@ export default function EventosPage() {
                             <DropdownMenuItem>
                               <Eye className="mr-2 h-4 w-4" /> Ver Detalhes
                             </DropdownMenuItem>
-
-                            {/* ITENS CONDICIONAIS */}
                             {hasPermission("eventos:editar") && (
                               <DropdownMenuItem
                                 disabled={isLocked}
-                                title={
-                                  isLocked
-                                    ? "Bloqueado por ser um evento aprovado"
-                                    : ""
-                                }
+                                title={isLocked ? "Bloqueado" : ""}
                               >
                                 {isLocked ? (
                                   <Lock className="mr-2 h-4 w-4 opacity-50" />
@@ -331,9 +626,6 @@ export default function EventosPage() {
                                 </span>
                               </DropdownMenuItem>
                             )}
-
-                            {/* CORREÇÃO: Usamos 'eventos:editar' como proxy para permissão de excluir, 
-                                já que 'eventos:excluir' não existe na definição de tipos atual. */}
                             {hasPermission("eventos:editar") && (
                               <DropdownMenuItem
                                 className={`focus:text-destructive ${isLocked ? "opacity-50 cursor-not-allowed" : "text-destructive"}`}
@@ -355,51 +647,351 @@ export default function EventosPage() {
                       </TableCell>
                     </TableRow>
                   );
-                })
-              ) : (
-                <TableRow>
-                  <TableCell
-                    colSpan={8}
-                    className="h-32 text-center text-muted-foreground"
-                  >
-                    Nenhum registro encontrado.
-                  </TableCell>
-                </TableRow>
+                })}
+              </TableBody>
+            </table>
+          </div>
+        </div>
+        <PaginationControls />
+        {/* Alerta de Exclusão */}
+        <AlertDialog
+          open={!!eventoToDelete}
+          onOpenChange={(open) => !open && setEventoToDelete(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir registro?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Isso excluirá o registro de perda permanentemente.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDelete}
+                className="bg-destructive hover:bg-destructive/90"
+              >
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    );
+  }
+
+  // RENDER PÁGINA PRINCIPAL
+  return (
+    <div
+      className={`flex flex-col h-[calc(100vh-2rem)] space-y-4 overflow-hidden ${hideScrollClass}`}
+    >
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Histórico de Perdas
+          </h1>
+          <p className="text-muted-foreground">
+            Gerencie e audite os registros de perdas.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportar}
+            className="h-9"
+          >
+            <Download className="mr-2 h-3.5 w-3.5" /> Exportar
+          </Button>
+
+          <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg border">
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "h-8 gap-2 text-xs hover:bg-background/60",
+                viewMode === "pastas" &&
+                  "bg-background shadow-sm text-foreground hover:bg-background",
               )}
-            </TableBody>
-          </table>
+              onClick={() => {
+                setViewMode("pastas");
+                setDateRange(undefined);
+              }}
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+              Lotes
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                "h-8 gap-2 text-xs hover:bg-background/60",
+                viewMode === "lista-completa" &&
+                  "bg-background shadow-sm text-foreground hover:bg-background",
+              )}
+              onClick={() => setViewMode("lista-completa")}
+            >
+              <LayoutList className="h-3.5 w-3.5" />
+              Lista
+            </Button>
+          </div>
         </div>
       </div>
 
-      {/* Paginação */}
-      <div className="flex items-center justify-between shrink-0 pt-2 border-t mt-auto">
-        <p className="text-xs text-muted-foreground">
-          {paginatedEventos.length} de {filteredEventos.length} registros
-        </p>
-        <div className="flex items-center space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8"
-            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-          >
-            Anterior
-          </Button>
-          <div className="text-xs font-medium px-2">
-            Pág {currentPage} de {Math.max(1, totalPages)}
+      {/* FILTROS */}
+      <div className="flex flex-col md:flex-row gap-3 items-end shrink-0 bg-background z-10 py-1">
+        <div className="flex-1 w-full">
+          <span className="text-xs font-medium mb-1.5 block text-muted-foreground ml-1">
+            Buscar
+          </span>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Nome, código ou autor..."
+              value={globalSearch}
+              onChange={(e) => setGlobalSearch(e.target.value)}
+              className="pl-9 h-9"
+            />
           </div>
+        </div>
+
+        <div className="w-full md:w-48">
+          <span className="text-xs font-medium mb-1.5 block text-muted-foreground ml-1">
+            Status
+          </span>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos</SelectItem>
+              <SelectItem value="aprovado">Aprovado</SelectItem>
+              <SelectItem value="pendente">Pendente</SelectItem>
+              <SelectItem value="rejeitado">Rejeitado</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="w-full md:w-auto">
+          <span className="text-xs font-medium mb-1.5 block text-muted-foreground ml-1">
+            Período
+          </span>
+          <DateFilter />
+        </div>
+
+        {(dateRange || globalSearch || statusFilter !== "todos") && (
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
-            className="h-8"
-            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages || totalPages === 0}
+            onClick={() => {
+              setDateRange(undefined);
+              setGlobalSearch("");
+              setStatusFilter("todos");
+            }}
+            className="text-muted-foreground h-9 self-end"
           >
-            Próximo
+            Limpar
           </Button>
+        )}
+      </div>
+
+      {/* CONTEÚDO */}
+      <div className="flex-1 min-h-0 border rounded-md bg-card relative overflow-hidden shadow-sm">
+        <div
+          className={`absolute inset-0 overflow-y-auto ${hideScrollClass} p-2`}
+        >
+          {viewMode === "pastas" ? (
+            <div className="flex flex-col gap-2">
+              {dadosPaginados.currentItems.map((lote: LoteDiario) => (
+                <div
+                  key={lote.data}
+                  className="group flex items-center justify-between p-3 rounded-md border bg-background hover:bg-muted/40 hover:border-primary/30 transition-all cursor-pointer shadow-sm"
+                  onClick={() => setLoteSelecionado(lote)}
+                >
+                  <div className="flex items-center gap-4">
+                    <div
+                      className={cn(
+                        "flex h-9 w-9 items-center justify-center rounded-full border",
+                        lote.status === "aprovado"
+                          ? "bg-success/10 text-success border-success/20"
+                          : lote.status === "rejeitado"
+                            ? "bg-destructive/10 text-destructive border-destructive/20"
+                            : "bg-muted text-muted-foreground",
+                      )}
+                    >
+                      <FileText className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold">{lote.data}</h3>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>{lote.autor}</span>
+                        <span>•</span>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "h-4 px-1 text-[10px] border-0 bg-transparent p-0 font-normal",
+                            lote.status === "aprovado"
+                              ? "text-success"
+                              : lote.status === "rejeitado"
+                                ? "text-destructive"
+                                : "text-muted-foreground",
+                          )}
+                        >
+                          {lote.status.toUpperCase()}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-6 md:gap-12">
+                    <div className="hidden md:block text-right">
+                      <p className="text-[10px] text-muted-foreground uppercase">
+                        Itens
+                      </p>
+                      <p className="text-sm font-medium">
+                        {lote.eventos.length}
+                      </p>
+                    </div>
+                    <div className="text-right min-w-20">
+                      <p className="text-[10px] text-muted-foreground uppercase">
+                        Total
+                      </p>
+                      <p className="text-sm font-bold">
+                        {formatCurrency(lote.totalCusto)}
+                      </p>
+                    </div>
+                    <ChevronRightSquare className="h-5 w-5 text-muted-foreground/30 group-hover:text-primary/50 transition-colors" />
+                  </div>
+                </div>
+              ))}
+              {dadosPaginados.totalItems === 0 && (
+                <div className="py-12 text-center text-muted-foreground border border-dashed rounded-lg bg-muted/5">
+                  Nenhum lote encontrado.
+                </div>
+              )}
+            </div>
+          ) : (
+            // TABELA LISTA COMPLETA (MODO LISTA) - COM CORREÇÃO STICKY HEADER
+            <table className="w-full caption-bottom text-sm">
+              <TableHeader className="sticky top-0 bg-card z-10 shadow-sm">
+                <TableRow>
+                  <TableHead>Data</TableHead>
+                  <TableHead>Código</TableHead>
+                  <TableHead>Produto</TableHead>
+                  <TableHead className="text-right">Qtd.</TableHead>
+                  <TableHead className="text-right">Total</TableHead>
+                  <TableHead className="w-45">Status</TableHead>
+                  <TableHead className="w-12"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {dadosPaginados.currentItems.map((evento: Evento) => {
+                  const isLocked =
+                    settings?.bloquearAprovados && evento.status === "aprovado";
+                  return (
+                    <TableRow key={evento.id}>
+                      <TableCell className="text-xs whitespace-nowrap text-muted-foreground">
+                        {formatDate(evento.dataHora)}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs text-muted-foreground">
+                        {evento.item?.codigoInterno}
+                      </TableCell>
+                      <TableCell className="font-medium text-sm">
+                        {evento.item?.nome}
+                      </TableCell>
+                      <TableCell className="text-right text-sm">
+                        {evento.quantidade} {evento.unidade}
+                      </TableCell>
+                      <TableCell className="text-right text-sm font-medium">
+                        {formatCurrency(
+                          (evento.custoSnapshot || 0) * evento.quantidade,
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={
+                            evento.status === "aprovado"
+                              ? "default"
+                              : evento.status === "rejeitado"
+                                ? "destructive"
+                                : "secondary"
+                          }
+                        >
+                          {evento.status === "enviado"
+                            ? "Pendente"
+                            : evento.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>
+                              <Eye className="mr-2 h-4 w-4" /> Ver Detalhes
+                            </DropdownMenuItem>
+                            {hasPermission("eventos:editar") && (
+                              <DropdownMenuItem
+                                disabled={isLocked}
+                                title={isLocked ? "Bloqueado" : ""}
+                              >
+                                {isLocked ? (
+                                  <Lock className="mr-2 h-4 w-4 opacity-50" />
+                                ) : (
+                                  <Edit className="mr-2 h-4 w-4" />
+                                )}
+                                <span className={isLocked ? "opacity-50" : ""}>
+                                  Editar
+                                </span>
+                              </DropdownMenuItem>
+                            )}
+                            {hasPermission("eventos:editar") && (
+                              <DropdownMenuItem
+                                className={`focus:text-destructive ${isLocked ? "opacity-50 cursor-not-allowed" : "text-destructive"}`}
+                                disabled={isLocked}
+                                onClick={() =>
+                                  !isLocked && setEventoToDelete(evento.id)
+                                }
+                              >
+                                {isLocked ? (
+                                  <Lock className="mr-2 h-4 w-4" />
+                                ) : (
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                )}
+                                <span>Excluir</span>
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {dadosPaginados.totalItems === 0 && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={7}
+                      className="h-24 text-center text-muted-foreground"
+                    >
+                      Nenhum item corresponde aos filtros.
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </table>
+          )}
         </div>
       </div>
+
+      <PaginationControls />
 
       {/* Alerta de Exclusão */}
       <AlertDialog
@@ -410,8 +1002,7 @@ export default function EventosPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir registro?</AlertDialogTitle>
             <AlertDialogDescription>
-              Isso excluirá o registro de perda permanentemente. O estoque não
-              será revertido automaticamente.
+              Isso excluirá o registro de perda permanentemente.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
