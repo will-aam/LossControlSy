@@ -1,5 +1,3 @@
-// app/(dashboard)/eventos/novo/page.tsx
-// Essa página é similar a app/(dashboard)/eventos/page.tsx, mas para criação de novos eventos
 "use client";
 
 import { useState, useEffect } from "react";
@@ -15,9 +13,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ItemSearch } from "@/components/forms/item-search";
-import { Item, formatCurrency, Evento } from "@/lib/mock-data";
+// Importações Corrigidas
+import { Item, Evento } from "@/lib/types";
+import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
-import { StorageService } from "@/lib/storage"; // Importar Storage
+import { StorageService } from "@/lib/storage";
 import {
   Plus,
   Trash2,
@@ -49,7 +49,7 @@ interface ItemLancamento {
   tempId: string;
   item: Item;
   quantidade: number;
-  unidade: "UN" | "KG";
+  unidade: string; // Atualizado para string para aceitar qualquer unidade do Item
   fotoUrl?: string;
 }
 
@@ -104,7 +104,7 @@ export default function NovoEventoPage() {
 
   const handleAddPhoto = (tempId: string) => {
     // Em um app real, aqui abriria o input de arquivo ou câmera
-    // Simulando uma URL de foto para teste
+    // Simulando uma URL de foto para teste (ou usar upload real se implementado)
     const mockPhoto =
       "https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=400";
 

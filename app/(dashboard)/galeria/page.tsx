@@ -23,14 +23,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+// Importações corrigidas
+import { Evidencia, Evento } from "@/lib/types";
 import {
-  Evidencia,
-  Evento,
   formatDate,
   formatDateTime,
   getStatusLabel,
   getStatusColor,
-} from "@/lib/mock-data";
+} from "@/lib/utils";
 import { StorageService } from "@/lib/storage";
 import { useAuth } from "@/lib/auth-context";
 import { UploadDialog } from "@/components/galeria/upload-dialog";
@@ -175,9 +175,11 @@ export default function GaleriaPage() {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
         (ev) =>
-          ev.evento?.item?.nome.toLowerCase().includes(query) ||
-          ev.evento?.item?.codigoInterno.toLowerCase().includes(query) ||
-          ev.motivo?.toLowerCase().includes(query),
+          (ev.evento?.item?.nome || "").toLowerCase().includes(query) ||
+          (ev.evento?.item?.codigoInterno || "")
+            .toLowerCase()
+            .includes(query) ||
+          (ev.motivo || "").toLowerCase().includes(query),
       );
     }
 

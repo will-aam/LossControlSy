@@ -20,7 +20,9 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ItemSearch } from "@/components/forms/item-search";
-import { Item, Evidencia, Evento, formatDate } from "@/lib/mock-data";
+// Importações Corrigidas
+import { Item, Evidencia, Evento } from "@/lib/types";
+import { formatDate } from "@/lib/utils";
 import { StorageService } from "@/lib/storage";
 import { X, ImageIcon, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -138,7 +140,6 @@ export function UploadDialog({
         dadosParaSalvar.eventoId = selectedEventoId;
         // Se vinculou evento, pegamos o Item ID dele automaticamente também
         const evento = eventos.find((e) => e.id === selectedEventoId);
-        // FIX TS: Usar Optional Chaining (?.)
         if (evento?.item?.id) dadosParaSalvar.itemId = evento.item.id;
       }
     }
@@ -151,10 +152,6 @@ export function UploadDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {/* AJUSTE DE LAYOUT: 
-          - max-h-[90vh] para não estourar a tela.
-          - flex flex-col para estruturar header, body e footer.
-      */}
       <DialogContent className="sm:max-w-125 max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden">
         {/* Header Fixo */}
         <DialogHeader className="p-6 pb-2 shrink-0">
@@ -289,7 +286,6 @@ export function UploadDialog({
                       <SelectContent className="max-h-50">
                         {eventosDoLote.map((ev) => (
                           <SelectItem key={ev.id} value={ev.id}>
-                            {/* FIX TS: Optional Chaining no ev.item?.nome */}
                             {ev.item?.nome || "Item desconhecido"} -{" "}
                             {ev.quantidade} {ev.unidade}
                           </SelectItem>

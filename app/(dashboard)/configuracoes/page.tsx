@@ -34,7 +34,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { User, getRoleLabel, UserRole } from "@/lib/mock-data";
+// Importações corrigidas
+import { User, UserRole } from "@/lib/types";
+import { getRoleLabel } from "@/lib/utils";
 import { StorageService, AppSettings } from "@/lib/storage";
 import { useAuth } from "@/lib/auth-context";
 import { UserFormDialog } from "@/components/configuracoes/user-form-dialog";
@@ -47,7 +49,6 @@ import {
   Edit,
   Trash2,
   Plus,
-  Images,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -241,6 +242,9 @@ export default function ConfiguracoesPage() {
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2">
                     <Label>Permitir funcionários na Galeria</Label>
+                    <Badge variant="outline" className="text-[10px] h-5">
+                      Novo
+                    </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">
                     Se ativo, funcionários poderão acessar a aba Galeria e

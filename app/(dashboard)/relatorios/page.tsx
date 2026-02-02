@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -42,18 +42,11 @@ import {
   PieChart,
   Pie,
   Cell,
-  ResponsiveContainer,
   Line,
   LineChart,
-  Legend,
 } from "recharts";
-import {
-  dashboardStats,
-  mockEventos,
-  mockItems,
-  formatCurrency,
-  categorias,
-} from "@/lib/mock-data";
+import { formatCurrency } from "@/lib/utils";
+import { StorageService } from "@/lib/storage";
 import { useAuth } from "@/lib/auth-context";
 import {
   AlertTriangle,
@@ -63,9 +56,8 @@ import {
   Package,
   DollarSign,
   BarChart3,
-  PieChartIcon,
-  FileSpreadsheet,
 } from "lucide-react";
+import { Evento, Item } from "@/lib/types";
 
 const chartConfig = {
   custo: {
@@ -90,56 +82,180 @@ const pieColors = [
   "var(--chart-5)",
 ];
 
-// Extended data for reports
-const monthlyData = [
-  { mes: "Ago", custo: 2100, precoVenda: 3200, quantidade: 145 },
-  { mes: "Set", custo: 1850, precoVenda: 2900, quantidade: 128 },
-  { mes: "Out", custo: 2350, precoVenda: 3650, quantidade: 162 },
-  { mes: "Nov", custo: 2680, precoVenda: 4100, quantidade: 185 },
-  { mes: "Dez", custo: 3200, precoVenda: 4850, quantidade: 220 },
-  { mes: "Jan", custo: 2450, precoVenda: 3890, quantidade: 156 },
-];
-
-const topMotivosPerdas = [
-  { motivo: "Validade vencida", quantidade: 45, custo: 890 },
-  { motivo: "Produto maduro", quantidade: 38, custo: 720 },
-  { motivo: "Danos no transporte", quantidade: 28, custo: 580 },
-  { motivo: "Embalagem danificada", quantidade: 22, custo: 340 },
-  { motivo: "Refrigeração falhou", quantidade: 15, custo: 420 },
-];
-
-const perdasPorDiaSemana = [
-  { dia: "Segunda", custo: 380, quantidade: 24 },
-  { dia: "Terça", custo: 290, quantidade: 18 },
-  { dia: "Quarta", custo: 420, quantidade: 28 },
-  { dia: "Quinta", custo: 310, quantidade: 20 },
-  { dia: "Sexta", custo: 480, quantidade: 32 },
-  { dia: "Sábado", custo: 520, quantidade: 35 },
-  { dia: "Domingo", custo: 250, quantidade: 15 },
-];
-
 export default function RelatoriosPage() {
   const { hasPermission } = useAuth();
   const [periodo, setPeriodo] = useState<
     "semana" | "mes" | "trimestre" | "ano"
   >("mes");
   const [selectedTab, setSelectedTab] = useState("visao-geral");
+  const [eventos, setEventos] = useState<Evento[]>([]);
 
-  // Calculate summary stats
+  // Carregar dados reais
+  useEffect(() => {
+    setEventos(StorageService.getEventos());
+  }, []);
+
+  // --- CÁLCULOS DINÂMICOS ---
+
+  const stats = useMemo(() => {
+    // Filtrar eventos válidos (aprovados ou enviados, dependendo da regra de negócio)
+    // Para relatórios, geralmente consideramos perdas confirmadas (aprovadas/exportadas)
+    // Mas para visualização geral, podemos incluir 'enviado' como pendente
+    const validEventos = eventos.filter(
+      (e) => e.status !== "rascunho" && e.status !== "rejeitado",
+    );
+
+    // 1. Dados Mensais (Últimos 6 meses)
+    const monthlyDataMap: Record<
+      string,
+      { custo: number; venda: number; qtd: number }
+    > = {};
+    const meses = [
+      "Jan",
+      "Fev",
+      "Mar",
+      "Abr",
+      "Mai",
+      "Jun",
+      "Jul",
+      "Ago",
+      "Set",
+      "Out",
+      "Nov",
+      "Dez",
+    ];
+
+    // Inicializa últimos 6 meses
+    const hoje = new Date();
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+      const key = meses[d.getMonth()];
+      monthlyDataMap[key] = { custo: 0, venda: 0, qtd: 0 };
+    }
+
+    validEventos.forEach((ev) => {
+      const d = new Date(ev.dataHora);
+      const key = meses[d.getMonth()];
+      if (monthlyDataMap[key]) {
+        monthlyDataMap[key].custo += (ev.custoSnapshot || 0) * ev.quantidade;
+        monthlyDataMap[key].venda +=
+          (ev.precoVendaSnapshot || 0) * ev.quantidade;
+        monthlyDataMap[key].qtd += ev.quantidade;
+      }
+    });
+
+    const monthlyData = Object.entries(monthlyDataMap).map(([mes, val]) => ({
+      mes,
+      ...val,
+    }));
+
+    // 2. Top Motivos
+    const motivosMap: Record<string, { qtd: number; custo: number }> = {};
+    validEventos.forEach((ev) => {
+      const motivo = ev.motivo || "Não especificado";
+      if (!motivosMap[motivo]) motivosMap[motivo] = { qtd: 0, custo: 0 };
+      motivosMap[motivo].qtd += ev.quantidade;
+      motivosMap[motivo].custo += (ev.custoSnapshot || 0) * ev.quantidade;
+    });
+
+    const topMotivosPerdas = Object.entries(motivosMap)
+      .map(([motivo, val]) => ({
+        motivo,
+        quantidade: val.qtd,
+        custo: val.custo,
+      }))
+      .sort((a, b) => b.custo - a.custo)
+      .slice(0, 5);
+
+    // 3. Perdas por Dia da Semana
+    const diasMap: Record<string, { qtd: number; custo: number }> = {
+      Domingo: { qtd: 0, custo: 0 },
+      Segunda: { qtd: 0, custo: 0 },
+      Terça: { qtd: 0, custo: 0 },
+      Quarta: { qtd: 0, custo: 0 },
+      Quinta: { qtd: 0, custo: 0 },
+      Sexta: { qtd: 0, custo: 0 },
+      Sábado: { qtd: 0, custo: 0 },
+    };
+
+    validEventos.forEach((ev) => {
+      const d = new Date(ev.dataHora);
+      const dia = d.toLocaleDateString("pt-BR", { weekday: "long" });
+      const diaKey = dia.charAt(0).toUpperCase() + dia.slice(1); // Capitalize
+
+      // Normalização simples para garantir match com as chaves
+      const normalizedKey =
+        Object.keys(diasMap).find(
+          (k) => k.toLowerCase() === diaKey.toLowerCase(),
+        ) || "Outro";
+
+      if (diasMap[normalizedKey]) {
+        diasMap[normalizedKey].qtd += ev.quantidade;
+        diasMap[normalizedKey].custo += (ev.custoSnapshot || 0) * ev.quantidade;
+      }
+    });
+
+    const perdasPorDiaSemana = Object.entries(diasMap).map(([dia, val]) => ({
+      dia,
+      quantidade: val.qtd,
+      custo: val.custo,
+    }));
+
+    // 4. Por Categoria
+    const catMap: Record<string, { custo: number; venda: number }> = {};
+    validEventos.forEach((ev) => {
+      const cat = ev.item?.categoria || "Outros";
+      if (!catMap[cat]) catMap[cat] = { custo: 0, venda: 0 };
+      catMap[cat].custo += (ev.custoSnapshot || 0) * ev.quantidade;
+      catMap[cat].venda += (ev.precoVendaSnapshot || 0) * ev.quantidade;
+    });
+
+    const perdasPorCategoria = Object.entries(catMap)
+      .map(([cat, val]) => ({ categoria: cat, ...val }))
+      .sort((a, b) => b.custo - a.custo);
+
+    // 5. Top Itens
+    const itemMap: Record<string, { item: Item; qtd: number; custo: number }> =
+      {};
+    validEventos.forEach((ev) => {
+      if (!ev.item) return;
+      if (!itemMap[ev.item.id])
+        itemMap[ev.item.id] = { item: ev.item, qtd: 0, custo: 0 };
+      itemMap[ev.item.id].qtd += ev.quantidade;
+      itemMap[ev.item.id].custo += (ev.custoSnapshot || 0) * ev.quantidade;
+    });
+
+    const topItens = Object.values(itemMap)
+      .sort((a, b) => b.custo - a.custo)
+      .slice(0, 10);
+
+    return {
+      monthlyData,
+      topMotivosPerdas,
+      perdasPorDiaSemana,
+      perdasPorCategoria,
+      topItens,
+    };
+  }, [eventos]);
+
+  // Calculate summary stats (simples, baseado no total carregado)
   const summary = useMemo(() => {
-    const totalCusto = monthlyData.reduce((acc, m) => acc + m.custo, 0);
-    const totalVenda = monthlyData.reduce((acc, m) => acc + m.precoVenda, 0);
-    const totalQtd = monthlyData.reduce((acc, m) => acc + m.quantidade, 0);
-    const mediaQtdDia = Math.round(totalQtd / 180); // ~6 months
+    const totalCusto = stats.monthlyData.reduce((acc, m) => acc + m.custo, 0);
+    const totalVenda = stats.monthlyData.reduce((acc, m) => acc + m.venda, 0);
+    const totalQtd = stats.monthlyData.reduce((acc, m) => acc + m.qtd, 0);
+    const mediaQtdDia = Math.round(totalQtd / 180) || 0; // ~6 months
 
     return {
       totalCusto,
       totalVenda,
       totalQtd,
       mediaQtdDia,
-      margemPerda: (((totalVenda - totalCusto) / totalVenda) * 100).toFixed(1),
+      margemPerda:
+        totalVenda > 0
+          ? (((totalVenda - totalCusto) / totalVenda) * 100).toFixed(1)
+          : "0.0",
     };
-  }, []);
+  }, [stats]);
 
   if (!hasPermission("relatorios:ver")) {
     return (
@@ -274,7 +390,7 @@ export default function RelatoriosPage() {
               </CardHeader>
               <CardContent>
                 <ChartContainer config={chartConfig} className="h-75">
-                  <LineChart data={monthlyData}>
+                  <LineChart data={stats.monthlyData}>
                     <CartesianGrid
                       strokeDasharray="3 3"
                       className="stroke-border"
@@ -294,7 +410,7 @@ export default function RelatoriosPage() {
                     />
                     <Line
                       type="monotone"
-                      dataKey="precoVenda"
+                      dataKey="venda"
                       stroke="var(--chart-2)"
                       strokeWidth={2}
                       dot={{ fill: "var(--chart-2)" }}
@@ -314,7 +430,7 @@ export default function RelatoriosPage() {
               </CardHeader>
               <CardContent>
                 <ChartContainer config={chartConfig} className="h-75">
-                  <BarChart data={perdasPorDiaSemana}>
+                  <BarChart data={stats.perdasPorDiaSemana}>
                     <CartesianGrid
                       strokeDasharray="3 3"
                       className="stroke-border"
@@ -351,20 +467,18 @@ export default function RelatoriosPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {monthlyData.map((row) => (
+                  {stats.monthlyData.map((row) => (
                     <TableRow key={row.mes}>
                       <TableCell className="font-medium">{row.mes}</TableCell>
-                      <TableCell className="text-right">
-                        {row.quantidade}
-                      </TableCell>
+                      <TableCell className="text-right">{row.qtd}</TableCell>
                       <TableCell className="text-right">
                         {formatCurrency(row.custo)}
                       </TableCell>
                       <TableCell className="text-right">
-                        {formatCurrency(row.precoVenda)}
+                        {formatCurrency(row.venda)}
                       </TableCell>
                       <TableCell className="text-right text-destructive">
-                        {formatCurrency(row.precoVenda - row.custo)}
+                        {formatCurrency(row.venda - row.custo)}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -388,7 +502,7 @@ export default function RelatoriosPage() {
                 <ChartContainer config={chartConfig} className="h-75">
                   <PieChart>
                     <Pie
-                      data={dashboardStats.perdasPorCategoria}
+                      data={stats.perdasPorCategoria}
                       dataKey="custo"
                       nameKey="categoria"
                       cx="50%"
@@ -398,7 +512,7 @@ export default function RelatoriosPage() {
                         `${categoria} (${(percent * 100).toFixed(0)}%)`
                       }
                     >
-                      {dashboardStats.perdasPorCategoria.map((_, index) => (
+                      {stats.perdasPorCategoria.map((_, index) => (
                         <Cell
                           key={`cell-${index}`}
                           fill={pieColors[index % pieColors.length]}
@@ -418,10 +532,7 @@ export default function RelatoriosPage() {
               </CardHeader>
               <CardContent>
                 <ChartContainer config={chartConfig} className="h-75">
-                  <BarChart
-                    data={dashboardStats.perdasPorCategoria}
-                    layout="vertical"
-                  >
+                  <BarChart data={stats.perdasPorCategoria} layout="vertical">
                     <CartesianGrid
                       strokeDasharray="3 3"
                       className="stroke-border"
@@ -445,7 +556,7 @@ export default function RelatoriosPage() {
                       radius={[0, 4, 4, 0]}
                     />
                     <Bar
-                      dataKey="precoVenda"
+                      dataKey="venda"
                       fill="var(--chart-2)"
                       radius={[0, 4, 4, 0]}
                     />
@@ -470,12 +581,15 @@ export default function RelatoriosPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {dashboardStats.perdasPorCategoria.map((cat) => {
-                    const total = dashboardStats.perdasPorCategoria.reduce(
+                  {stats.perdasPorCategoria.map((cat) => {
+                    const total = stats.perdasPorCategoria.reduce(
                       (acc, c) => acc + c.custo,
                       0,
                     );
-                    const percent = ((cat.custo / total) * 100).toFixed(1);
+                    const percent =
+                      total > 0
+                        ? ((cat.custo / total) * 100).toFixed(1)
+                        : "0.0";
                     return (
                       <TableRow key={cat.categoria}>
                         <TableCell className="font-medium">
@@ -485,7 +599,7 @@ export default function RelatoriosPage() {
                           {formatCurrency(cat.custo)}
                         </TableCell>
                         <TableCell className="text-right">
-                          {formatCurrency(cat.precoVenda)}
+                          {formatCurrency(cat.venda)}
                         </TableCell>
                         <TableCell className="text-right">{percent}%</TableCell>
                       </TableRow>
@@ -519,7 +633,7 @@ export default function RelatoriosPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {dashboardStats.topItens.map((entry, index) => (
+                  {stats.topItens.map((entry, index) => (
                     <TableRow key={entry.item.id}>
                       <TableCell className="font-medium">{index + 1}</TableCell>
                       <TableCell>
@@ -547,15 +661,13 @@ export default function RelatoriosPage() {
                         <Badge variant="outline">{entry.item.categoria}</Badge>
                       </TableCell>
                       <TableCell className="text-right">
-                        {entry.quantidade} {entry.item.unidade}
+                        {entry.qtd} {entry.item.unidade}
                       </TableCell>
                       <TableCell className="text-right">
                         {formatCurrency(entry.custo)}
                       </TableCell>
                       <TableCell className="text-right text-destructive">
-                        {formatCurrency(
-                          entry.quantidade * entry.item.precoVenda,
-                        )}
+                        {formatCurrency(entry.qtd * entry.item.precoVenda)}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -577,7 +689,7 @@ export default function RelatoriosPage() {
               </CardHeader>
               <CardContent>
                 <ChartContainer config={chartConfig} className="h-75">
-                  <BarChart data={topMotivosPerdas}>
+                  <BarChart data={stats.topMotivosPerdas}>
                     <CartesianGrid
                       strokeDasharray="3 3"
                       className="stroke-border"
@@ -610,11 +722,12 @@ export default function RelatoriosPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {topMotivosPerdas.map((item, index) => {
+                  {stats.topMotivosPerdas.map((item, index) => {
                     const maxCusto = Math.max(
-                      ...topMotivosPerdas.map((i) => i.custo),
+                      ...stats.topMotivosPerdas.map((i) => i.custo),
                     );
-                    const percent = (item.custo / maxCusto) * 100;
+                    const percent =
+                      maxCusto > 0 ? (item.custo / maxCusto) * 100 : 0;
                     return (
                       <div key={item.motivo} className="space-y-2">
                         <div className="flex items-center justify-between text-sm">
@@ -657,13 +770,17 @@ export default function RelatoriosPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {topMotivosPerdas.map((item) => {
-                    const total = topMotivosPerdas.reduce(
+                  {stats.topMotivosPerdas.map((item) => {
+                    const total = stats.topMotivosPerdas.reduce(
                       (acc, i) => acc + i.custo,
                       0,
                     );
-                    const percent = ((item.custo / total) * 100).toFixed(1);
-                    const media = item.custo / item.quantidade;
+                    const percent =
+                      total > 0
+                        ? ((item.custo / total) * 100).toFixed(1)
+                        : "0.0";
+                    const media =
+                      item.quantidade > 0 ? item.custo / item.quantidade : 0;
                     return (
                       <TableRow key={item.motivo}>
                         <TableCell className="font-medium">
