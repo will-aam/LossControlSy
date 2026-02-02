@@ -58,14 +58,13 @@ import {
   getStatusColor,
   EventoStatus,
 } from "@/lib/mock-data";
-import { StorageService } from "@/lib/storage"; // Importar Storage
+import { StorageService } from "@/lib/storage";
 import { useAuth } from "@/lib/auth-context";
 import {
   FileText,
   Search,
   ArrowLeft,
   CheckCircle2,
-  XCircle,
   LayoutList,
   LayoutGrid,
   CalendarIcon,
@@ -319,13 +318,89 @@ export default function EventosPage() {
     toast.success("Lote aprovado!");
   };
 
+  // --- FUNÇÃO DE EXPORTAÇÃO CSV ---
   const handleExportar = () => {
-    toast.success("Funcionalidade de exportação em desenvolvimento.");
+    if (!loteSelecionado) return;
+
+    // 1. Validar se todos estão aprovados
+    const todosAprovados = loteSelecionado.eventos.every(
+      (e) => e.status === "aprovado" || e.status === "exportado",
+    );
+
+    if (!todosAprovados) {
+      toast.error("Exportação bloqueada", {
+        description: "Todos os itens do lote precisam estar APROVADOS.",
+      });
+      return;
+    }
+
+    // 2. Montar cabeçalhos (Ponto e vírgula para Excel Brasil)
+    const headers = [
+      "Item",
+      "Código Interno",
+      "Código de Barras",
+      "Categoria",
+      "Unidade",
+      "Quantidade",
+      "Custo Unitário",
+      "Custo Total",
+      "Venda Unitária",
+      "Venda Total",
+    ];
+
+    // 3. Montar linhas
+    const rows = loteSelecionado.eventos.map((ev) => {
+      const custoUnit = ev.custoSnapshot || 0;
+      const vendaUnit = ev.precoVendaSnapshot || 0;
+      const custoTotal = custoUnit * ev.quantidade;
+      const vendaTotal = vendaUnit * ev.quantidade;
+
+      // Função para limpar string e evitar quebrar o CSV
+      const clean = (str: string | undefined) =>
+        `"${(str || "").replace(/"/g, '""')}"`;
+
+      // Formatar número para padrão BR (com vírgula) se desejar, ou manter ponto
+      // Para CSV universal, manter ponto é mais seguro, mas Excel BR prefere vírgula.
+      // Vamos usar replace('.', ',') para compatibilidade com Excel em PT-BR.
+      const fmtNum = (num: number) => num.toFixed(2).replace(".", ",");
+
+      return [
+        clean(ev.item?.nome),
+        clean(ev.item?.codigoInterno),
+        clean(ev.item?.codigoBarras),
+        clean(ev.item?.categoria),
+        clean(ev.unidade),
+        ev.quantidade.toString().replace(".", ","),
+        fmtNum(custoUnit),
+        fmtNum(custoTotal),
+        fmtNum(vendaUnit),
+        fmtNum(vendaTotal),
+      ].join(";");
+    });
+
+    // 4. Criar Blob com BOM para acentos funcionarem no Excel
+    const csvContent = "\uFEFF" + headers.join(";") + "\n" + rows.join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+
+    // 5. Download
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute(
+      "download",
+      `perdas_${loteSelecionado.data.replace(/\//g, "-")}.csv`,
+    );
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    // Opcional: Marcar como exportado
+    // handleStatusChange(ev.id, 'exportado') ... se desejar mudar o status após baixar
+    toast.success("Arquivo CSV baixado com sucesso!");
   };
 
   const confirmDelete = () => {
     if (eventoToDelete) {
-      // Re-verificar se pode excluir (segurança extra)
       const evento = eventosLocais.find((e) => e.id === eventoToDelete);
       if (
         evento &&
@@ -337,18 +412,15 @@ export default function EventosPage() {
         return;
       }
 
-      // Filtrar e atualizar estado local
       const novosEventos = eventosLocais.filter((e) => e.id !== eventoToDelete);
       setEventosLocais(novosEventos);
 
-      // Aqui idealmente chamariamos StorageService.deleteEvento(eventoToDelete)
-      // Como simulado:
+      // Simulação de persistência
       // StorageService.saveEventos(novosEventos);
 
       toast.success("Evento excluído");
       setEventoToDelete(null);
 
-      // Atualizar lote se necessário
       if (loteSelecionado) {
         setLoteSelecionado((prev) =>
           prev
@@ -483,6 +555,8 @@ export default function EventosPage() {
 
   // RENDER DETALHE DO LOTE
   if (loteSelecionado) {
+    const isLoteAprovado = loteSelecionado.status === "aprovado";
+
     return (
       <div
         className={`flex flex-col h-[calc(100vh-2rem)] space-y-4 ${hideScrollClass}`}
@@ -517,18 +591,34 @@ export default function EventosPage() {
             </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleExportar}>
-              <Download className="mr-2 h-4 w-4" /> Exportar
-            </Button>
-            {loteSelecionado.status === "pendente" && (
+            {/* BOTÃO EXPORTAR: Só aparece aqui e só habilita se aprovado */}
+            {hasPermission("eventos:exportar") && (
               <Button
-                onClick={handleAprovarLoteInteiro}
-                className="bg-success hover:bg-success/90 text-white"
+                variant="outline"
+                size="sm"
+                onClick={handleExportar}
+                disabled={!isLoteAprovado} // Desabilita visualmente se não estiver aprovado
+                className={
+                  !isLoteAprovado ? "opacity-50 cursor-not-allowed" : ""
+                }
+                title={
+                  !isLoteAprovado ? "Aprove todos os itens para baixar" : ""
+                }
               >
-                <CheckCircle2 className="mr-2 h-4 w-4" />
-                Aprovar Tudo
+                <Download className="mr-2 h-4 w-4" /> Baixar CSV
               </Button>
             )}
+
+            {loteSelecionado.status === "pendente" &&
+              hasPermission("eventos:aprovar") && (
+                <Button
+                  onClick={handleAprovarLoteInteiro}
+                  className="bg-success hover:bg-success/90 text-white"
+                >
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Aprovar Tudo
+                </Button>
+              )}
           </div>
         </div>
 
@@ -536,7 +626,6 @@ export default function EventosPage() {
           <div
             className={`absolute inset-0 overflow-y-auto ${hideScrollClass}`}
           >
-            {/* CORREÇÃO DO STICKY HEADER AQUI */}
             <table className="w-full caption-bottom text-sm">
               <TableHeader className="sticky top-0 bg-card z-20 shadow-sm">
                 <TableRow>
@@ -569,6 +658,7 @@ export default function EventosPage() {
                         )}
                       </TableCell>
                       <TableCell>
+                        {/* Select de Status - Desabilitado para Fiscal */}
                         <Select
                           value={
                             evento.status === "enviado"
@@ -581,22 +671,27 @@ export default function EventosPage() {
                               v === "pendente" ? "enviado" : v,
                             )
                           }
-                          disabled={isLocked}
+                          disabled={
+                            isLocked || !hasPermission("eventos:editar")
+                          }
                         >
                           <SelectTrigger
                             className={`h-8 w-full ${getStatusColor(evento.status)} border-transparent text-xs ${isLocked ? "opacity-70 cursor-not-allowed" : ""}`}
                           >
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="pendente">Pendente</SelectItem>
-                            <SelectItem value="aprovado">Aprovado</SelectItem>
-                            <SelectItem value="rejeitado">Rejeitado</SelectItem>
-                          </SelectContent>
+                          {hasPermission("eventos:editar") && (
+                            <SelectContent>
+                              <SelectItem value="pendente">Pendente</SelectItem>
+                              <SelectItem value="aprovado">Aprovado</SelectItem>
+                              <SelectItem value="rejeitado">
+                                Rejeitado
+                              </SelectItem>
+                            </SelectContent>
+                          )}
                         </Select>
                       </TableCell>
                       <TableCell>
-                        {/* BOTÕES DE AÇÃO COM BLOQUEIO */}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
@@ -626,7 +721,7 @@ export default function EventosPage() {
                                 </span>
                               </DropdownMenuItem>
                             )}
-                            {hasPermission("eventos:editar") && (
+                            {hasPermission("eventos:excluir") && (
                               <DropdownMenuItem
                                 className={`focus:text-destructive ${isLocked ? "opacity-50 cursor-not-allowed" : "text-destructive"}`}
                                 disabled={isLocked}
@@ -653,6 +748,7 @@ export default function EventosPage() {
           </div>
         </div>
         <PaginationControls />
+
         {/* Alerta de Exclusão */}
         <AlertDialog
           open={!!eventoToDelete}
@@ -696,14 +792,7 @@ export default function EventosPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportar}
-            className="h-9"
-          >
-            <Download className="mr-2 h-3.5 w-3.5" /> Exportar
-          </Button>
+          {/* BOTÃO EXPORTAR REMOVIDO DAQUI (Só faz sentido dentro do lote) */}
 
           <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg border">
             <Button
@@ -872,7 +961,7 @@ export default function EventosPage() {
               )}
             </div>
           ) : (
-            // TABELA LISTA COMPLETA (MODO LISTA) - COM CORREÇÃO STICKY HEADER
+            // TABELA LISTA COMPLETA (MODO LISTA)
             <table className="w-full caption-bottom text-sm">
               <TableHeader className="sticky top-0 bg-card z-10 shadow-sm">
                 <TableRow>
@@ -953,7 +1042,7 @@ export default function EventosPage() {
                                 </span>
                               </DropdownMenuItem>
                             )}
-                            {hasPermission("eventos:editar") && (
+                            {hasPermission("eventos:excluir") && (
                               <DropdownMenuItem
                                 className={`focus:text-destructive ${isLocked ? "opacity-50 cursor-not-allowed" : "text-destructive"}`}
                                 disabled={isLocked}
