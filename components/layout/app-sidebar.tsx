@@ -41,7 +41,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth-context";
-import { getRoleLabel, UserRole } from "@/lib/mock-data";
+import { getRoleLabel } from "@/lib/utils"; // Importação corrigida
+import { UserRole } from "@/lib/types"; // Importação corrigida
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   LayoutDashboard,

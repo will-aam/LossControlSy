@@ -1,4 +1,4 @@
-import { Item, CategoriaData, User, Evento, Evidencia } from "./mock-data";
+import { Item, CategoriaData, User, Evento, Evidencia } from "@/lib/types";
 
 const KEYS = {
   USERS: "losscontrol_users",
@@ -15,7 +15,7 @@ export interface AppSettings {
   exigirFoto: boolean;
   bloquearAprovados: boolean;
   limiteDiario: number;
-  permitirFuncionarioGaleria: boolean; // NOVA CONFIGURAÇÃO
+  permitirFuncionarioGaleria: boolean;
 }
 
 // Configuração Padrão
@@ -24,7 +24,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   exigirFoto: false,
   bloquearAprovados: true,
   limiteDiario: 1000,
-  permitirFuncionarioGaleria: false, // Padrão é desativado
+  permitirFuncionarioGaleria: false,
 };
 
 const get = <T>(key: string, defaultValue: T): T => {
@@ -55,6 +55,7 @@ export const StorageService = {
   getUsers: (): User[] => {
     const users = get<User[]>(KEYS.USERS, []);
     if (users.length === 0) {
+      // Cria usuário admin padrão se não existir nenhum
       const defaultUser: User = {
         id: "1",
         nome: "Admin Inicial",
@@ -176,7 +177,7 @@ export const StorageService = {
     const avulsas = StorageService.getEvidenciasAvulsas();
 
     const doEventos = eventos.flatMap((evt) =>
-      evt.evidencias.map((ev) => ({ ...ev, evento: evt })),
+      (evt.evidencias || []).map((ev) => ({ ...ev, evento: evt })),
     );
 
     return [...doEventos, ...avulsas].sort(
@@ -185,5 +186,9 @@ export const StorageService = {
     );
   },
 
-  clearAll: () => localStorage.clear(),
+  clearAll: () => {
+    if (typeof window !== "undefined") {
+      localStorage.clear();
+    }
+  },
 };

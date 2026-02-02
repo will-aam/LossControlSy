@@ -51,13 +51,9 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
-import {
-  Evento,
-  formatCurrency,
-  formatDate,
-  getStatusColor,
-  EventoStatus,
-} from "@/lib/mock-data";
+// Importações corrigidas
+import { Evento, EventoStatus } from "@/lib/types";
+import { formatCurrency, formatDate, getStatusColor } from "@/lib/utils";
 import { StorageService } from "@/lib/storage";
 import { useAuth } from "@/lib/auth-context";
 import {
@@ -416,7 +412,7 @@ export default function EventosPage() {
       setEventosLocais(novosEventos);
 
       // Simulação de persistência
-      // StorageService.saveEventos(novosEventos);
+      StorageService.saveEvento({ ...evento, status: "rejeitado" } as Evento); // Ou realmente deletar do storage se tiver método
 
       toast.success("Evento excluído");
       setEventoToDelete(null);

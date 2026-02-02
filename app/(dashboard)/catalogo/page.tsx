@@ -35,11 +35,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Item,
-  categorias as mockCategorias,
-  formatCurrency,
-} from "@/lib/mock-data";
+// Importações corrigidas para Types e Utils
+import { Item } from "@/lib/types";
+import { formatCurrency } from "@/lib/utils";
 import { parseItemsCSV } from "@/lib/csv-parser";
 import { useAuth } from "@/lib/auth-context";
 import { ItemFormDialog } from "@/components/catalogo/item-form-dialog";
@@ -73,8 +71,7 @@ export default function CatalogoPage() {
   const [items, setItems] = useState<Item[]>([]);
 
   // Lista de categorias dinâmica
-  const [categoriasList, setCategoriasList] =
-    useState<string[]>(mockCategorias);
+  const [categoriasList, setCategoriasList] = useState<string[]>([]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [categoriaFilter, setCategoriaFilter] = useState<string>("todas");

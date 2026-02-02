@@ -21,11 +21,11 @@ import {
   Tooltip,
 } from "recharts";
 import { TrendingDown, AlertTriangle, DollarSign, Package } from "lucide-react";
-import { formatCurrency, Evento, Item } from "@/lib/mock-data";
+import { Evento, Item } from "@/lib/types"; // Importação Corrigida
+import { formatCurrency } from "@/lib/utils"; // Importação Corrigida
 import { useAuth } from "@/lib/auth-context";
 import { StorageService } from "@/lib/storage";
 
-// CORREÇÃO: Usar var() direta para compatibilidade com o tema
 const chartConfig = {
   custo: {
     label: "Custo",
@@ -96,7 +96,6 @@ export default function DashboardPage() {
         perdasSemana.qtd += 1;
         perdasSemana.custo += custoTotal;
 
-        // Verifica se o dia está no range dos últimos 7 dias para o gráfico
         const diffDays = Math.floor(
           (new Date().getTime() - dataEv.getTime()) / (1000 * 3600 * 24),
         );
@@ -232,7 +231,6 @@ export default function DashboardPage() {
       </div>
 
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
-        {/* Gráfico 1: Tendência */}
         <Card className="col-span-1">
           <CardHeader>
             <CardTitle>Tendência Semanal</CardTitle>
@@ -275,7 +273,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Gráfico 2: Categorias */}
         <Card className="col-span-1">
           <CardHeader>
             <CardTitle>Top Categorias (Mês)</CardTitle>

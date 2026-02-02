@@ -1,4 +1,3 @@
-// components/catalogo/item-form-dialog.tsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -21,7 +20,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Item, categorias } from "@/lib/mock-data";
+import { Item } from "@/lib/types"; // Importação Corrigida
+import { StorageService } from "@/lib/storage"; // Para pegar categorias
 import {
   Upload,
   Link as LinkIcon,
@@ -49,9 +49,18 @@ export function ItemFormDialog({
   // Estados do Formulário
   const [formData, setFormData] = useState<Partial<Item>>({});
 
+  // Estado para Categorias (carregar dinamicamente)
+  const [categorias, setCategorias] = useState<string[]>([]);
+
   // Estados da Imagem
   const [imageTab, setImageTab] = useState<"url" | "upload">("upload");
   const [previewUrl, setPreviewUrl] = useState<string>("");
+
+  // Carregar categorias ao montar
+  useEffect(() => {
+    const cats = StorageService.getCategorias().map((c) => c.nome);
+    setCategorias(cats);
+  }, [open]);
 
   // Resetar ou Preencher dados ao abrir
   useEffect(() => {
@@ -59,7 +68,7 @@ export function ItemFormDialog({
       if (item) {
         setFormData(item);
         setPreviewUrl(item.imagemUrl || "");
-        setImageTab(item.imagemUrl?.startsWith("blob:") ? "upload" : "url"); // Tenta adivinhar a aba
+        setImageTab(item.imagemUrl?.startsWith("blob:") ? "upload" : "url");
       } else {
         setFormData({ unidade: "UN", status: "ativo" });
         setPreviewUrl("");
@@ -76,23 +85,16 @@ export function ItemFormDialog({
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Cria uma URL temporária para mostrar o preview imediatamente
       const objectUrl = URL.createObjectURL(file);
       setPreviewUrl(objectUrl);
-      handleInputChange("imagemUrl", objectUrl); // No sistema real, aqui você subiria para o Storage
+      handleInputChange("imagemUrl", objectUrl);
     }
   };
 
   const handleSave = () => {
-    // Validação básica
     if (!formData.nome || !formData.categoria || !formData.precoVenda) {
-      // Adicionar toast de erro se quiser
       return;
     }
-
-    // Se estiver na aba URL, garante que o campo imagemUrl pegue o valor do input de texto
-    // Se estiver na aba Upload, o handleFileSelect já atualizou o formData
-
     onSave(formData);
     onOpenChange(false);
   };
@@ -261,6 +263,8 @@ export function ItemFormDialog({
                 <SelectContent>
                   <SelectItem value="UN">UN (Unidade)</SelectItem>
                   <SelectItem value="KG">KG (Quilograma)</SelectItem>
+                  <SelectItem value="CX">CX (Caixa)</SelectItem>
+                  <SelectItem value="L">L (Litro)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
