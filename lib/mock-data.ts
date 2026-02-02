@@ -95,6 +95,11 @@ export const mockUsers: User[] = [
 // Current logged user (for demo)
 export const currentUser: User = mockUsers[1]; // Gestor by default
 
+export interface NavItem {
+  title: string;
+  href: string;
+  icon: string;
+}
 // Mock Items (Catalog)
 export const mockItems: Item[] = [
   {
