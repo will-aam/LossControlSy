@@ -225,7 +225,7 @@ export default function CatalogoPage() {
 
   return (
     <div
-      className={`flex flex-col h-[calc(100vh-2rem)] space-y-4 overflow-hidden ${hideScrollClass}`}
+      className={`flex flex-col h-[calc(100vh-2rem)] space-y-4 overflow-hidden ${hideScrollClass}`} // Certifique-se que hideScrollClass está aqui
     >
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between shrink-0">
         <div>
