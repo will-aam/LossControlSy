@@ -68,3 +68,27 @@ export interface CategoriaData {
   status: "ativa" | "inativa";
   itemCount?: number;
 }
+
+export interface NotaFiscal {
+  id: string;
+  dataUpload: string; // Data em que você subiu o arquivo
+  uploadedBy: User; // Quem subiu (Fiscal, Dono, etc.)
+
+  // Arquivos
+  pdfUrl?: string; // Link para o PDF (simulado no LocalStorage)
+  xmlContent?: string; // O conteúdo texto do XML para leitura futura
+
+  // Metadados extraídos do XML (ou preenchidos manualmente)
+  numero?: string;
+  serie?: string;
+  emitente?: string; // xNome
+  cnpjEmitente?: string;
+  dataEmissao?: string; // dhEmi
+  valorTotal?: number; // vNF
+  naturezaOperacao?: string; // natOp
+  chaveAcesso?: string;
+
+  // Vínculos
+  eventoId?: string; // Para vincular a uma perda específica (opcional)
+  observacoes?: string;
+}

@@ -1,4 +1,11 @@
-import { Item, CategoriaData, User, Evento, Evidencia } from "@/lib/types";
+import {
+  User,
+  Item,
+  Evento,
+  NotaFiscal,
+  CategoriaData,
+  Evidencia,
+} from "./types";
 
 const KEYS = {
   USERS: "losscontrol_users",
@@ -7,6 +14,7 @@ const KEYS = {
   EVENTS: "losscontrol_events",
   GALLERY: "losscontrol_gallery",
   SETTINGS: "losscontrol_settings",
+  NOTAS: "losscontrol_notas_fiscais", // Nova chave adicionada
 };
 
 // Interface para as Configurações Gerais
@@ -27,6 +35,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   permitirFuncionarioGaleria: false,
 };
 
+// Helpers internos
 const get = <T>(key: string, defaultValue: T): T => {
   if (typeof window === "undefined") return defaultValue;
   const stored = localStorage.getItem(key);
@@ -55,7 +64,6 @@ export const StorageService = {
   getUsers: (): User[] => {
     const users = get<User[]>(KEYS.USERS, []);
     if (users.length === 0) {
-      // Cria usuário admin padrão se não existir nenhum
       const defaultUser: User = {
         id: "1",
         nome: "Admin Inicial",
@@ -184,6 +192,28 @@ export const StorageService = {
       (a, b) =>
         new Date(b.dataUpload).getTime() - new Date(a.dataUpload).getTime(),
     );
+  },
+
+  // --- NOTAS FISCAIS (Agora no lugar certo) ---
+  getNotasFiscais: (): NotaFiscal[] => {
+    return get<NotaFiscal[]>(KEYS.NOTAS, []);
+  },
+
+  saveNotaFiscal: (nota: NotaFiscal) => {
+    const notas = StorageService.getNotasFiscais();
+    const index = notas.findIndex((n) => n.id === nota.id);
+
+    if (index >= 0) {
+      notas[index] = nota;
+    } else {
+      notas.push(nota);
+    }
+    set(KEYS.NOTAS, notas);
+  },
+
+  deleteNotaFiscal: (id: string) => {
+    const notas = StorageService.getNotasFiscais().filter((n) => n.id !== id);
+    set(KEYS.NOTAS, notas);
   },
 
   clearAll: () => {

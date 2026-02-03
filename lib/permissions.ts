@@ -29,6 +29,11 @@ export type Permission =
   | "galeria:upload"
   | "galeria:excluir"
 
+  // Notas Fiscais (NOVO)
+  | "notas:ver"
+  | "notas:upload"
+  | "notas:excluir"
+
   // Outros
   | "relatorios:ver"
   | "dashboard:ver"
@@ -65,6 +70,9 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     "galeria:ver",
     "galeria:upload",
     "galeria:excluir",
+    "notas:ver", // NOVO
+    "notas:upload", // NOVO
+    "notas:excluir", // NOVO
     "relatorios:ver",
     "dashboard:ver",
   ],
@@ -82,6 +90,9 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     "categorias:editar",
     "categorias:excluir",
     "galeria:ver",
+    "galeria:upload", // Fiscal pode subir foto
+    "notas:ver", // NOVO
+    "notas:upload", // NOVO
     "relatorios:ver",
     "dashboard:ver",
   ],
@@ -105,6 +116,9 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     "galeria:ver",
     "galeria:upload",
     "galeria:excluir",
+    "notas:ver", // NOVO
+    "notas:upload", // NOVO
+    "notas:excluir", // NOVO
     "relatorios:ver",
     "dashboard:ver",
     "configuracoes:ver",
@@ -164,6 +178,12 @@ export const navItems: NavItem[] = [
     href: "/galeria",
     icon: "Images",
     permission: "galeria:ver",
+  },
+  {
+    title: "Notas Fiscais", // NOVO ITEM
+    href: "/notas",
+    icon: "FileText",
+    permission: "notas:ver",
   },
   {
     title: "Relatórios",

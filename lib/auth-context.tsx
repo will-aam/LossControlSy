@@ -3,6 +3,17 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { User, NavItem } from "@/lib/types";
 import { StorageService } from "@/lib/storage";
+import {
+  LayoutDashboard,
+  ClipboardCheck,
+  Package,
+  Images,
+  BarChart3,
+  Settings,
+  Tags,
+  PlusCircle,
+  FileText, // Importado ícone para Notas
+} from "lucide-react";
 import { toast } from "sonner";
 
 // Definição Granular das Permissões
@@ -37,6 +48,11 @@ type Permission =
   | "galeria:upload"
   | "galeria:excluir"
 
+  // Notas Fiscais (NOVO)
+  | "notas:ver"
+  | "notas:upload"
+  | "notas:excluir"
+
   // Outros
   | "relatorios:ver"
   | "configuracoes:ver";
@@ -64,8 +80,11 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "galeria:ver",
     "galeria:upload",
     "galeria:excluir",
+    "notas:ver", // NOVO
+    "notas:upload", // NOVO
+    "notas:excluir", // NOVO
     "relatorios:ver",
-    "configuracoes:ver", // Apenas Dono tem acesso
+    "configuracoes:ver",
   ],
   gestor: [
     "dashboard:ver",
@@ -88,8 +107,10 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "galeria:ver",
     "galeria:upload",
     "galeria:excluir",
+    "notas:ver", // NOVO
+    "notas:upload", // NOVO
+    "notas:excluir", // NOVO
     "relatorios:ver",
-    // REMOVIDO: "configuracoes:ver"
   ],
   fiscal: [
     "dashboard:ver",
@@ -106,8 +127,10 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "categorias:editar",
     "categorias:excluir",
     "galeria:ver",
+    "galeria:upload", // Fiscal pode subir foto
+    "notas:ver", // NOVO
+    "notas:upload", // NOVO
     "relatorios:ver",
-    // REMOVIDO: "configuracoes:ver"
   ],
   funcionario: [
     "eventos:criar",
@@ -233,6 +256,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     if (hasPermission("galeria:ver")) {
       items.push({ title: "Galeria", href: "/galeria", icon: "Images" });
+    }
+
+    // ITEM DE MENU DAS NOTAS FISCAIS
+    if (hasPermission("notas:ver")) {
+      items.push({ title: "Notas Fiscais", href: "/notas", icon: "FileText" });
     }
 
     if (hasPermission("relatorios:ver")) {
