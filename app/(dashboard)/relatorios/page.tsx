@@ -98,6 +98,14 @@ export default function RelatoriosPage() {
     setEventos(StorageService.getEventos());
   }, []);
 
+  // Define a aba correta para mobile no carregamento inicial
+  useEffect(() => {
+    const isMobile = window.innerWidth < 768; // 'md' breakpoint
+    if (isMobile) {
+      setSelectedTab("grafico-1");
+    }
+  }, []);
+
   // Rotação automática dos cards (Deck)
   useEffect(() => {
     const interval = setInterval(() => {
@@ -114,14 +122,10 @@ export default function RelatoriosPage() {
   // --- CÁLCULOS DINÂMICOS ---
 
   const stats = useMemo(() => {
-    // Filtrar eventos válidos (aprovados ou enviados, dependendo da regra de negócio)
-    // Para relatórios, geralmente consideramos perdas confirmadas (aprovadas/exportadas)
-    // Mas para visualização geral, podemos incluir 'enviado' como pendente
     const validEventos = eventos.filter(
       (e) => e.status !== "rascunho" && e.status !== "rejeitado",
     );
 
-    // 1. Dados Mensais (Últimos 6 meses)
     const monthlyDataMap: Record<
       string,
       { custo: number; venda: number; qtd: number }
@@ -141,7 +145,6 @@ export default function RelatoriosPage() {
       "Dez",
     ];
 
-    // Inicializa últimos 6 meses
     const hoje = new Date();
     for (let i = 5; i >= 0; i--) {
       const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
@@ -165,7 +168,6 @@ export default function RelatoriosPage() {
       ...val,
     }));
 
-    // 2. Top Motivos
     const motivosMap: Record<string, { qtd: number; custo: number }> = {};
     validEventos.forEach((ev) => {
       const motivo = ev.motivo || "Não especificado";
@@ -183,7 +185,6 @@ export default function RelatoriosPage() {
       .sort((a, b) => b.custo - a.custo)
       .slice(0, 5);
 
-    // 3. Perdas por Dia da Semana
     const diasMap: Record<string, { qtd: number; custo: number }> = {
       Domingo: { qtd: 0, custo: 0 },
       Segunda: { qtd: 0, custo: 0 },
@@ -197,9 +198,8 @@ export default function RelatoriosPage() {
     validEventos.forEach((ev) => {
       const d = new Date(ev.dataHora);
       const dia = d.toLocaleDateString("pt-BR", { weekday: "long" });
-      const diaKey = dia.charAt(0).toUpperCase() + dia.slice(1); // Capitalize
+      const diaKey = dia.charAt(0).toUpperCase() + dia.slice(1);
 
-      // Normalização simples para garantir match com as chaves
       const normalizedKey =
         Object.keys(diasMap).find(
           (k) => k.toLowerCase() === diaKey.toLowerCase(),
@@ -217,7 +217,6 @@ export default function RelatoriosPage() {
       custo: val.custo,
     }));
 
-    // 4. Por Categoria
     const catMap: Record<string, { custo: number; venda: number }> = {};
     validEventos.forEach((ev) => {
       const cat = ev.item?.categoria || "Outros";
@@ -230,7 +229,6 @@ export default function RelatoriosPage() {
       .map(([cat, val]) => ({ categoria: cat, ...val }))
       .sort((a, b) => b.custo - a.custo);
 
-    // 5. Top Itens
     const itemMap: Record<string, { item: Item; qtd: number; custo: number }> =
       {};
     validEventos.forEach((ev) => {
@@ -254,12 +252,11 @@ export default function RelatoriosPage() {
     };
   }, [eventos]);
 
-  // Calculate summary stats (simples, baseado no total carregado)
   const summary = useMemo(() => {
     const totalCusto = stats.monthlyData.reduce((acc, m) => acc + m.custo, 0);
     const totalVenda = stats.monthlyData.reduce((acc, m) => acc + m.venda, 0);
     const totalQtd = stats.monthlyData.reduce((acc, m) => acc + m.qtd, 0);
-    const mediaQtdDia = Math.round(totalQtd / 180) || 0; // ~6 months
+    const mediaQtdDia = Math.round(totalQtd / 180) || 0;
 
     return {
       totalCusto,
@@ -273,7 +270,6 @@ export default function RelatoriosPage() {
     };
   }, [stats]);
 
-  // Dados dos cards para facilitar a reutilização
   const cardsData = [
     {
       title: "Total Perdas (Custo)",
@@ -362,46 +358,34 @@ export default function RelatoriosPage() {
 
       {/* --- MOBILE: STACKED DECK (BARALHO) --- */}
       <div className="block md:hidden py-4 px-2">
-        <div
-          className="relative w-full h-40" // Altura fixa para o container do baralho
-          onClick={handleCardClick}
-        >
+        <div className="relative w-full h-40" onClick={handleCardClick}>
           {cardsData.map((card, index) => {
-            // Calcula a posição relativa ao card ativo
-            // 0 = ativo, 1 = próximo, 2 = seguinte...
             const position = (index - activeCardIndex + 4) % 4;
-
-            // Define estilos baseados na posição
             let zIndex = 0;
             let scale = 1;
             let translateX = 0;
             let opacity = 1;
-            let rotate = 0; // Opcional: leve rotação para dar charme
 
             if (position === 0) {
-              // Card Ativo (Frente)
               zIndex = 30;
               scale = 1;
               translateX = 0;
               opacity = 1;
             } else if (position === 1) {
-              // Card 2 (Atrás)
               zIndex = 20;
               scale = 0.95;
-              translateX = 12; // Desloca levemente para direita
+              translateX = 12;
               opacity = 0.9;
             } else if (position === 2) {
-              // Card 3 (Fundo)
               zIndex = 10;
               scale = 0.9;
-              translateX = 24; // Desloca mais para direita
+              translateX = 24;
               opacity = 0.7;
             } else {
-              // Card 4 (Escondido atrás do ativo, pronto para aparecer)
               zIndex = 0;
               scale = 0.85;
               translateX = 0;
-              opacity = 0; // Invisível para não atrapalhar
+              opacity = 0;
             }
 
             return (
@@ -432,7 +416,6 @@ export default function RelatoriosPage() {
             );
           })}
         </div>
-        {/* Indicador de instrução sutil */}
         <p className="text-[10px] text-center text-muted-foreground mt-2 opacity-50">
           Toque no cartão para ver o próximo
         </p>
@@ -458,19 +441,15 @@ export default function RelatoriosPage() {
         ))}
       </div>
 
-      {/* Tabs */}
-      <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-        <TabsList>
-          <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
-          <TabsTrigger value="categorias">Por Categoria</TabsTrigger>
-          <TabsTrigger value="itens">Por Item</TabsTrigger>
-          <TabsTrigger value="motivos">Por Motivo</TabsTrigger>
-        </TabsList>
+      {/* --- MOBILE: GRÁFICOS E TABELA --- */}
+      <div className="block md:hidden">
+        <Tabs value={selectedTab} onValueChange={setSelectedTab}>
+          <TabsList className="grid w-full grid-cols-2 mb-4">
+            <TabsTrigger value="grafico-1">Graf. 1</TabsTrigger>
+            <TabsTrigger value="grafico-2">Graf. 2</TabsTrigger>
+          </TabsList>
 
-        {/* Visão Geral Tab */}
-        <TabsContent value="visao-geral" className="mt-6 space-y-6">
-          <div className="grid gap-6 lg:grid-cols-2">
-            {/* Tendência Mensal */}
+          <TabsContent value="grafico-1">
             <Card>
               <CardHeader>
                 <CardTitle>Tendência Mensal</CardTitle>
@@ -479,16 +458,18 @@ export default function RelatoriosPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ChartContainer config={chartConfig} className="h-75">
+                <ChartContainer config={chartConfig} className="h-64 w-full">
                   <LineChart data={stats.monthlyData}>
                     <CartesianGrid
                       strokeDasharray="3 3"
                       className="stroke-border"
+                      vertical={false}
                     />
                     <XAxis dataKey="mes" className="text-xs" />
                     <YAxis
                       className="text-xs"
                       tickFormatter={(v) => `R$${v}`}
+                      width={50}
                     />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Line
@@ -509,8 +490,9 @@ export default function RelatoriosPage() {
                 </ChartContainer>
               </CardContent>
             </Card>
+          </TabsContent>
 
-            {/* Perdas por Dia da Semana */}
+          <TabsContent value="grafico-2">
             <Card>
               <CardHeader>
                 <CardTitle>Perdas por Dia da Semana</CardTitle>
@@ -519,11 +501,12 @@ export default function RelatoriosPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ChartContainer config={chartConfig} className="h-75">
+                <ChartContainer config={chartConfig} className="h-64 w-full">
                   <BarChart data={stats.perdasPorDiaSemana}>
                     <CartesianGrid
                       strokeDasharray="3 3"
                       className="stroke-border"
+                      vertical={false}
                     />
                     <XAxis dataKey="dia" className="text-xs" />
                     <YAxis className="text-xs" />
@@ -537,364 +520,487 @@ export default function RelatoriosPage() {
                 </ChartContainer>
               </CardContent>
             </Card>
-          </div>
+          </TabsContent>
+        </Tabs>
 
-          {/* Tabela Resumo */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Resumo do Período</CardTitle>
-              <CardDescription>Detalhamento mensal de perdas</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Mês</TableHead>
-                    <TableHead className="text-right">Quantidade</TableHead>
-                    <TableHead className="text-right">Custo</TableHead>
-                    <TableHead className="text-right">Preço Venda</TableHead>
-                    <TableHead className="text-right">Diferença</TableHead>
+        {/* Tabela Resumo - sempre visível no mobile */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Resumo do Período</CardTitle>
+            <CardDescription>Detalhamento mensal de perdas</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Mês</TableHead>
+                  <TableHead className="text-right">Qtd</TableHead>
+                  <TableHead className="text-right">Custo</TableHead>
+                  <TableHead className="text-right">Diferença</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {stats.monthlyData.map((row) => (
+                  <TableRow key={row.mes}>
+                    <TableCell className="font-medium">{row.mes}</TableCell>
+                    <TableCell className="text-right">{row.qtd}</TableCell>
+                    <TableCell className="text-right">
+                      {formatCurrency(row.custo)}
+                    </TableCell>
+                    <TableCell className="text-right text-destructive">
+                      {formatCurrency(row.venda - row.custo)}
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {stats.monthlyData.map((row) => (
-                    <TableRow key={row.mes}>
-                      <TableCell className="font-medium">{row.mes}</TableCell>
-                      <TableCell className="text-right">{row.qtd}</TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(row.custo)}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(row.venda)}
-                      </TableCell>
-                      <TableCell className="text-right text-destructive">
-                        {formatCurrency(row.venda - row.custo)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
 
-        {/* Por Categoria Tab */}
-        <TabsContent value="categorias" className="mt-6 space-y-6">
-          <div className="grid gap-6 lg:grid-cols-2">
+      {/* --- DESKTOP: GRÁFICOS E TABELAS COMPLETOS --- */}
+      <div className="hidden md:block">
+        <Tabs value={selectedTab} onValueChange={setSelectedTab}>
+          <TabsList>
+            <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
+            <TabsTrigger value="categorias">Por Categoria</TabsTrigger>
+            <TabsTrigger value="itens">Por Item</TabsTrigger>
+            <TabsTrigger value="motivos">Por Motivo</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="visao-geral" className="mt-6 space-y-6">
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Tendência Mensal</CardTitle>
+                  <CardDescription>
+                    Evolução de perdas nos últimos 6 meses
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer config={chartConfig} className="h-75">
+                    <LineChart data={stats.monthlyData}>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        className="stroke-border"
+                      />
+                      <XAxis dataKey="mes" className="text-xs" />
+                      <YAxis
+                        className="text-xs"
+                        tickFormatter={(v) => `R$${v}`}
+                      />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Line
+                        type="monotone"
+                        dataKey="custo"
+                        stroke="var(--chart-1)"
+                        strokeWidth={2}
+                        dot={{ fill: "var(--chart-1)" }}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="venda"
+                        stroke="var(--chart-2)"
+                        strokeWidth={2}
+                        dot={{ fill: "var(--chart-2)" }}
+                      />
+                    </LineChart>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Perdas por Dia da Semana</CardTitle>
+                  <CardDescription>
+                    Identificar dias com maior incidência
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer config={chartConfig} className="h-75">
+                    <BarChart data={stats.perdasPorDiaSemana}>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        className="stroke-border"
+                      />
+                      <XAxis dataKey="dia" className="text-xs" />
+                      <YAxis className="text-xs" />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Bar
+                        dataKey="quantidade"
+                        fill="var(--chart-3)"
+                        radius={4}
+                      />
+                    </BarChart>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+            </div>
+
             <Card>
               <CardHeader>
-                <CardTitle>Distribuição por Categoria</CardTitle>
+                <CardTitle>Resumo do Período</CardTitle>
+                <CardDescription>Detalhamento mensal de perdas</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Mês</TableHead>
+                      <TableHead className="text-right">Quantidade</TableHead>
+                      <TableHead className="text-right">Custo</TableHead>
+                      <TableHead className="text-right">Preço Venda</TableHead>
+                      <TableHead className="text-right">Diferença</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {stats.monthlyData.map((row) => (
+                      <TableRow key={row.mes}>
+                        <TableCell className="font-medium">{row.mes}</TableCell>
+                        <TableCell className="text-right">{row.qtd}</TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(row.custo)}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(row.venda)}
+                        </TableCell>
+                        <TableCell className="text-right text-destructive">
+                          {formatCurrency(row.venda - row.custo)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="categorias" className="mt-6 space-y-6">
+            {/* ... (conteúdo da aba Por Categoria) ... */}
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Distribuição por Categoria</CardTitle>
+                  <CardDescription>
+                    Participação de cada categoria no total
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer config={chartConfig} className="h-75">
+                    <PieChart>
+                      <Pie
+                        data={stats.perdasPorCategoria}
+                        dataKey="custo"
+                        nameKey="categoria"
+                        cx="50%"
+                        cy="50%"
+                        outerRadius={100}
+                        label={({ categoria, percent }) =>
+                          `${categoria} (${(percent * 100).toFixed(0)}%)`
+                        }
+                      >
+                        {stats.perdasPorCategoria.map((_, index) => (
+                          <Cell
+                            key={`cell-${index}`}
+                            fill={pieColors[index % pieColors.length]}
+                          />
+                        ))}
+                      </Pie>
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                    </PieChart>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Comparativo por Categoria</CardTitle>
+                  <CardDescription>Custo vs. Preço de Venda</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer config={chartConfig} className="h-75">
+                    <BarChart data={stats.perdasPorCategoria} layout="vertical">
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        className="stroke-border"
+                        horizontal={false}
+                      />
+                      <XAxis
+                        type="number"
+                        className="text-xs"
+                        tickFormatter={(v) => `R$${v}`}
+                      />
+                      <YAxis
+                        dataKey="categoria"
+                        type="category"
+                        className="text-xs"
+                        width={80}
+                      />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Bar
+                        dataKey="custo"
+                        fill="var(--chart-1)"
+                        radius={[0, 4, 4, 0]}
+                      />
+                      <Bar
+                        dataKey="venda"
+                        fill="var(--chart-2)"
+                        radius={[0, 4, 4, 0]}
+                      />
+                    </BarChart>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Detalhamento por Categoria</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Categoria</TableHead>
+                      <TableHead className="text-right">Custo</TableHead>
+                      <TableHead className="text-right">Preço Venda</TableHead>
+                      <TableHead className="text-right">% do Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {stats.perdasPorCategoria.map((cat) => {
+                      const total = stats.perdasPorCategoria.reduce(
+                        (acc, c) => acc + c.custo,
+                        0,
+                      );
+                      const percent =
+                        total > 0
+                          ? ((cat.custo / total) * 100).toFixed(1)
+                          : "0.0";
+                      return (
+                        <TableRow key={cat.categoria}>
+                          <TableCell className="font-medium">
+                            {cat.categoria}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {formatCurrency(cat.custo)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {formatCurrency(cat.venda)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {percent}%
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="itens" className="mt-6">
+            {/* ... (conteúdo da aba Por Item) ... */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Top Itens com Maior Perda</CardTitle>
                 <CardDescription>
-                  Participação de cada categoria no total
+                  Ranking de itens por custo de perda
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ChartContainer config={chartConfig} className="h-75">
-                  <PieChart>
-                    <Pie
-                      data={stats.perdasPorCategoria}
-                      dataKey="custo"
-                      nameKey="categoria"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={100}
-                      label={({ categoria, percent }) =>
-                        `${categoria} (${(percent * 100).toFixed(0)}%)`
-                      }
-                    >
-                      {stats.perdasPorCategoria.map((_, index) => (
-                        <Cell
-                          key={`cell-${index}`}
-                          fill={pieColors[index % pieColors.length]}
-                        />
-                      ))}
-                    </Pie>
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                  </PieChart>
-                </ChartContainer>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Comparativo por Categoria</CardTitle>
-                <CardDescription>Custo vs. Preço de Venda</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ChartContainer config={chartConfig} className="h-75">
-                  <BarChart data={stats.perdasPorCategoria} layout="vertical">
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      className="stroke-border"
-                      horizontal={false}
-                    />
-                    <XAxis
-                      type="number"
-                      className="text-xs"
-                      tickFormatter={(v) => `R$${v}`}
-                    />
-                    <YAxis
-                      dataKey="categoria"
-                      type="category"
-                      className="text-xs"
-                      width={80}
-                    />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar
-                      dataKey="custo"
-                      fill="var(--chart-1)"
-                      radius={[0, 4, 4, 0]}
-                    />
-                    <Bar
-                      dataKey="venda"
-                      fill="var(--chart-2)"
-                      radius={[0, 4, 4, 0]}
-                    />
-                  </BarChart>
-                </ChartContainer>
-              </CardContent>
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Detalhamento por Categoria</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Categoria</TableHead>
-                    <TableHead className="text-right">Custo</TableHead>
-                    <TableHead className="text-right">Preço Venda</TableHead>
-                    <TableHead className="text-right">% do Total</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {stats.perdasPorCategoria.map((cat) => {
-                    const total = stats.perdasPorCategoria.reduce(
-                      (acc, c) => acc + c.custo,
-                      0,
-                    );
-                    const percent =
-                      total > 0
-                        ? ((cat.custo / total) * 100).toFixed(1)
-                        : "0.0";
-                    return (
-                      <TableRow key={cat.categoria}>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-10">#</TableHead>
+                      <TableHead>Item</TableHead>
+                      <TableHead>Categoria</TableHead>
+                      <TableHead className="text-right">Quantidade</TableHead>
+                      <TableHead className="text-right">Custo Total</TableHead>
+                      <TableHead className="text-right">Perda Venda</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {stats.topItens.map((entry, index) => (
+                      <TableRow key={entry.item.id}>
                         <TableCell className="font-medium">
-                          {cat.categoria}
+                          {index + 1}
                         </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(cat.custo)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(cat.venda)}
-                        </TableCell>
-                        <TableCell className="text-right">{percent}%</TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Por Item Tab */}
-        <TabsContent value="itens" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Top Itens com Maior Perda</CardTitle>
-              <CardDescription>
-                Ranking de itens por custo de perda
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-10">#</TableHead>
-                    <TableHead>Item</TableHead>
-                    <TableHead>Categoria</TableHead>
-                    <TableHead className="text-right">Quantidade</TableHead>
-                    <TableHead className="text-right">Custo Total</TableHead>
-                    <TableHead className="text-right">Perda Venda</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {stats.topItens.map((entry, index) => (
-                    <TableRow key={entry.item.id}>
-                      <TableCell className="font-medium">{index + 1}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          {entry.item.imagemUrl ? (
-                            <img
-                              src={entry.item.imagemUrl || "/placeholder.svg"}
-                              alt={entry.item.nome}
-                              className="h-8 w-8 rounded object-cover"
-                            />
-                          ) : (
-                            <div className="flex h-8 w-8 items-center justify-center rounded bg-muted">
-                              <Package className="h-4 w-4 text-muted-foreground" />
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            {entry.item.imagemUrl ? (
+                              <img
+                                src={entry.item.imagemUrl || "/placeholder.svg"}
+                                alt={entry.item.nome}
+                                className="h-8 w-8 rounded object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-8 w-8 items-center justify-center rounded bg-muted">
+                                <Package className="h-4 w-4 text-muted-foreground" />
+                              </div>
+                            )}
+                            <div>
+                              <p className="font-medium">{entry.item.nome}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {entry.item.codigoInterno}
+                              </p>
                             </div>
-                          )}
-                          <div>
-                            <p className="font-medium">{entry.item.nome}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {entry.item.codigoInterno}
-                            </p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {entry.item.categoria}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {entry.qtd} {entry.item.unidade}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(entry.custo)}
+                        </TableCell>
+                        <TableCell className="text-right text-destructive">
+                          {formatCurrency(entry.qtd * entry.item.precoVenda)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="motivos" className="mt-6 space-y-6">
+            {/* ... (conteúdo da aba Por Motivo) ... */}
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Perdas por Motivo</CardTitle>
+                  <CardDescription>
+                    Distribuição de eventos por causa
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ChartContainer config={chartConfig} className="h-75">
+                    <BarChart data={stats.topMotivosPerdas}>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        className="stroke-border"
+                      />
+                      <XAxis
+                        dataKey="motivo"
+                        className="text-xs"
+                        angle={-45}
+                        textAnchor="end"
+                        height={80}
+                      />
+                      <YAxis className="text-xs" />
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                      <Bar
+                        dataKey="quantidade"
+                        fill="var(--chart-4)"
+                        radius={4}
+                      />
+                    </BarChart>
+                  </ChartContainer>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Custo por Motivo</CardTitle>
+                  <CardDescription>
+                    Impacto financeiro de cada causa
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {stats.topMotivosPerdas.map((item, index) => {
+                      const maxCusto = Math.max(
+                        ...stats.topMotivosPerdas.map((i) => i.custo),
+                      );
+                      const percent =
+                        maxCusto > 0 ? (item.custo / maxCusto) * 100 : 0;
+                      return (
+                        <div key={item.motivo} className="space-y-2">
+                          <div className="flex items-center justify-between text-sm">
+                            <span>{item.motivo}</span>
+                            <span className="font-medium">
+                              {formatCurrency(item.custo)}
+                            </span>
+                          </div>
+                          <div className="h-2 rounded-full bg-muted overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all"
+                              style={{
+                                width: `${percent}%`,
+                                backgroundColor:
+                                  pieColors[index % pieColors.length],
+                              }}
+                            />
                           </div>
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{entry.item.categoria}</Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {entry.qtd} {entry.item.unidade}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(entry.custo)}
-                      </TableCell>
-                      <TableCell className="text-right text-destructive">
-                        {formatCurrency(entry.qtd * entry.item.precoVenda)}
-                      </TableCell>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Tabela de Motivos</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Motivo</TableHead>
+                      <TableHead className="text-right">Quantidade</TableHead>
+                      <TableHead className="text-right">Custo Total</TableHead>
+                      <TableHead className="text-right">Custo Médio</TableHead>
+                      <TableHead className="text-right">% do Total</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Por Motivo Tab */}
-        <TabsContent value="motivos" className="mt-6 space-y-6">
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle>Perdas por Motivo</CardTitle>
-                <CardDescription>
-                  Distribuição de eventos por causa
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ChartContainer config={chartConfig} className="h-75">
-                  <BarChart data={stats.topMotivosPerdas}>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      className="stroke-border"
-                    />
-                    <XAxis
-                      dataKey="motivo"
-                      className="text-xs"
-                      angle={-45}
-                      textAnchor="end"
-                      height={80}
-                    />
-                    <YAxis className="text-xs" />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Bar
-                      dataKey="quantidade"
-                      fill="var(--chart-4)"
-                      radius={4}
-                    />
-                  </BarChart>
-                </ChartContainer>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Custo por Motivo</CardTitle>
-                <CardDescription>
-                  Impacto financeiro de cada causa
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {stats.topMotivosPerdas.map((item, index) => {
-                    const maxCusto = Math.max(
-                      ...stats.topMotivosPerdas.map((i) => i.custo),
-                    );
-                    const percent =
-                      maxCusto > 0 ? (item.custo / maxCusto) * 100 : 0;
-                    return (
-                      <div key={item.motivo} className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span>{item.motivo}</span>
-                          <span className="font-medium">
+                  </TableHeader>
+                  <TableBody>
+                    {stats.topMotivosPerdas.map((item) => {
+                      const total = stats.topMotivosPerdas.reduce(
+                        (acc, i) => acc + i.custo,
+                        0,
+                      );
+                      const percent =
+                        total > 0
+                          ? ((item.custo / total) * 100).toFixed(1)
+                          : "0.0";
+                      const media =
+                        item.quantidade > 0 ? item.custo / item.quantidade : 0;
+                      return (
+                        <TableRow key={item.motivo}>
+                          <TableCell className="font-medium">
+                            {item.motivo}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {item.quantidade}
+                          </TableCell>
+                          <TableCell className="text-right">
                             {formatCurrency(item.custo)}
-                          </span>
-                        </div>
-                        <div className="h-2 rounded-full bg-muted overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all"
-                            style={{
-                              width: `${percent}%`,
-                              backgroundColor:
-                                pieColors[index % pieColors.length],
-                            }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {formatCurrency(media)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {percent}%
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Tabela de Motivos</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Motivo</TableHead>
-                    <TableHead className="text-right">Quantidade</TableHead>
-                    <TableHead className="text-right">Custo Total</TableHead>
-                    <TableHead className="text-right">Custo Médio</TableHead>
-                    <TableHead className="text-right">% do Total</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {stats.topMotivosPerdas.map((item) => {
-                    const total = stats.topMotivosPerdas.reduce(
-                      (acc, i) => acc + i.custo,
-                      0,
-                    );
-                    const percent =
-                      total > 0
-                        ? ((item.custo / total) * 100).toFixed(1)
-                        : "0.0";
-                    const media =
-                      item.quantidade > 0 ? item.custo / item.quantidade : 0;
-                    return (
-                      <TableRow key={item.motivo}>
-                        <TableCell className="font-medium">
-                          {item.motivo}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {item.quantidade}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(item.custo)}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          {formatCurrency(media)}
-                        </TableCell>
-                        <TableCell className="text-right">{percent}%</TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }
