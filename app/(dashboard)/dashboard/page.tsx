@@ -157,12 +157,19 @@ export default function DashboardPage() {
       }),
     );
 
+    // Calcular o percentual para cada item em relação ao maior valor
+    const maxCusto = Math.max(...topItens.map((item) => item.custo), 1);
+    const topItensComPercentual = topItens.map((item) => ({
+      ...item,
+      percentual: (item.custo / maxCusto) * 100,
+    }));
+
     return {
       perdasHoje,
       perdasSemana,
       perdasMes,
       perdasPorCategoria,
-      topItens,
+      topItens: topItensComPercentual,
       tendenciaSemanal,
     };
   }, [eventos]);
@@ -499,57 +506,71 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Top 5 Itens Críticos (Mês)</CardTitle>
-          <CardDescription>Itens que mais geraram prejuízo</CardDescription>
+      {/* Seção Top 5 Itens Críticos - Versão Minimalista e Mobile-First */}
+      <Card className="overflow-hidden">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg">Top 5 Itens Críticos</CardTitle>
+          <CardDescription className="text-sm">
+            Maior prejuízo este mês
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {stats.topItens.length > 0 ? (
-              stats.topItens.map((entry, index) => (
+        <CardContent className="p-0">
+          {stats.topItens.length > 0 ? (
+            <div className="divide-y">
+              {stats.topItens.map((entry, index) => (
                 <div
                   key={entry.item.id}
-                  className="flex flex-col sm:flex-row sm:items-center gap-4 rounded-lg border p-3"
+                  className="p-3 hover:bg-muted/50 transition-colors"
                 >
-                  <div className="flex items-center gap-4 flex-1">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-sm font-medium shrink-0">
-                      #{index + 1}
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-semibold text-sm">
+                      {index + 1}
                     </div>
                     {entry.item.imagemUrl ? (
                       <img
                         src={entry.item.imagemUrl}
                         alt={entry.item.nome}
-                        className="h-10 w-10 rounded-lg object-cover shrink-0"
+                        className="w-10 h-10 rounded-md object-cover"
                       />
                     ) : (
-                      <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                      <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center">
                         <Package className="h-5 w-5 text-muted-foreground" />
                       </div>
                     )}
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium truncate">{entry.item.nome}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {entry.item.codigoInterno}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-sm truncate">
+                        {entry.item.nome}
                       </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs text-muted-foreground">
+                          {entry.qtd} {entry.item.unidade}
+                        </span>
+                        <span className="text-xs text-muted-foreground">•</span>
+                        <span className="text-xs font-medium text-destructive">
+                          {formatCurrency(entry.custo)}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                  <div className="flex justify-between sm:block sm:text-right pl-14 sm:pl-0">
-                    <p className="font-medium">
-                      {entry.qtd} {entry.item.unidade}
-                    </p>
-                    <p className="text-sm text-destructive font-bold">
-                      {formatCurrency(entry.custo)}
-                    </p>
+
+                  {/* Barra de progresso visual para representar o impacto */}
+                  <div className="mt-2 ml-11">
+                    <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                      <div
+                        className="h-full bg-linear-to-r from-destructive/70 to-destructive rounded-full transition-all duration-500"
+                        style={{ width: `${entry.percentual}%` }}
+                      />
+                    </div>
                   </div>
                 </div>
-              ))
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                Nenhuma perda registrada neste mês.
-              </div>
-            )}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-8 text-center text-muted-foreground">
+              <Package className="h-10 w-10 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">Nenhuma perda registrada neste mês</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
