@@ -90,10 +90,26 @@ export default function RelatoriosPage() {
   const [selectedTab, setSelectedTab] = useState("visao-geral");
   const [eventos, setEventos] = useState<Evento[]>([]);
 
+  // Estado para controlar qual card está na frente (0 a 3)
+  const [activeCardIndex, setActiveCardIndex] = useState(0);
+
   // Carregar dados reais
   useEffect(() => {
     setEventos(StorageService.getEventos());
   }, []);
+
+  // Rotação automática dos cards (Deck)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveCardIndex((prev) => (prev + 1) % 4); // 4 é o número de cards
+    }, 5000); // 5 segundos
+    return () => clearInterval(interval);
+  }, []);
+
+  // Função para passar para o próximo card ao clicar
+  const handleCardClick = () => {
+    setActiveCardIndex((prev) => (prev + 1) % 4);
+  };
 
   // --- CÁLCULOS DINÂMICOS ---
 
@@ -257,6 +273,46 @@ export default function RelatoriosPage() {
     };
   }, [stats]);
 
+  // Dados dos cards para facilitar a reutilização
+  const cardsData = [
+    {
+      title: "Total Perdas (Custo)",
+      icon: DollarSign,
+      mainValue: formatCurrency(summary.totalCusto),
+      subText: "no período selecionado",
+      iconColor: "text-muted-foreground",
+      valueColor: "text-foreground",
+      borderColor: "border-primary/20",
+    },
+    {
+      title: "Perda em Venda",
+      icon: TrendingDown,
+      mainValue: formatCurrency(summary.totalVenda),
+      subText: "receita não realizada",
+      iconColor: "text-destructive",
+      valueColor: "text-destructive",
+      borderColor: "border-destructive/20",
+    },
+    {
+      title: "Total de Eventos",
+      icon: Package,
+      mainValue: summary.totalQtd,
+      subText: `~${summary.mediaQtdDia} eventos/dia`,
+      iconColor: "text-muted-foreground",
+      valueColor: "text-foreground",
+      borderColor: "border-blue-500/20",
+    },
+    {
+      title: "Margem de Perda",
+      icon: BarChart3,
+      mainValue: `${summary.margemPerda}%`,
+      subText: "diferença custo vs. venda",
+      iconColor: "text-muted-foreground",
+      valueColor: "text-foreground",
+      borderColor: "border-emerald-500/20",
+    },
+  ];
+
   if (!hasPermission("relatorios:ver")) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
@@ -304,68 +360,102 @@ export default function RelatoriosPage() {
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total Perdas (Custo)
-            </CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {formatCurrency(summary.totalCusto)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              no período selecionado
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">
-              Perda em Venda
-            </CardTitle>
-            <TrendingDown className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">
-              {formatCurrency(summary.totalVenda)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              receita não realizada
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">
-              Total de Eventos
-            </CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{summary.totalQtd}</div>
-            <p className="text-xs text-muted-foreground">
-              ~{summary.mediaQtdDia} eventos/dia
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">
-              Margem de Perda
-            </CardTitle>
-            <BarChart3 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{summary.margemPerda}%</div>
-            <p className="text-xs text-muted-foreground">
-              diferença custo vs. venda
-            </p>
-          </CardContent>
-        </Card>
+      {/* --- MOBILE: STACKED DECK (BARALHO) --- */}
+      <div className="block md:hidden py-4 px-2">
+        <div
+          className="relative w-full h-40" // Altura fixa para o container do baralho
+          onClick={handleCardClick}
+        >
+          {cardsData.map((card, index) => {
+            // Calcula a posição relativa ao card ativo
+            // 0 = ativo, 1 = próximo, 2 = seguinte...
+            const position = (index - activeCardIndex + 4) % 4;
+
+            // Define estilos baseados na posição
+            let zIndex = 0;
+            let scale = 1;
+            let translateX = 0;
+            let opacity = 1;
+            let rotate = 0; // Opcional: leve rotação para dar charme
+
+            if (position === 0) {
+              // Card Ativo (Frente)
+              zIndex = 30;
+              scale = 1;
+              translateX = 0;
+              opacity = 1;
+            } else if (position === 1) {
+              // Card 2 (Atrás)
+              zIndex = 20;
+              scale = 0.95;
+              translateX = 12; // Desloca levemente para direita
+              opacity = 0.9;
+            } else if (position === 2) {
+              // Card 3 (Fundo)
+              zIndex = 10;
+              scale = 0.9;
+              translateX = 24; // Desloca mais para direita
+              opacity = 0.7;
+            } else {
+              // Card 4 (Escondido atrás do ativo, pronto para aparecer)
+              zIndex = 0;
+              scale = 0.85;
+              translateX = 0;
+              opacity = 0; // Invisível para não atrapalhar
+            }
+
+            return (
+              <Card
+                key={index}
+                className={`absolute inset-0 transition-all duration-500 ease-in-out cursor-pointer shadow-lg border bg-card`}
+                style={{
+                  zIndex: zIndex,
+                  transform: `translateX(${translateX}px) scale(${scale})`,
+                  opacity: opacity,
+                }}
+              >
+                <CardHeader className="flex flex-row items-center justify-between pb-2 pl-6">
+                  <CardTitle className="text-sm font-medium">
+                    {card.title}
+                  </CardTitle>
+                  <card.icon className={`h-4 w-4 ${card.iconColor}`} />
+                </CardHeader>
+                <CardContent className="pl-6">
+                  <div className={`text-3xl font-bold ${card.valueColor}`}>
+                    {card.mainValue}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {card.subText}
+                  </p>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+        {/* Indicador de instrução sutil */}
+        <p className="text-[10px] text-center text-muted-foreground mt-2 opacity-50">
+          Toque no cartão para ver o próximo
+        </p>
+      </div>
+
+      {/* --- DESKTOP: GRID PADRÃO --- */}
+      <div className="hidden md:grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {cardsData.map((card, index) => (
+          <Card key={index} className={`border-l-4 ${card.borderColor}`}>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">
+                {card.title}
+              </CardTitle>
+              <card.icon className={`h-4 w-4 ${card.iconColor}`} />
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${card.valueColor}`}>
+                {card.mainValue}
+              </div>
+              <p className="text-xs text-muted-foreground">{card.subText}</p>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {/* Tabs */}
