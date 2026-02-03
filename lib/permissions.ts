@@ -8,26 +8,26 @@ export type Permission =
   | "eventos:aprovar"
   | "eventos:editar"
   | "eventos:exportar"
-  | "eventos:excluir" // Adicionado
+  | "eventos:excluir"
 
   // Catálogo
   | "catalogo:ver"
   | "catalogo:criar"
   | "catalogo:editar"
-  | "catalogo:status" // Adicionado
-  | "catalogo:importar" // Adicionado
-  | "catalogo:excluir" // Adicionado
+  | "catalogo:status"
+  | "catalogo:importar"
+  | "catalogo:excluir"
 
   // Categorias
   | "categorias:ver"
   | "categorias:criar"
   | "categorias:editar"
-  | "categorias:excluir" // Adicionado
+  | "categorias:excluir"
 
   // Galeria
   | "galeria:ver"
-  | "galeria:upload" // Adicionado
-  | "galeria:excluir" // Adicionado
+  | "galeria:upload"
+  | "galeria:excluir"
 
   // Outros
   | "relatorios:ver"
@@ -67,7 +67,6 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     "galeria:excluir",
     "relatorios:ver",
     "dashboard:ver",
-    "configuracoes:ver",
   ],
   fiscal: [
     "eventos:ver_todos",
@@ -85,7 +84,6 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     "galeria:ver",
     "relatorios:ver",
     "dashboard:ver",
-    "configuracoes:ver",
   ],
   dono: [
     "eventos:criar",

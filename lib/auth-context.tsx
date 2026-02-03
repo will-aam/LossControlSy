@@ -1,18 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { User, NavItem } from "@/lib/types"; // Importação corrigida
+import { User, NavItem } from "@/lib/types";
 import { StorageService } from "@/lib/storage";
-import {
-  LayoutDashboard,
-  ClipboardCheck,
-  Package,
-  Images,
-  BarChart3,
-  Settings,
-  Tags,
-  PlusCircle,
-} from "lucide-react";
 import { toast } from "sonner";
 
 // Definição Granular das Permissões
@@ -75,7 +65,7 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "galeria:upload",
     "galeria:excluir",
     "relatorios:ver",
-    "configuracoes:ver",
+    "configuracoes:ver", // Apenas Dono tem acesso
   ],
   gestor: [
     "dashboard:ver",
@@ -99,7 +89,7 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "galeria:upload",
     "galeria:excluir",
     "relatorios:ver",
-    "configuracoes:ver",
+    // REMOVIDO: "configuracoes:ver"
   ],
   fiscal: [
     "dashboard:ver",
@@ -117,7 +107,7 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "categorias:excluir",
     "galeria:ver",
     "relatorios:ver",
-    "configuracoes:ver",
+    // REMOVIDO: "configuracoes:ver"
   ],
   funcionario: [
     "eventos:criar",
