@@ -349,10 +349,6 @@ export default function RelatoriosPage() {
               <SelectItem value="ano">Último Ano</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline">
-            <Download className="mr-2 h-4 w-4" />
-            Exportar
-          </Button>
         </div>
       </div>
 
@@ -578,8 +574,11 @@ export default function RelatoriosPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ChartContainer config={chartConfig} className="h-75">
-                    <LineChart data={stats.monthlyData}>
+                  <ChartContainer config={chartConfig} className="h-80 w-full">
+                    <LineChart
+                      data={stats.monthlyData}
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                    >
                       <CartesianGrid
                         strokeDasharray="3 3"
                         className="stroke-border"
@@ -617,8 +616,11 @@ export default function RelatoriosPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ChartContainer config={chartConfig} className="h-75">
-                    <BarChart data={stats.perdasPorDiaSemana}>
+                  <ChartContainer config={chartConfig} className="h-80 w-full">
+                    <BarChart
+                      data={stats.perdasPorDiaSemana}
+                      margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                    >
                       <CartesianGrid
                         strokeDasharray="3 3"
                         className="stroke-border"
@@ -676,7 +678,6 @@ export default function RelatoriosPage() {
           </TabsContent>
 
           <TabsContent value="categorias" className="mt-6 space-y-6">
-            {/* ... (conteúdo da aba Por Categoria) ... */}
             <div className="grid gap-6 lg:grid-cols-2">
               <Card>
                 <CardHeader>
@@ -686,7 +687,7 @@ export default function RelatoriosPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ChartContainer config={chartConfig} className="h-75">
+                  <ChartContainer config={chartConfig} className="h-80 w-full">
                     <PieChart>
                       <Pie
                         data={stats.perdasPorCategoria}
@@ -694,9 +695,10 @@ export default function RelatoriosPage() {
                         nameKey="categoria"
                         cx="50%"
                         cy="50%"
-                        outerRadius={100}
-                        label={({ categoria, percent }) =>
-                          `${categoria} (${(percent * 100).toFixed(0)}%)`
+                        outerRadius={80}
+                        labelLine={false}
+                        label={({ percent }) =>
+                          `${(percent * 100).toFixed(0)}%`
                         }
                       >
                         {stats.perdasPorCategoria.map((_, index) => (
@@ -718,8 +720,12 @@ export default function RelatoriosPage() {
                   <CardDescription>Custo vs. Preço de Venda</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ChartContainer config={chartConfig} className="h-75">
-                    <BarChart data={stats.perdasPorCategoria} layout="vertical">
+                  <ChartContainer config={chartConfig} className="h-80 w-full">
+                    <BarChart
+                      data={stats.perdasPorCategoria}
+                      layout="vertical"
+                      margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
+                    >
                       <CartesianGrid
                         strokeDasharray="3 3"
                         className="stroke-border"
@@ -801,7 +807,6 @@ export default function RelatoriosPage() {
           </TabsContent>
 
           <TabsContent value="itens" className="mt-6">
-            {/* ... (conteúdo da aba Por Item) ... */}
             <Card>
               <CardHeader>
                 <CardTitle>Top Itens com Maior Perda</CardTitle>
@@ -871,7 +876,6 @@ export default function RelatoriosPage() {
           </TabsContent>
 
           <TabsContent value="motivos" className="mt-6 space-y-6">
-            {/* ... (conteúdo da aba Por Motivo) ... */}
             <div className="grid gap-6 lg:grid-cols-2">
               <Card>
                 <CardHeader>
@@ -881,8 +885,11 @@ export default function RelatoriosPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <ChartContainer config={chartConfig} className="h-75">
-                    <BarChart data={stats.topMotivosPerdas}>
+                  <ChartContainer config={chartConfig} className="h-80 w-full">
+                    <BarChart
+                      data={stats.topMotivosPerdas}
+                      margin={{ top: 5, right: 30, left: 20, bottom: 60 }}
+                    >
                       <CartesianGrid
                         strokeDasharray="3 3"
                         className="stroke-border"
