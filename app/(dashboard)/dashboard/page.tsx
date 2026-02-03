@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef } from "react";
+import { useEffect, useState, useMemo } from "react";
 import {
   Card,
   CardContent,
@@ -8,11 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-} from "@/components/ui/carousel";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 import {
   Area,
@@ -30,7 +26,6 @@ import { Evento, Item } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import { StorageService } from "@/lib/storage";
-import Autoplay from "embla-carousel-autoplay";
 
 const chartConfig = {
   custo: {
@@ -55,11 +50,25 @@ export default function DashboardPage() {
   const { hasPermission } = useAuth();
   const [eventos, setEventos] = useState<Evento[]>([]);
 
-  const plugin = useRef(Autoplay({ delay: 4000, stopOnInteraction: false }));
+  // Estado para controlar qual card está na frente (0 a 3)
+  const [activeCardIndex, setActiveCardIndex] = useState(0);
 
   useEffect(() => {
     setEventos(StorageService.getEventos());
   }, []);
+
+  // Rotação automática dos cards (Deck)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveCardIndex((prev) => (prev + 1) % 4); // 4 é o número de cards
+    }, 5000); // 5 segundos
+    return () => clearInterval(interval);
+  }, []);
+
+  // Função para passar para o próximo card ao clicar
+  const handleCardClick = () => {
+    setActiveCardIndex((prev) => (prev + 1) % 4);
+  };
 
   const stats = useMemo(() => {
     const hoje = new Date();
@@ -217,52 +226,82 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* --- MOBILE: CARROSSEL ESTILO WALLET (LATERAL) --- */}
-      <div className="block md:hidden py-4 px-4 overflow-visible">
-        <Carousel
-          plugins={[plugin.current]}
-          className="w-full"
-          onMouseEnter={plugin.current.stop}
-          onMouseLeave={plugin.current.reset}
-          opts={{
-            loop: true,
-            align: "center",
-          }}
+      {/* --- MOBILE: STACKED DECK (BARALHO) --- */}
+      <div className="block md:hidden py-4 px-2">
+        <div
+          className="relative w-full h-40" // Altura fixa para o container do baralho
+          onClick={handleCardClick}
         >
-          {/* Removido -ml-2 para centralizar melhor e ajustar o stack */}
-          <CarouselContent className="py-2">
-            {cardsData.map((card, index) => (
-              /* ALTERAÇÃO AQUI: basis-full faz o card ocupar 100% da largura, escondendo o próximo */
-              <CarouselItem key={index} className="basis-full">
-                <div className="relative group mr-4">
-                  {" "}
-                  {/* mr-4 cria espaço para a sombra sair na direita sem cortar */}
-                  {/* Stack Layer 2 (Mais atrás e à direita) */}
-                  <div className="absolute top-2 bottom-2 -right-2 w-full bg-foreground/5 rounded-xl z-[-2] scale-y-[0.85] transition-all duration-500" />
-                  {/* Stack Layer 1 (Atrás e à direita) */}
-                  <div className="absolute top-1 bottom-1 -right-1 w-full bg-foreground/10 rounded-xl z-[-1] scale-y-[0.92] transition-all duration-500" />
-                  {/* Cartão Principal */}
-                  <Card className="relative shadow-sm border bg-card transition-all duration-300 active:scale-[0.98]">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium">
-                        {card.title}
-                      </CardTitle>
-                      <card.icon className={`h-4 w-4 ${card.iconColor}`} />
-                    </CardHeader>
-                    <CardContent>
-                      <div className={`text-3xl font-bold ${card.valueColor}`}>
-                        {card.mainValue}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {card.subText}
-                      </p>
-                    </CardContent>
-                  </Card>
-                </div>
-              </CarouselItem>
-            ))}
-          </CarouselContent>
-        </Carousel>
+          {cardsData.map((card, index) => {
+            // Calcula a posição relativa ao card ativo
+            // 0 = ativo, 1 = próximo, 2 = seguinte...
+            const position = (index - activeCardIndex + 4) % 4;
+
+            // Define estilos baseados na posição
+            let zIndex = 0;
+            let scale = 1;
+            let translateX = 0;
+            let opacity = 1;
+            let rotate = 0; // Opcional: leve rotação para dar charme
+
+            if (position === 0) {
+              // Card Ativo (Frente)
+              zIndex = 30;
+              scale = 1;
+              translateX = 0;
+              opacity = 1;
+            } else if (position === 1) {
+              // Card 2 (Atrás)
+              zIndex = 20;
+              scale = 0.95;
+              translateX = 12; // Desloca levemente para direita
+              opacity = 0.9;
+            } else if (position === 2) {
+              // Card 3 (Fundo)
+              zIndex = 10;
+              scale = 0.9;
+              translateX = 24; // Desloca mais para direita
+              opacity = 0.7;
+            } else {
+              // Card 4 (Escondido atrás do ativo, pronto para aparecer)
+              zIndex = 0;
+              scale = 0.85;
+              translateX = 0;
+              opacity = 0; // Invisível para não atrapalhar
+            }
+
+            return (
+              <Card
+                key={index}
+                className={`absolute inset-0 transition-all duration-500 ease-in-out cursor-pointer shadow-lg border bg-card`}
+                style={{
+                  zIndex: zIndex,
+                  transform: `translateX(${translateX}px) scale(${scale})`,
+                  opacity: opacity,
+                }}
+              >
+                <CardHeader className="flex flex-row items-center justify-between pb-2 pl-6">
+                  <CardTitle className="text-sm font-medium">
+                    {card.title}
+                  </CardTitle>
+                  <card.icon className={`h-4 w-4 ${card.iconColor}`} />
+                </CardHeader>
+                <CardContent className="pl-6">
+                  <div className={`text-3xl font-bold ${card.valueColor}`}>
+                    {card.mainValue}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {card.subText}
+                  </p>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+        {/* Indicador de instrução sutil */}
+        <p className="text-[10px] text-center text-muted-foreground mt-2 opacity-50">
+          Toque no cartão para ver o próximo
+        </p>
       </div>
 
       {/* --- DESKTOP: GRID PADRÃO --- */}
@@ -285,8 +324,102 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* --- GRÁFICOS --- */}
-      <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+      {/* --- GRÁFICOS COM TABS (MOBILE) / GRID (DESKTOP) --- */}
+      <div className="block md:hidden">
+        <Tabs defaultValue="tendencia" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 mb-4">
+            <TabsTrigger value="tendencia">Tendência</TabsTrigger>
+            <TabsTrigger value="categorias">Categorias</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="tendencia">
+            <Card>
+              <CardHeader>
+                <CardTitle>Tendência Semanal</CardTitle>
+                <CardDescription>Custo vs. Preço de Venda</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ChartContainer config={chartConfig} className="h-64 w-full">
+                  <AreaChart data={stats.tendenciaSemanal}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                    <XAxis
+                      dataKey="dia"
+                      tickLine={false}
+                      axisLine={false}
+                      tickMargin={8}
+                      className="text-xs"
+                    />
+                    <YAxis
+                      tickLine={false}
+                      axisLine={false}
+                      tickFormatter={(v) => `R$${v}`}
+                      className="text-xs"
+                      width={40}
+                    />
+                    <Tooltip content={<ChartTooltipContent />} />
+                    <Area
+                      type="monotone"
+                      dataKey="custo"
+                      stroke="var(--color-custo)"
+                      fill="var(--color-custo)"
+                      fillOpacity={0.2}
+                      strokeWidth={2}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="venda"
+                      stroke="var(--color-precoVenda)"
+                      fill="var(--color-precoVenda)"
+                      fillOpacity={0.2}
+                      strokeWidth={2}
+                    />
+                  </AreaChart>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="categorias">
+            <Card>
+              <CardHeader>
+                <CardTitle>Top Categorias (Mês)</CardTitle>
+                <CardDescription>Onde estamos perdendo mais?</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ChartContainer config={chartConfig} className="h-64 w-full">
+                  <BarChart
+                    data={stats.perdasPorCategoria}
+                    layout="vertical"
+                    margin={{ left: 0, right: 0 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                    <YAxis
+                      dataKey="categoria"
+                      type="category"
+                      tickLine={false}
+                      axisLine={false}
+                      width={80}
+                      className="text-[10px] font-medium"
+                    />
+                    <XAxis type="number" hide />
+                    <Tooltip content={<ChartTooltipContent />} />
+                    <Bar dataKey="custo" radius={4}>
+                      {stats.perdasPorCategoria.map((_, index) => (
+                        <Cell
+                          key={`cell-${index}`}
+                          fill={categoryColors[index % categoryColors.length]}
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ChartContainer>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+
+      <div className="hidden md:grid gap-4 grid-cols-1 lg:grid-cols-2">
         <Card className="col-span-1">
           <CardHeader>
             <CardTitle>Tendência Semanal</CardTitle>
