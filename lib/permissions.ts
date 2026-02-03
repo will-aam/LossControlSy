@@ -1,56 +1,112 @@
 // RBAC - Role Based Access Control
-import { UserRole } from "./mock-data";
+import { UserRole } from "./types";
 
 export type Permission =
+  // Eventos
   | "eventos:criar"
   | "eventos:ver_todos"
   | "eventos:aprovar"
   | "eventos:editar"
   | "eventos:exportar"
+  | "eventos:excluir" // Adicionado
+
+  // Catálogo
   | "catalogo:ver"
-  | "categorias:ver"
   | "catalogo:criar"
   | "catalogo:editar"
+  | "catalogo:status" // Adicionado
+  | "catalogo:importar" // Adicionado
+  | "catalogo:excluir" // Adicionado
+
+  // Categorias
+  | "categorias:ver"
+  | "categorias:criar"
+  | "categorias:editar"
+  | "categorias:excluir" // Adicionado
+
+  // Galeria
   | "galeria:ver"
+  | "galeria:upload" // Adicionado
+  | "galeria:excluir" // Adicionado
+
+  // Outros
   | "relatorios:ver"
   | "dashboard:ver"
   | "configuracoes:ver"
   | "usuarios:gerenciar";
 
 const rolePermissions: Record<UserRole, Permission[]> = {
-  funcionario: ["eventos:criar", "catalogo:ver"],
+  funcionario: [
+    "eventos:criar",
+    "catalogo:ver",
+    "catalogo:status",
+    "catalogo:criar",
+    "categorias:ver",
+    "categorias:criar",
+    "categorias:editar",
+  ],
   gestor: [
     "eventos:criar",
     "eventos:ver_todos",
     "eventos:aprovar",
     "eventos:editar",
+    "eventos:excluir",
+    "eventos:exportar",
     "catalogo:ver",
     "catalogo:criar",
-    "categorias:ver",
+    "catalogo:status",
     "catalogo:editar",
+    "catalogo:excluir",
+    "catalogo:importar",
+    "categorias:ver",
+    "categorias:criar",
+    "categorias:editar",
+    "categorias:excluir",
     "galeria:ver",
+    "galeria:upload",
+    "galeria:excluir",
     "relatorios:ver",
     "dashboard:ver",
+    "configuracoes:ver",
   ],
   fiscal: [
     "eventos:ver_todos",
     "eventos:exportar",
     "catalogo:ver",
+    "catalogo:criar",
+    "catalogo:status",
+    "catalogo:editar",
+    "catalogo:importar",
+    "catalogo:excluir",
     "categorias:ver",
+    "categorias:criar",
+    "categorias:editar",
+    "categorias:excluir",
     "galeria:ver",
     "relatorios:ver",
     "dashboard:ver",
+    "configuracoes:ver",
   ],
   dono: [
     "eventos:criar",
     "eventos:ver_todos",
     "eventos:aprovar",
     "eventos:editar",
+    "eventos:excluir",
     "eventos:exportar",
     "catalogo:ver",
     "catalogo:criar",
+    "catalogo:status",
     "catalogo:editar",
+    "catalogo:excluir",
+    "catalogo:importar",
+    "categorias:ver",
+    "categorias:criar",
+    "categorias:editar",
+    "categorias:excluir",
     "galeria:ver",
+    "galeria:upload",
+    "galeria:excluir",
     "relatorios:ver",
     "dashboard:ver",
     "configuracoes:ver",
@@ -90,7 +146,7 @@ export const navItems: NavItem[] = [
   {
     title: "Eventos",
     href: "/eventos",
-    icon: "List",
+    icon: "ClipboardCheck",
     permission: "eventos:ver_todos",
   },
   {
@@ -99,12 +155,11 @@ export const navItems: NavItem[] = [
     icon: "Package",
     permission: "catalogo:ver",
   },
-
   {
     title: "Categorias",
     href: "/categorias",
     icon: "Tags",
-    permission: "categorias:ver", // Ou use 'catalogo:criar' se não criou a permissão nova
+    permission: "categorias:ver",
   },
   {
     title: "Galeria",

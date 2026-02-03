@@ -9,7 +9,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -31,13 +30,14 @@ import {
   User,
   ImageIcon,
 } from "lucide-react";
+// Importações corrigidas
+import { Evento } from "@/lib/types";
 import {
-  Evento,
   formatCurrency,
   formatDateTime,
   getStatusColor,
   getStatusLabel,
-} from "@/lib/mock-data";
+} from "@/lib/utils";
 
 interface EventoCardProps {
   evento: Evento;

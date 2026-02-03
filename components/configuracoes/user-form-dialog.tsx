@@ -18,7 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { User, UserRole } from "@/lib/mock-data";
+// Importações corrigidas
+import { User, UserRole } from "@/lib/types";
 
 interface UserFormDialogProps {
   open: boolean;

@@ -1,4 +1,4 @@
-import { Item } from "./mock-data";
+import { Item } from "@/lib/types"; // Importação corrigida
 
 export async function parseItemsCSV(file: File): Promise<Item[]> {
   return new Promise((resolve, reject) => {
@@ -43,6 +43,13 @@ export async function parseItemsCSV(file: File): Promise<Item[]> {
           return parseFloat(cleanVal) || 0;
         };
 
+        // Normaliza a unidade lida do CSV
+        const rawUnidade = cols[3]?.trim().toUpperCase();
+        // Garante que seja uma das unidades válidas, senão padroniza para UN
+        const unidadeValida = ["UN", "KG", "CX", "L"].includes(rawUnidade)
+          ? (rawUnidade as Item["unidade"])
+          : "UN";
+
         // Mapeamento exato para o arquivo itens-gama-jardins.csv
         const item: Item = {
           id: Math.random().toString(36).substr(2, 9),
@@ -53,7 +60,7 @@ export async function parseItemsCSV(file: File): Promise<Item[]> {
           // Coluna 2: categoria
           categoria: cols[2]?.trim().replace(/^\*/, "") || "Geral", // Remove asterisco se tiver (ex: *PADARIA)
           // Coluna 3: sgl_unidade
-          unidade: (cols[3]?.trim().toUpperCase() as "UN" | "KG") || "UN",
+          unidade: unidadeValida,
           // Coluna 4: cod_barra (Se vazio, usa o código interno ou vazio)
           codigoBarras: cols[4]?.trim() || "",
           // Coluna 5: val_custo_unitario
@@ -63,9 +70,6 @@ export async function parseItemsCSV(file: File): Promise<Item[]> {
           status: "ativo",
           imagemUrl: "", // CSV não tem imagem
         };
-
-        // Validação extra: Se não tiver nome ou preço zerado, marca para revisão ou importa mesmo assim?
-        // Vamos importar tudo, mas garantir que custos venham como number.
 
         newItems.push(item);
       }
@@ -80,6 +84,6 @@ export async function parseItemsCSV(file: File): Promise<Item[]> {
       reject(new Error("Erro ao ler o arquivo"));
     };
 
-    reader.readAsText(file, "ISO-8859-1"); // Tenta forçar encoding comum no BR se UTF-8 falhar nos acentos
+    reader.readAsText(file, "ISO-8859-1");
   });
 }
