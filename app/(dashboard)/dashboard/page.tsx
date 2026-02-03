@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -8,6 +8,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from "@/components/ui/carousel";
 import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 import {
   Area,
@@ -21,10 +28,11 @@ import {
   Tooltip,
 } from "recharts";
 import { TrendingDown, AlertTriangle, DollarSign, Package } from "lucide-react";
-import { Evento, Item } from "@/lib/types"; // Importação Corrigida
-import { formatCurrency } from "@/lib/utils"; // Importação Corrigida
+import { Evento, Item } from "@/lib/types";
+import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import { StorageService } from "@/lib/storage";
+import Autoplay from "embla-carousel-autoplay";
 
 const chartConfig = {
   custo: {
@@ -48,6 +56,9 @@ const categoryColors = [
 export default function DashboardPage() {
   const { hasPermission } = useAuth();
   const [eventos, setEventos] = useState<Evento[]>([]);
+
+  // Plugin do Autoplay para o Carrossel (6 segundos)
+  const plugin = useRef(Autoplay({ delay: 6000, stopOnInteraction: true }));
 
   // Carrega dados
   useEffect(() => {
@@ -153,6 +164,42 @@ export default function DashboardPage() {
     };
   }, [eventos]);
 
+  // --- PREPARAÇÃO DOS DADOS DOS CARDS ---
+  const cardsData = [
+    {
+      title: "Perdas Hoje",
+      icon: TrendingDown,
+      mainValue: stats.perdasHoje.qtd,
+      subText: `${formatCurrency(stats.perdasHoje.custo)} em custo`,
+      iconColor: "text-muted-foreground",
+      valueColor: "text-foreground",
+    },
+    {
+      title: "Perdas Semana",
+      icon: Package,
+      mainValue: stats.perdasSemana.qtd,
+      subText: `${formatCurrency(stats.perdasSemana.custo)} em custo`,
+      iconColor: "text-muted-foreground",
+      valueColor: "text-foreground",
+    },
+    {
+      title: "Custo Mensal",
+      icon: DollarSign,
+      mainValue: formatCurrency(stats.perdasMes.custo),
+      subText: `${stats.perdasMes.qtd} eventos aprovados`,
+      iconColor: "text-muted-foreground",
+      valueColor: "text-foreground",
+    },
+    {
+      title: "Perda em Venda (Mês)",
+      icon: AlertTriangle,
+      mainValue: formatCurrency(stats.perdasMes.venda),
+      subText: "potencial não realizado",
+      iconColor: "text-destructive",
+      valueColor: "text-destructive",
+    },
+  ];
+
   if (!hasPermission("dashboard:ver")) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
@@ -173,63 +220,75 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Perdas Hoje</CardTitle>
-            <TrendingDown className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.perdasHoje.qtd}</div>
-            <p className="text-xs text-muted-foreground">
-              {formatCurrency(stats.perdasHoje.custo)} em custo
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Perdas Semana</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats.perdasSemana.qtd}</div>
-            <p className="text-xs text-muted-foreground">
-              {formatCurrency(stats.perdasSemana.custo)} em custo
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">Custo Mensal</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">
-              {formatCurrency(stats.perdasMes.custo)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {stats.perdasMes.qtd} eventos aprovados/enviados
-            </p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">
-              Perda em Venda (Mês)
-            </CardTitle>
-            <AlertTriangle className="h-4 w-4 text-destructive" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-destructive">
-              {formatCurrency(stats.perdasMes.venda)}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              potencial não realizado
-            </p>
-          </CardContent>
-        </Card>
+      {/* --- ÁREA DE CARDS (RESPONSIVA) --- */}
+
+      {/* 1. Versão Mobile: Carrossel (Slider) */}
+      <div className="block md:hidden">
+        <Carousel
+          plugins={[plugin.current]}
+          className="w-full"
+          onMouseEnter={plugin.current.stop}
+          onMouseLeave={plugin.current.reset}
+          opts={{
+            loop: true,
+            align: "center",
+          }}
+        >
+          <CarouselContent>
+            {cardsData.map((card, index) => (
+              <CarouselItem key={index}>
+                <div className="p-1">
+                  <Card className="shadow-md border-primary/10 bg-linear-to-br from-card to-muted/20">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-sm font-medium">
+                        {card.title}
+                      </CardTitle>
+                      <card.icon className={`h-4 w-4 ${card.iconColor}`} />
+                    </CardHeader>
+                    <CardContent>
+                      <div className={`text-3xl font-bold ${card.valueColor}`}>
+                        {card.mainValue}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {card.subText}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+              </CarouselItem>
+            ))}
+          </CarouselContent>
+          {/* Botões de navegação manuais (opcional, mas bom ter) */}
+          <div className="hidden sm:block">
+            <CarouselPrevious className="left-0" />
+            <CarouselNext className="right-0" />
+          </div>
+          {/* Indicadores de slide (pontinhos) podem ser feitos com CSS customizado, 
+              mas o swipe já é intuitivo no mobile */}
+        </Carousel>
       </div>
 
+      {/* 2. Versão Desktop: Grid Tradicional */}
+      <div className="hidden md:grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {cardsData.map((card, index) => (
+          <Card key={index}>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">
+                {card.title}
+              </CardTitle>
+              <card.icon className={`h-4 w-4 ${card.iconColor}`} />
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${card.valueColor}`}>
+                {card.mainValue}
+              </div>
+              <p className="text-xs text-muted-foreground">{card.subText}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* --- GRÁFICOS (Mantidos iguais) --- */}
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         <Card className="col-span-1">
           <CardHeader>
