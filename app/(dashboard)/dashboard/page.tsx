@@ -12,8 +12,6 @@ import {
   Carousel,
   CarouselContent,
   CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
 } from "@/components/ui/carousel";
 import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 import {
@@ -57,15 +55,12 @@ export default function DashboardPage() {
   const { hasPermission } = useAuth();
   const [eventos, setEventos] = useState<Evento[]>([]);
 
-  // Plugin do Autoplay para o Carrossel (6 segundos)
-  const plugin = useRef(Autoplay({ delay: 6000, stopOnInteraction: true }));
+  const plugin = useRef(Autoplay({ delay: 4000, stopOnInteraction: false }));
 
-  // Carrega dados
   useEffect(() => {
     setEventos(StorageService.getEventos());
   }, []);
 
-  // --- CÁLCULOS ---
   const stats = useMemo(() => {
     const hoje = new Date();
     const inicioHoje = new Date(hoje.setHours(0, 0, 0, 0));
@@ -84,7 +79,6 @@ export default function DashboardPage() {
     > = {};
     const tendenciaMap: Record<string, { custo: number; venda: number }> = {};
 
-    // Inicializa últimos 7 dias para o gráfico
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
@@ -164,7 +158,6 @@ export default function DashboardPage() {
     };
   }, [eventos]);
 
-  // --- PREPARAÇÃO DOS DADOS DOS CARDS ---
   const cardsData = [
     {
       title: "Perdas Hoje",
@@ -173,6 +166,7 @@ export default function DashboardPage() {
       subText: `${formatCurrency(stats.perdasHoje.custo)} em custo`,
       iconColor: "text-muted-foreground",
       valueColor: "text-foreground",
+      borderColor: "border-primary/20",
     },
     {
       title: "Perdas Semana",
@@ -181,6 +175,7 @@ export default function DashboardPage() {
       subText: `${formatCurrency(stats.perdasSemana.custo)} em custo`,
       iconColor: "text-muted-foreground",
       valueColor: "text-foreground",
+      borderColor: "border-blue-500/20",
     },
     {
       title: "Custo Mensal",
@@ -189,6 +184,7 @@ export default function DashboardPage() {
       subText: `${stats.perdasMes.qtd} eventos aprovados`,
       iconColor: "text-muted-foreground",
       valueColor: "text-foreground",
+      borderColor: "border-emerald-500/20",
     },
     {
       title: "Perda em Venda (Mês)",
@@ -197,6 +193,7 @@ export default function DashboardPage() {
       subText: "potencial não realizado",
       iconColor: "text-destructive",
       valueColor: "text-destructive",
+      borderColor: "border-destructive/20",
     },
   ];
 
@@ -220,10 +217,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* --- ÁREA DE CARDS (RESPONSIVA) --- */}
-
-      {/* 1. Versão Mobile: Carrossel (Slider) */}
-      <div className="block md:hidden">
+      {/* --- MOBILE: CARROSSEL ESTILO WALLET (LATERAL) --- */}
+      <div className="block md:hidden py-4 px-4 overflow-visible">
         <Carousel
           plugins={[plugin.current]}
           className="w-full"
@@ -234,11 +229,20 @@ export default function DashboardPage() {
             align: "center",
           }}
         >
-          <CarouselContent>
+          {/* Removido -ml-2 para centralizar melhor e ajustar o stack */}
+          <CarouselContent className="py-2">
             {cardsData.map((card, index) => (
-              <CarouselItem key={index}>
-                <div className="p-1">
-                  <Card className="shadow-md border-primary/10 bg-linear-to-br from-card to-muted/20">
+              /* ALTERAÇÃO AQUI: basis-full faz o card ocupar 100% da largura, escondendo o próximo */
+              <CarouselItem key={index} className="basis-full">
+                <div className="relative group mr-4">
+                  {" "}
+                  {/* mr-4 cria espaço para a sombra sair na direita sem cortar */}
+                  {/* Stack Layer 2 (Mais atrás e à direita) */}
+                  <div className="absolute top-2 bottom-2 -right-2 w-full bg-foreground/5 rounded-xl z-[-2] scale-y-[0.85] transition-all duration-500" />
+                  {/* Stack Layer 1 (Atrás e à direita) */}
+                  <div className="absolute top-1 bottom-1 -right-1 w-full bg-foreground/10 rounded-xl z-[-1] scale-y-[0.92] transition-all duration-500" />
+                  {/* Cartão Principal */}
+                  <Card className="relative shadow-sm border bg-card transition-all duration-300 active:scale-[0.98]">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
                       <CardTitle className="text-sm font-medium">
                         {card.title}
@@ -258,20 +262,13 @@ export default function DashboardPage() {
               </CarouselItem>
             ))}
           </CarouselContent>
-          {/* Botões de navegação manuais (opcional, mas bom ter) */}
-          <div className="hidden sm:block">
-            <CarouselPrevious className="left-0" />
-            <CarouselNext className="right-0" />
-          </div>
-          {/* Indicadores de slide (pontinhos) podem ser feitos com CSS customizado, 
-              mas o swipe já é intuitivo no mobile */}
         </Carousel>
       </div>
 
-      {/* 2. Versão Desktop: Grid Tradicional */}
+      {/* --- DESKTOP: GRID PADRÃO --- */}
       <div className="hidden md:grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {cardsData.map((card, index) => (
-          <Card key={index}>
+          <Card key={index} className={`border-l-4 ${card.borderColor}`}>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">
                 {card.title}
@@ -288,7 +285,7 @@ export default function DashboardPage() {
         ))}
       </div>
 
-      {/* --- GRÁFICOS (Mantidos iguais) --- */}
+      {/* --- GRÁFICOS --- */}
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         <Card className="col-span-1">
           <CardHeader>
