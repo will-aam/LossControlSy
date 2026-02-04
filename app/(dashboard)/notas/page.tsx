@@ -5,13 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { StorageService } from "@/lib/storage";
 import { NotaFiscal, Evento } from "@/lib/types";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -23,6 +17,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Table,
   TableBody,
@@ -36,6 +40,8 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import {
   Select,
@@ -54,21 +60,26 @@ import {
   DollarSign,
   AlertCircle,
   FileText,
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
-import { UploadZone } from "@/components/notas/upload-zone"; // Importamos nosso componente
+import { UploadZone } from "@/components/notas/upload-zone";
 
 export default function NotasFiscaisPage() {
   const { user, hasPermission } = useAuth();
   const [notas, setNotas] = useState<NotaFiscal[]>([]);
+  const [eventos, setEventos] = useState<Evento[]>([]);
+
+  // Estados de controle
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [notaToDelete, setNotaToDelete] = useState<string | null>(null);
 
-  // Estados do formulário de upload
-  const [file, setFile] = useState<File | null>(null);
+  // Estados do formulário
+  const [xmlFile, setXmlFile] = useState<File | null>(null);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<Partial<NotaFiscal>>({});
-  const [eventos, setEventos] = useState<Evento[]>([]);
   const [selectedEventoId, setSelectedEventoId] = useState<string>("none");
 
   // Carregar dados
@@ -79,35 +90,44 @@ export default function NotasFiscaisPage() {
     );
   }, []);
 
-  // Callback chamado quando o componente UploadZone recebe um arquivo
-  const handleFileSelect = (
-    selectedFile: File,
-    data: Partial<NotaFiscal> = {},
+  const handleFilesSelected = (
+    xml: File | null,
+    pdf: File | null,
+    data: Partial<NotaFiscal>,
   ) => {
-    setFile(selectedFile);
-    setParsedData(data);
+    setXmlFile(xml);
+    setPdfFile(pdf);
+    // Preserva dados anteriores se o novo parse vier vazio (caso só tenha adicionado PDF depois)
+    setParsedData((prev) => ({ ...prev, ...data }));
   };
 
   const handleSave = () => {
-    if (!file || !user) return;
+    if ((!xmlFile && !pdfFile) || !user) return;
 
     setIsUploading(true);
 
-    // Simula delay de upload/processamento
     setTimeout(() => {
       const novaNota: NotaFiscal = {
         id: Math.random().toString(36).substr(2, 9),
         dataUpload: new Date().toISOString(),
         uploadedBy: user,
-        pdfUrl: file.type.includes("pdf")
-          ? URL.createObjectURL(file)
-          : undefined,
 
-        // Mescla os dados extraídos pelo componente
-        ...parsedData,
+        // Salva URL temporária para o PDF (em prod seria upload S3/Blob)
+        pdfUrl: pdfFile ? URL.createObjectURL(pdfFile) : undefined,
 
-        // Fallback se não pegou nome
-        emitente: parsedData.emitente || file.name,
+        // Salva conteúdo do XML se existir
+        xmlContent: parsedData.xmlContent,
+
+        // Dados extraídos ou fallback
+        emitente:
+          parsedData.emitente || xmlFile?.name || pdfFile?.name || "Documento",
+        numero: parsedData.numero,
+        serie: parsedData.serie,
+        dataEmissao: parsedData.dataEmissao,
+        valorTotal: parsedData.valorTotal,
+        cnpjEmitente: parsedData.cnpjEmitente,
+        chaveAcesso: parsedData.chaveAcesso,
+        naturezaOperacao: parsedData.naturezaOperacao,
 
         eventoId: selectedEventoId !== "none" ? selectedEventoId : undefined,
       };
@@ -115,22 +135,53 @@ export default function NotasFiscaisPage() {
       StorageService.saveNotaFiscal(novaNota);
       setNotas(StorageService.getNotasFiscais());
 
-      // Reset
+      // Reset total
       setIsUploadOpen(false);
       setIsUploading(false);
-      setFile(null);
+      setXmlFile(null);
+      setPdfFile(null);
       setParsedData({});
       setSelectedEventoId("none");
       toast.success("Nota fiscal salva com sucesso!");
-    }, 800);
+    }, 1000);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm("Tem certeza que deseja excluir esta nota?")) {
-      StorageService.deleteNotaFiscal(id);
+  const confirmDelete = () => {
+    if (notaToDelete) {
+      StorageService.deleteNotaFiscal(notaToDelete);
       setNotas(StorageService.getNotasFiscais());
+      setNotaToDelete(null);
       toast.success("Nota excluída.");
     }
+  };
+
+  // Função para "baixar" arquivos (simulação com Blob)
+  const downloadFile = (
+    content: string | undefined,
+    filename: string,
+    type: string,
+  ) => {
+    if (!content) return;
+
+    // Se for URL de PDF (blob:)
+    if (type === "pdf" && content.startsWith("blob:")) {
+      const link = document.createElement("a");
+      link.href = content;
+      link.download = filename;
+      link.click();
+      return;
+    }
+
+    // Se for conteúdo XML texto
+    const blob = new Blob([content], {
+      type: type === "xml" ? "text/xml" : "application/pdf",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   if (!hasPermission("notas:ver")) {
@@ -168,22 +219,20 @@ export default function NotasFiscaisPage() {
             </DialogTrigger>
             <DialogContent className="sm:max-w-md">
               <DialogHeader>
-                <DialogTitle>Upload de Nota Fiscal</DialogTitle>
+                <DialogTitle>Upload de Documentos</DialogTitle>
                 <DialogDescription>
-                  Arraste ou clique para selecionar. Suporta XML (NFe) e PDF.
+                  Arraste XML e PDF juntos ou selecione individualmente.
                 </DialogDescription>
               </DialogHeader>
 
-              {/* Área de Upload (Drag & Drop) */}
               <div className="py-2">
                 <UploadZone
-                  onFileSelect={handleFileSelect}
+                  onFilesSelected={handleFilesSelected}
                   isUploading={isUploading}
                 />
               </div>
 
-              {/* Seleção de Vínculo (Só aparece se tiver arquivo) */}
-              {file && (
+              {(xmlFile || pdfFile) && (
                 <div className="grid gap-2 animate-in fade-in slide-in-from-top-2">
                   <Label htmlFor="evento">Vincular a Perda (Opcional)</Label>
                   <Select
@@ -214,7 +263,10 @@ export default function NotasFiscaisPage() {
                 >
                   Cancelar
                 </Button>
-                <Button onClick={handleSave} disabled={!file || isUploading}>
+                <Button
+                  onClick={handleSave}
+                  disabled={(!xmlFile && !pdfFile) || isUploading}
+                >
                   {isUploading ? "Salvando..." : "Salvar Nota"}
                 </Button>
               </DialogFooter>
@@ -240,18 +292,22 @@ export default function NotasFiscaisPage() {
               <Card key={nota.id} className="overflow-hidden">
                 <CardContent className="p-4">
                   <div className="flex justify-between items-start mb-3">
-                    <div className="flex items-center gap-2 max-w-[85%]">
+                    <div className="flex items-center gap-2 max-w-[80%]">
                       <div
                         className={`p-2 rounded-lg ${
-                          nota.xmlContent
-                            ? "bg-blue-100 dark:bg-blue-900/30"
-                            : "bg-red-100 dark:bg-red-900/30"
+                          nota.xmlContent && nota.pdfUrl
+                            ? "bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400"
+                            : nota.xmlContent
+                              ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
+                              : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
                         }`}
                       >
-                        {nota.xmlContent ? (
-                          <FileCode className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                        {nota.xmlContent && nota.pdfUrl ? (
+                          <FileText className="h-5 w-5" />
+                        ) : nota.xmlContent ? (
+                          <FileCode className="h-5 w-5" />
                         ) : (
-                          <FileIcon className="h-5 w-5 text-red-600 dark:text-red-400" />
+                          <FileIcon className="h-5 w-5" />
                         )}
                       </div>
                       <div className="min-w-0">
@@ -264,28 +320,57 @@ export default function NotasFiscaisPage() {
                       </div>
                     </div>
 
-                    {hasPermission("notas:excluir") && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 -mr-2"
-                          >
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 -mr-2"
+                        >
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Ações</DropdownMenuLabel>
+                        {nota.xmlContent && (
                           <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => handleDelete(nota.id)}
+                            onClick={() =>
+                              downloadFile(
+                                nota.xmlContent,
+                                `nota-${nota.numero || "xml"}.xml`,
+                                "xml",
+                              )
+                            }
                           >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Excluir
+                            <FileCode className="mr-2 h-4 w-4" /> Baixar XML
                           </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
+                        )}
+                        {nota.pdfUrl && (
+                          <DropdownMenuItem
+                            onClick={() =>
+                              downloadFile(
+                                nota.pdfUrl,
+                                `nota-${nota.numero || "doc"}.pdf`,
+                                "pdf",
+                              )
+                            }
+                          >
+                            <FileIcon className="mr-2 h-4 w-4" /> Baixar PDF
+                          </DropdownMenuItem>
+                        )}
+                        {hasPermission("notas:excluir") && (
+                          <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => setNotaToDelete(nota.id)}
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 text-sm mt-4 bg-muted/30 p-3 rounded-md">
@@ -329,28 +414,31 @@ export default function NotasFiscaisPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-12"></TableHead>
+                  <TableHead className="w-16 text-center">Tipo</TableHead>
                   <TableHead>Emitente</TableHead>
                   <TableHead>Número / Série</TableHead>
                   <TableHead>Emissão</TableHead>
-                  <TableHead>Upload em</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
-                  <TableHead className="w-24 text-right">Ações</TableHead>
+                  <TableHead className="text-right">Arquivos</TableHead>
+                  <TableHead className="w-12"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {notas.map((nota) => (
                   <TableRow key={nota.id}>
-                    <TableCell>
-                      {nota.xmlContent ? (
-                        <div title="XML">
-                          <FileCode className="h-5 w-5 text-blue-500" />
-                        </div>
-                      ) : (
-                        <div title="PDF">
-                          <FileIcon className="h-5 w-5 text-red-500" />
-                        </div>
-                      )}
+                    <TableCell className="text-center">
+                      <div className="flex justify-center gap-1">
+                        {nota.xmlContent && (
+                          <div title="Possui XML" className="text-blue-500">
+                            <FileCode className="h-5 w-5" />
+                          </div>
+                        )}
+                        {nota.pdfUrl && (
+                          <div title="Possui PDF" className="text-red-500">
+                            <FileIcon className="h-5 w-5" />
+                          </div>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="font-medium">
                       <div className="flex flex-col max-w-xs">
@@ -370,11 +458,44 @@ export default function NotasFiscaisPage() {
                         ? new Date(nota.dataEmissao).toLocaleDateString()
                         : "-"}
                     </TableCell>
-                    <TableCell className="text-muted-foreground text-xs">
-                      {new Date(nota.dataUpload).toLocaleDateString()}
-                    </TableCell>
                     <TableCell className="text-right font-medium">
                       {formatCurrency(nota.valorTotal || 0)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-1">
+                        {nota.xmlContent && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() =>
+                              downloadFile(
+                                nota.xmlContent,
+                                `nota-${nota.numero}.xml`,
+                                "xml",
+                              )
+                            }
+                          >
+                            XML
+                          </Button>
+                        )}
+                        {nota.pdfUrl && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs"
+                            onClick={() =>
+                              downloadFile(
+                                nota.pdfUrl,
+                                `nota-${nota.numero}.pdf`,
+                                "pdf",
+                              )
+                            }
+                          >
+                            PDF
+                          </Button>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       {hasPermission("notas:excluir") && (
@@ -382,7 +503,7 @@ export default function NotasFiscaisPage() {
                           variant="ghost"
                           size="icon"
                           className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          onClick={() => handleDelete(nota.id)}
+                          onClick={() => setNotaToDelete(nota.id)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -395,6 +516,31 @@ export default function NotasFiscaisPage() {
           </div>
         </>
       )}
+
+      {/* Alerta de Exclusão */}
+      <AlertDialog
+        open={!!notaToDelete}
+        onOpenChange={() => setNotaToDelete(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita. Isso excluirá permanentemente a
+              nota fiscal e seus arquivos anexados.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
