@@ -5,6 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { StorageService } from "@/lib/storage";
 import { NotaFiscal, Evento } from "@/lib/types";
 import { formatCurrency, formatDateTime } from "@/lib/utils";
+import { getPresignedUploadUrl } from "@/app/actions/storage"; // Importação da Server Action
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -84,7 +85,7 @@ export default function NotasFiscaisPage() {
   const [isUploading, setIsUploading] = useState(false);
   const [notaToDelete, setNotaToDelete] = useState<string | null>(null);
 
-  // Controle de Upload Rápido (Adicionar arquivo faltante)
+  // Controle de Upload Rápido
   const quickUploadInputRef = useRef<HTMLInputElement>(null);
   const [quickUploadTarget, setQuickUploadTarget] = useState<{
     id: string;
@@ -111,21 +112,35 @@ export default function NotasFiscaisPage() {
     );
   }, []);
 
-  // --- LÓGICA DE UPLOAD RÁPIDO (Adicionar Faltante) ---
+  // --- FUNÇÃO DE UPLOAD PARA O R2 ---
+  const uploadToCloud = async (file: File) => {
+    // 1. Pede ao servidor uma URL assinada
+    const { uploadUrl, publicUrl } = await getPresignedUploadUrl(
+      file.name,
+      file.type,
+    );
 
+    // 2. Envia o arquivo direto para o Cloudflare R2
+    await fetch(uploadUrl, {
+      method: "PUT",
+      body: file,
+      headers: { "Content-Type": file.type },
+    });
+
+    return publicUrl;
+  };
+
+  // --- LÓGICA DE UPLOAD RÁPIDO (Adicionar Faltante) ---
   const handleQuickUploadClick = (id: string, type: "xml" | "pdf") => {
     setQuickUploadTarget({ id, type });
     if (quickUploadInputRef.current) {
-      // Limpa o valor anterior para permitir selecionar o mesmo arquivo se necessário
       quickUploadInputRef.current.value = "";
-      // Define o tipo aceito
       quickUploadInputRef.current.accept = type === "xml" ? ".xml" : ".pdf";
-      // Abre a janela de seleção
       quickUploadInputRef.current.click();
     }
   };
 
-  const processQuickUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const processQuickUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !quickUploadTarget || !user) return;
 
@@ -136,85 +151,71 @@ export default function NotasFiscaisPage() {
     let notaAtualizada = { ...notaAtual };
 
     toast.promise(
-      new Promise<void>((resolve, reject) => {
-        // Se for PDF
+      async () => {
+        // 1. Upload para Cloudflare R2
+        const publicUrl = await uploadToCloud(file);
+
         if (quickUploadTarget.type === "pdf") {
-          if (file.type !== "application/pdf") {
-            reject("Arquivo deve ser um PDF");
-            return;
-          }
-          notaAtualizada.pdfUrl = URL.createObjectURL(file);
-          resolve();
+          if (file.type !== "application/pdf")
+            throw new Error("Arquivo deve ser um PDF");
+          notaAtualizada.pdfUrl = publicUrl;
+        } else {
+          if (file.type !== "text/xml" && !file.name.endsWith(".xml"))
+            throw new Error("Arquivo deve ser um XML");
+
+          notaAtualizada.xmlUrl = publicUrl; // Salva URL do XML
+
+          // Ler conteúdo para salvar o texto do XML também (backup/leitura rápida)
+          const text = await file.text();
+          notaAtualizada.xmlContent = text;
+
+          // Parse para enriquecer dados se faltar
+          const parser = new DOMParser();
+          const xmlDoc = parser.parseFromString(text, "text/xml");
+
+          const infNFe = xmlDoc.getElementsByTagName("infNFe")[0];
+          const ide = xmlDoc.getElementsByTagName("ide")[0];
+          const emit = xmlDoc.getElementsByTagName("emit")[0];
+          const total = xmlDoc.getElementsByTagName("total")[0];
+
+          if (!notaAtualizada.chaveAcesso)
+            notaAtualizada.chaveAcesso =
+              infNFe?.getAttribute("Id")?.replace("NFe", "") || "";
+          if (!notaAtualizada.numero)
+            notaAtualizada.numero =
+              ide?.getElementsByTagName("nNF")[0]?.textContent || "";
+          if (!notaAtualizada.serie)
+            notaAtualizada.serie =
+              ide?.getElementsByTagName("serie")[0]?.textContent || "";
+          if (!notaAtualizada.dataEmissao)
+            notaAtualizada.dataEmissao =
+              ide?.getElementsByTagName("dhEmi")[0]?.textContent ||
+              ide?.getElementsByTagName("dEmi")[0]?.textContent ||
+              "";
+
+          const emitenteXml =
+            emit?.getElementsByTagName("xNome")[0]?.textContent;
+          if (emitenteXml) notaAtualizada.emitente = emitenteXml;
+
+          if (!notaAtualizada.cnpjEmitente)
+            notaAtualizada.cnpjEmitente =
+              emit?.getElementsByTagName("CNPJ")[0]?.textContent || "";
+
+          const val = parseFloat(
+            total?.getElementsByTagName("vNF")[0]?.textContent || "0",
+          );
+          if (val > 0) notaAtualizada.valorTotal = val;
         }
-        // Se for XML
-        else {
-          if (file.type !== "text/xml" && !file.name.endsWith(".xml")) {
-            reject("Arquivo deve ser um XML");
-            return;
-          }
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            try {
-              const text = event.target?.result as string;
-              // Parse simples para enriquecer dados se estiverem faltando
-              const parser = new DOMParser();
-              const xmlDoc = parser.parseFromString(text, "text/xml");
 
-              // Extração segura
-              const infNFe = xmlDoc.getElementsByTagName("infNFe")[0];
-              const ide = xmlDoc.getElementsByTagName("ide")[0];
-              const emit = xmlDoc.getElementsByTagName("emit")[0];
-              const total = xmlDoc.getElementsByTagName("total")[0];
-
-              notaAtualizada.xmlContent = text;
-
-              // Só sobrescreve se o dado atual for genérico ou vazio
-              if (!notaAtualizada.chaveAcesso)
-                notaAtualizada.chaveAcesso =
-                  infNFe?.getAttribute("Id")?.replace("NFe", "") || "";
-              if (!notaAtualizada.numero)
-                notaAtualizada.numero =
-                  ide?.getElementsByTagName("nNF")[0]?.textContent || "";
-              if (!notaAtualizada.serie)
-                notaAtualizada.serie =
-                  ide?.getElementsByTagName("serie")[0]?.textContent || "";
-              if (!notaAtualizada.dataEmissao)
-                notaAtualizada.dataEmissao =
-                  ide?.getElementsByTagName("dhEmi")[0]?.textContent ||
-                  ide?.getElementsByTagName("dEmi")[0]?.textContent ||
-                  "";
-
-              // O emitente do XML geralmente é mais preciso que o nome do arquivo PDF
-              const emitenteXml =
-                emit?.getElementsByTagName("xNome")[0]?.textContent;
-              if (emitenteXml) notaAtualizada.emitente = emitenteXml;
-
-              if (!notaAtualizada.cnpjEmitente)
-                notaAtualizada.cnpjEmitente =
-                  emit?.getElementsByTagName("CNPJ")[0]?.textContent || "";
-
-              const val = parseFloat(
-                total?.getElementsByTagName("vNF")[0]?.textContent || "0",
-              );
-              if (val > 0) notaAtualizada.valorTotal = val;
-
-              resolve();
-            } catch (err) {
-              reject("Erro ao ler XML");
-            }
-          };
-          reader.readAsText(file);
-        }
-      }).then(() => {
-        // Salvar atualização
+        // Salvar no "Banco" (LocalStorage por enquanto)
         StorageService.saveNotaFiscal(notaAtualizada);
         setNotas(StorageService.getNotasFiscais());
         setQuickUploadTarget(null);
-      }),
+      },
       {
-        loading: "Processando arquivo...",
+        loading: "Enviando para a nuvem...",
         success: "Arquivo anexado com sucesso!",
-        error: (err) => `Erro: ${err}`,
+        error: "Erro ao enviar arquivo.",
       },
     );
   };
@@ -272,18 +273,35 @@ export default function NotasFiscaisPage() {
     setParsedData((prev) => ({ ...prev, ...data }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if ((!xmlFile && !pdfFile) || !user) return;
 
     setIsUploading(true);
+    toast.info("Iniciando upload...");
 
-    setTimeout(() => {
+    try {
+      let uploadedPdfUrl = undefined;
+      let uploadedXmlUrl = undefined;
+
+      // Upload do PDF se existir
+      if (pdfFile) {
+        uploadedPdfUrl = await uploadToCloud(pdfFile);
+      }
+
+      // Upload do XML se existir
+      if (xmlFile) {
+        uploadedXmlUrl = await uploadToCloud(xmlFile);
+      }
+
       const novaNota: NotaFiscal = {
         id: Math.random().toString(36).substr(2, 9),
         dataUpload: new Date().toISOString(),
         uploadedBy: user,
-        pdfUrl: pdfFile ? URL.createObjectURL(pdfFile) : undefined,
-        xmlContent: parsedData.xmlContent,
+
+        pdfUrl: uploadedPdfUrl,
+        xmlUrl: uploadedXmlUrl,
+        xmlContent: parsedData.xmlContent, // Salva o texto também para backup
+
         emitente:
           parsedData.emitente || xmlFile?.name || pdfFile?.name || "Documento",
         numero: parsedData.numero,
@@ -300,17 +318,22 @@ export default function NotasFiscaisPage() {
       setNotas(StorageService.getNotasFiscais());
 
       setIsUploadOpen(false);
-      setIsUploading(false);
       setXmlFile(null);
       setPdfFile(null);
       setParsedData({});
       setSelectedEventoId("none");
       toast.success("Nota salva com sucesso!");
-    }, 800);
+    } catch (error) {
+      console.error("Erro no upload:", error);
+      toast.error("Erro ao fazer upload dos arquivos.");
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const confirmDelete = () => {
     if (notaToDelete) {
+      // TODO: Futuramente, deletar também do R2 usando deleteFileFromStorage
       StorageService.deleteNotaFiscal(notaToDelete);
       setNotas(StorageService.getNotasFiscais());
       setNotaToDelete(null);
@@ -318,30 +341,13 @@ export default function NotasFiscaisPage() {
     }
   };
 
-  const downloadFile = (
-    content: string | undefined,
-    filename: string,
-    type: string,
-  ) => {
-    if (!content) return;
-
-    if (type === "pdf" && content.startsWith("blob:")) {
-      const link = document.createElement("a");
-      link.href = content;
-      link.download = filename;
-      link.click();
-      return;
-    }
-
-    const blob = new Blob([content], {
-      type: type === "xml" ? "text/xml" : "application/pdf",
-    });
-    const url = URL.createObjectURL(blob);
+  const downloadFile = (url: string | undefined, filename: string) => {
+    if (!url) return;
     const link = document.createElement("a");
     link.href = url;
     link.download = filename;
+    link.target = "_blank"; // Abre em nova aba se for PDF/XML visualizável
     link.click();
-    URL.revokeObjectURL(url);
   };
 
   if (!hasPermission("notas:ver")) {
@@ -500,17 +506,16 @@ export default function NotasFiscaisPage() {
                         {/* Ícones de Status Mobile */}
                         <div
                           onClick={() =>
-                            nota.xmlContent
+                            nota.xmlUrl
                               ? downloadFile(
-                                  nota.xmlContent,
+                                  nota.xmlUrl,
                                   `nota-${nota.numero}.xml`,
-                                  "xml",
                                 )
                               : handleQuickUploadClick(nota.id, "xml")
                           }
                           className={cn(
                             "p-2 rounded-lg cursor-pointer transition-colors",
-                            nota.xmlContent
+                            nota.xmlUrl || nota.xmlContent
                               ? "bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400"
                               : "bg-muted text-muted-foreground border border-dashed border-muted-foreground/30 hover:bg-muted/80",
                           )}
@@ -523,7 +528,6 @@ export default function NotasFiscaisPage() {
                               ? downloadFile(
                                   nota.pdfUrl,
                                   `nota-${nota.numero}.pdf`,
-                                  "pdf",
                                 )
                               : handleQuickUploadClick(nota.id, "pdf")
                           }
@@ -640,30 +644,33 @@ export default function NotasFiscaisPage() {
                       <div className="flex justify-center gap-2">
                         {/* Botão XML: Baixar ou Importar */}
                         <Button
-                          variant={nota.xmlContent ? "secondary" : "outline"}
+                          variant={
+                            nota.xmlUrl || nota.xmlContent
+                              ? "secondary"
+                              : "outline"
+                          }
                           size="icon"
                           className={cn(
                             "h-8 w-8",
-                            nota.xmlContent
+                            nota.xmlUrl || nota.xmlContent
                               ? "bg-blue-100 text-blue-600 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400"
                               : "text-muted-foreground border-dashed hover:border-blue-400 hover:text-blue-500",
                           )}
                           title={
-                            nota.xmlContent
+                            nota.xmlUrl || nota.xmlContent
                               ? "Baixar XML"
                               : "Importar XML Faltante"
                           }
                           onClick={() =>
-                            nota.xmlContent
+                            nota.xmlUrl || nota.xmlContent
                               ? downloadFile(
-                                  nota.xmlContent,
+                                  nota.xmlUrl,
                                   `nota-${nota.numero}.xml`,
-                                  "xml",
                                 )
                               : handleQuickUploadClick(nota.id, "xml")
                           }
                         >
-                          {nota.xmlContent ? (
+                          {nota.xmlUrl || nota.xmlContent ? (
                             <Download className="h-4 w-4" />
                           ) : (
                             <Plus className="h-4 w-4" />
@@ -689,7 +696,6 @@ export default function NotasFiscaisPage() {
                               ? downloadFile(
                                   nota.pdfUrl,
                                   `nota-${nota.numero}.pdf`,
-                                  "pdf",
                                 )
                               : handleQuickUploadClick(nota.id, "pdf")
                           }

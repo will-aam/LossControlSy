@@ -1,13 +1,15 @@
 // Definições de Tipos do Sistema (Sem dados falsos)
 
-export type UserRole = "funcionario" | "gestor" | "fiscal" | "dono";
+export type UserRole = "dono" | "gestor" | "fiscal" | "funcionario";
 
 export interface User {
   id: string;
   nome: string;
   email: string;
   role: UserRole;
-  avatar?: string;
+  avatarUrl?: string; // Atualizado de 'avatar' para 'avatarUrl'
+  createdAt?: string;
+  // Outros campos opcionais que podem vir do banco
 }
 
 export interface NavItem {
@@ -71,24 +73,25 @@ export interface CategoriaData {
 
 export interface NotaFiscal {
   id: string;
-  dataUpload: string; // Data em que você subiu o arquivo
-  uploadedBy: User; // Quem subiu (Fiscal, Dono, etc.)
+  dataUpload: string;
+  uploadedBy: User;
 
   // Arquivos
-  pdfUrl?: string; // Link para o PDF (simulado no LocalStorage)
-  xmlContent?: string; // O conteúdo texto do XML para leitura futura
+  pdfUrl?: string; // URL do PDF no R2
+  xmlUrl?: string; // NOVO: URL do XML no R2
+  xmlContent?: string; // Conteúdo texto do XML (para leitura/backup)
 
-  // Metadados extraídos do XML (ou preenchidos manualmente)
+  // Metadados
   numero?: string;
   serie?: string;
-  emitente?: string; // xNome
+  emitente?: string;
   cnpjEmitente?: string;
-  dataEmissao?: string; // dhEmi
-  valorTotal?: number; // vNF
-  naturezaOperacao?: string; // natOp
+  dataEmissao?: string;
+  valorTotal?: number;
+  naturezaOperacao?: string;
   chaveAcesso?: string;
 
   // Vínculos
-  eventoId?: string; // Para vincular a uma perda específica (opcional)
+  eventoId?: string;
   observacoes?: string;
 }

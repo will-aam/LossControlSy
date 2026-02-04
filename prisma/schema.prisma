@@ -1,225 +1,191 @@
-// Sistema de Controle de Perdas - Prisma Schema
-// APENAS MODELAGEM - NÃO EXECUTAR MIGRAÇÕES
-// Preparado para integração futura com Supabase
-
+// Configuração do Cliente e Banco de Dados
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
-// ============================================
-// ENUMS
-// ============================================
+// --- ENUMS (Opções fixas do sistema) ---
 
 enum UserRole {
-  FUNCIONARIO
-  GESTOR
-  FISCAL
-  DONO
-}
-
-enum Unidade {
-  UN
-  KG
+  dono
+  gestor
+  fiscal
+  funcionario
 }
 
 enum EventoStatus {
-  RASCUNHO
-  ENVIADO
-  APROVADO
-  REJEITADO
-  EXPORTADO
+  rascunho
+  enviado
+  aprovado
+  rejeitado
+  exportado
 }
 
-enum ItemStatus {
-  ATIVO
-  INATIVO
+enum ItemUnidade {
+  UN
+  KG
+  CX
+  L
 }
 
-// ============================================
-// MODELS
-// ============================================
+// --- MODELOS (Tabelas) ---
 
-/// Usuário do sistema
+// Usuários do Sistema (Dono, Gerente, etc.)
 model User {
-  id            String    @id @default(uuid())
-  email         String    @unique
-  nome          String
-  role          UserRole  @default(FUNCIONARIO)
-  avatar        String?   /// URL da imagem de avatar
-  ativo         Boolean   @default(true)
-  criadoEm      DateTime  @default(now()) @map("criado_em")
-  atualizadoEm  DateTime  @updatedAt @map("atualizado_em")
+  id           String   @id @default(uuid())
+  nome         String
+  email        String   @unique
+  passwordHash String // Senha criptografada
+  role         UserRole @default(funcionario)
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  // Relacionamentos
-  eventosCriados   Evento[]  @relation("EventosCriados")
-  eventosAprovados Evento[]  @relation("EventosAprovados")
+  // Relacionamentos Inversos
+  eventosCriados   Evento[]     @relation("CriadoPor")
+  eventosAprovados Evento[]     @relation("AprovadoPor")
+  notasFiscais     NotaFiscal[]
+  evidencias       Evidencia[] // Evidências avulsas da galeria enviadas por ele
+  Configuracao     Configuracao[] // Geralmente só o dono terá uma, mas mantemos relação
 
   @@map("users")
 }
 
-/// Categoria de itens
+// Categorias de Produtos
 model Categoria {
-  id            String    @id @default(uuid())
-  nome          String    @unique
-  descricao     String?
-  criadoEm      DateTime  @default(now()) @map("criado_em")
-  atualizadoEm  DateTime  @updatedAt @map("atualizado_em")
+  id        String   @id @default(uuid())
+  nome      String   @unique
+  descricao String?
+  status    String   @default("ativa") // ativa, inativa
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relacionamentos
-  itens         Item[]
-  subcategorias Subcategoria[]
+  items Item[]
 
   @@map("categorias")
 }
 
-/// Subcategoria de itens
-model Subcategoria {
-  id            String    @id @default(uuid())
-  nome          String
-  categoriaId   String    @map("categoria_id")
-  criadoEm      DateTime  @default(now()) @map("criado_em")
-  atualizadoEm  DateTime  @updatedAt @map("atualizado_em")
-
-  // Relacionamentos
-  categoria     Categoria @relation(fields: [categoriaId], references: [id])
-  itens         Item[]
-
-  @@unique([categoriaId, nome])
-  @@map("subcategorias")
-}
-
-/// Item do catálogo de produtos
+// Itens (Produtos)
 model Item {
-  id              String      @id @default(uuid())
-  codigoInterno   String      @unique @map("codigo_interno")
-  codigoBarras    String?     @map("codigo_barras")
-  nome            String
-  categoriaId     String      @map("categoria_id")
-  subcategoriaId  String?     @map("subcategoria_id")
-  unidade         Unidade     @default(UN)
-  custo           Decimal     @db.Decimal(10, 2)
-  precoVenda      Decimal     @map("preco_venda") @db.Decimal(10, 2)
-  imagemUrl       String?     @map("imagem_url") /// URL externa (ToDo Friendly)
-  status          ItemStatus  @default(ATIVO)
-  criadoEm        DateTime    @default(now()) @map("criado_em")
-  atualizadoEm    DateTime    @updatedAt @map("atualizado_em")
+  id            String      @id @default(uuid())
+  codigoInterno String      @unique
+  codigoBarras  String?
+  nome          String
+  unidade       ItemUnidade @default(UN)
+  custo         Decimal     @db.Decimal(10, 2) // Ex: 12345.67
+  precoVenda    Decimal     @db.Decimal(10, 2)
+  imagemUrl     String?
+  status        String      @default("ativo") // ativo, inativo
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // Chave Estrangeira
+  categoriaId String
+  categoria   Categoria @relation(fields: [categoriaId], references: [id])
 
   // Relacionamentos
-  categoria       Categoria     @relation(fields: [categoriaId], references: [id])
-  subcategoria    Subcategoria? @relation(fields: [subcategoriaId], references: [id])
-  eventos         Evento[]
+  eventos Evento[]
 
-  @@index([codigoBarras])
-  @@index([categoriaId])
-  @@index([status])
-  @@map("itens")
+  @@map("items")
 }
 
-/// Evento de perda (quebra/descarte)
+// Eventos de Perda/Quebra
 model Evento {
-  id                  String        @id @default(uuid())
-  dataHora            DateTime      @default(now()) @map("data_hora")
-  itemId              String?       @map("item_id") /// Opcional - pode registrar sem item
-  quantidade          Decimal       @db.Decimal(10, 3)
-  unidade             Unidade       @default(UN)
-  custoSnapshot       Decimal?      @map("custo_snapshot") @db.Decimal(10, 2) /// Custo no momento do registro
-  precoVendaSnapshot  Decimal?      @map("preco_venda_snapshot") @db.Decimal(10, 2) /// Preço de venda no momento
-  motivo              String?       /// Descrição do motivo da perda
-  status              EventoStatus  @default(RASCUNHO)
-  criadoPorId         String        @map("criado_por_id")
-  aprovadoPorId       String?       @map("aprovado_por_id")
-  dataAprovacao       DateTime?     @map("data_aprovacao")
-  dataExportacao      DateTime?     @map("data_exportacao")
-  observacoes         String?       /// Observações adicionais
-  criadoEm            DateTime      @default(now()) @map("criado_em")
-  atualizadoEm        DateTime      @updatedAt @map("atualizado_em")
+  id        String       @id @default(uuid())
+  dataHora  DateTime
+  motivo    String?
+  status    EventoStatus @default(rascunho)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  // Dados do Item (Snapshots para histórico financeiro)
+  quantidade         Decimal @db.Decimal(10, 3) // Permite 1.500 KG
+  unidade            String
+  custoSnapshot      Decimal @db.Decimal(10, 2) // Custo no momento da perda
+  precoVendaSnapshot Decimal @db.Decimal(10, 2) // Preço no momento da perda
 
   // Relacionamentos
-  item                Item?         @relation(fields: [itemId], references: [id])
-  criadoPor           User          @relation("EventosCriados", fields: [criadoPorId], references: [id])
-  aprovadoPor         User?         @relation("EventosAprovados", fields: [aprovadoPorId], references: [id])
-  evidencias          Evidencia[]
+  itemId String? // Opcional caso o item seja deletado (manter histórico)
+  item   Item?   @relation(fields: [itemId], references: [id], onDelete: SetNull)
 
-  @@index([dataHora])
-  @@index([status])
-  @@index([itemId])
-  @@index([criadoPorId])
+  criadoPorId String
+  criadoPor   User   @relation("CriadoPor", fields: [criadoPorId], references: [id])
+
+  aprovadoPorId String?
+  aprovadoPor   User?   @relation("AprovadoPor", fields: [aprovadoPorId], references: [id])
+
+  evidencias   Evidencia[]
+  notasFiscais NotaFiscal[]
+
   @@map("eventos")
 }
 
-/// Evidência fotográfica de um evento
+// Evidências (Fotos) - Galeria e Eventos
 model Evidencia {
-  id            String    @id @default(uuid())
-  eventoId      String    @map("evento_id")
-  url           String    /// URL externa (ToDo Friendly)
-  descricao     String?   /// Descrição opcional da foto
-  ordem         Int       @default(0) /// Ordem de exibição
-  dataUpload    DateTime  @default(now()) @map("data_upload")
-  criadoEm      DateTime  @default(now()) @map("criado_em")
+  id         String   @id @default(uuid())
+  url        String // URL pública do Cloudflare R2
+  motivo     String?
+  dataUpload DateTime @default(now())
 
   // Relacionamentos
-  evento        Evento    @relation(fields: [eventoId], references: [id], onDelete: Cascade)
+  eventoId String? // Se null, é uma "evidência avulsa" da galeria
+  evento   Evento? @relation(fields: [eventoId], references: [id], onDelete: Cascade)
 
-  @@index([eventoId])
+  userId String // Quem subiu a foto
+  user   User   @relation(fields: [userId], references: [id])
+
   @@map("evidencias")
 }
 
-/// Configurações do sistema
+// Notas Fiscais (XML e PDF)
+model NotaFiscal {
+  id         String   @id @default(uuid())
+  dataUpload DateTime @default(now())
+
+  // Arquivos (Links do R2)
+  pdfUrl     String?
+  xmlUrl     String?
+  xmlContent String? @db.Text // Conteúdo completo do XML para backup/leitura
+
+  // Metadados extraídos
+  numero           String?
+  serie            String?
+  emitente         String?
+  cnpjEmitente     String?
+  dataEmissao      DateTime? // Datetime para facilitar filtros
+  valorTotal       Decimal?  @db.Decimal(12, 2)
+  naturezaOperacao String?
+  chaveAcesso      String?
+  observacoes      String?
+
+  // Relacionamentos
+  uploadedById String
+  uploadedBy   User   @relation(fields: [uploadedById], references: [id])
+
+  eventoId String? // Pode vincular a uma perda específica
+  evento   Evento? @relation(fields: [eventoId], references: [id])
+
+  @@map("notas_fiscais")
+}
+
+// Configurações do Sistema (Singleton)
 model Configuracao {
-  id            String    @id @default(uuid())
-  chave         String    @unique
-  valor         String
-  descricao     String?
-  tipo          String    @default("string") /// string, number, boolean, json
-  criadoEm      DateTime  @default(now()) @map("criado_em")
-  atualizadoEm  DateTime  @updatedAt @map("atualizado_em")
+  id                         String  @id @default(uuid())
+  empresaNome                String  @default("Minha Empresa")
+  exigirFoto                 Boolean @default(false)
+  bloquearAprovados          Boolean @default(true)
+  limiteDiario               Decimal @default(1000.00) @db.Decimal(10, 2)
+  permitirFuncionarioGaleria Boolean @default(false)
+
+  // Vincula a configuração ao Dono (opcional, mas bom para multi-tenant futuro)
+  donoId String @unique
+  dono   User   @relation(fields: [donoId], references: [id])
 
   @@map("configuracoes")
 }
-
-/// Log de auditoria
-model AuditLog {
-  id            String    @id @default(uuid())
-  tabela        String    /// Nome da tabela afetada
-  registroId    String    @map("registro_id") /// ID do registro afetado
-  acao          String    /// CREATE, UPDATE, DELETE
-  dadosAntigos  Json?     @map("dados_antigos") /// Snapshot antes da alteração
-  dadosNovos    Json?     @map("dados_novos") /// Snapshot após a alteração
-  usuarioId     String?   @map("usuario_id") /// Quem executou a ação
-  ip            String?   /// IP do usuário
-  userAgent     String?   @map("user_agent")
-  criadoEm      DateTime  @default(now()) @map("criado_em")
-
-  @@index([tabela, registroId])
-  @@index([usuarioId])
-  @@index([criadoEm])
-  @@map("audit_logs")
-}
-
-// ============================================
-// VIEWS E ÍNDICES ADICIONAIS (Sugestões)
-// ============================================
-
-// Para relatórios de perdas por período:
-// CREATE INDEX idx_eventos_data_status ON eventos(data_hora, status);
-
-// Para busca full-text de itens:
-// CREATE INDEX idx_itens_nome_gin ON itens USING gin(to_tsvector('portuguese', nome));
-
-// View materializada para dashboard:
-// CREATE MATERIALIZED VIEW perdas_por_categoria AS
-// SELECT 
-//   c.nome as categoria,
-//   SUM(e.quantidade * e.custo_snapshot) as custo_total,
-//   SUM(e.quantidade * e.preco_venda_snapshot) as preco_venda_total,
-//   COUNT(*) as total_eventos
-// FROM eventos e
-// JOIN itens i ON e.item_id = i.id
-// JOIN categorias c ON i.categoria_id = c.id
-// WHERE e.status IN ('APROVADO', 'EXPORTADO')
-// GROUP BY c.nome;

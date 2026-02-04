@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { Upload, FileText, FileCode, X, CheckCircle, Plus } from "lucide-react";
+import { Upload, FileText, FileCode, X, CheckCircle } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import { NotaFiscal } from "@/lib/types";

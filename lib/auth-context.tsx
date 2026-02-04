@@ -1,8 +1,20 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+} from "react";
 import { User, NavItem } from "@/lib/types";
 import { StorageService } from "@/lib/storage";
+import {
+  loginAction,
+  logoutAction,
+  getClientSession,
+} from "@/app/actions/auth";
+import { useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   ClipboardCheck,
@@ -12,52 +24,38 @@ import {
   Settings,
   Tags,
   PlusCircle,
-  FileText, // Importado ícone para Notas
+  FileText,
 } from "lucide-react";
 import { toast } from "sonner";
 
-// Definição Granular das Permissões
+// --- DEFINIÇÃO DE PERMISSÕES (Mantida a sua original) ---
 type Permission =
-  // Dashboard
   | "dashboard:ver"
-
-  // Eventos (Perdas)
   | "eventos:ver_todos"
   | "eventos:criar"
   | "eventos:editar"
   | "eventos:excluir"
   | "eventos:aprovar"
   | "eventos:exportar"
-
-  // Catálogo (Itens)
   | "catalogo:ver"
   | "catalogo:criar"
   | "catalogo:importar"
   | "catalogo:editar"
   | "catalogo:status"
   | "catalogo:excluir"
-
-  // Categorias
   | "categorias:ver"
   | "categorias:criar"
   | "categorias:editar"
   | "categorias:excluir"
-
-  // Galeria
   | "galeria:ver"
   | "galeria:upload"
   | "galeria:excluir"
-
-  // Notas Fiscais (NOVO)
   | "notas:ver"
   | "notas:upload"
   | "notas:excluir"
-
-  // Outros
   | "relatorios:ver"
   | "configuracoes:ver";
 
-// Matriz de Permissões por Cargo
 const ROLE_PERMISSIONS: Record<string, Permission[]> = {
   dono: [
     "dashboard:ver",
@@ -80,9 +78,9 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "galeria:ver",
     "galeria:upload",
     "galeria:excluir",
-    "notas:ver", // NOVO
-    "notas:upload", // NOVO
-    "notas:excluir", // NOVO
+    "notas:ver",
+    "notas:upload",
+    "notas:excluir",
     "relatorios:ver",
     "configuracoes:ver",
   ],
@@ -107,9 +105,9 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "galeria:ver",
     "galeria:upload",
     "galeria:excluir",
-    "notas:ver", // NOVO
-    "notas:upload", // NOVO
-    "notas:excluir", // NOVO
+    "notas:ver",
+    "notas:upload",
+    "notas:excluir",
     "relatorios:ver",
   ],
   fiscal: [
@@ -127,9 +125,9 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "categorias:editar",
     "categorias:excluir",
     "galeria:ver",
-    "galeria:upload", // Fiscal pode subir foto
-    "notas:ver", // NOVO
-    "notas:upload", // NOVO
+    "galeria:upload",
+    "notas:ver",
+    "notas:upload",
     "relatorios:ver",
   ],
   funcionario: [
@@ -158,53 +156,67 @@ const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [settings, setSettings] = useState(StorageService.getSettings());
+  const [settings, setSettings] = useState(StorageService.getSettings()); // Mantendo settings locais por enquanto
+  const router = useRouter();
 
+  // Atualiza settings se o usuário mudar (compatibilidade)
   useEffect(() => {
     setSettings(StorageService.getSettings());
   }, [user]);
 
+  // --- NOVA LÓGICA: Verifica Sessão no Servidor ao Carregar ---
   useEffect(() => {
-    const checkAuth = () => {
-      const storedUserId = localStorage.getItem("losscontrol_active_user_id");
-      if (storedUserId) {
-        const allUsers = StorageService.getUsers();
-        const foundUser = allUsers.find((u) => u.id === storedUserId);
-        if (foundUser) {
-          setUser(foundUser);
-        } else {
-          localStorage.removeItem("losscontrol_active_user_id");
+    const checkAuth = async () => {
+      try {
+        const sessionUser = await getClientSession(); // Pergunta ao servidor: "Quem sou eu?"
+        if (sessionUser) {
+          setUser(sessionUser);
         }
+      } catch (error) {
+        console.error("Erro ao verificar sessão:", error);
+      } finally {
+        setIsLoading(false);
       }
-      setIsLoading(false);
     };
     checkAuth();
   }, []);
 
+  // --- NOVA LÓGICA: Login via Server Action ---
   const login = async (email: string, password?: string) => {
     setIsLoading(true);
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    const users = StorageService.getUsers();
-    const foundUser = users.find(
-      (u) => u.email.toLowerCase() === email.toLowerCase(),
-    );
+    try {
+      const result = await loginAction(email, password);
 
-    if (foundUser) {
-      setUser(foundUser);
-      localStorage.setItem("losscontrol_active_user_id", foundUser.id);
-      toast.success(`Bem-vindo, ${foundUser.nome.split(" ")[0]}!`);
-    } else {
-      toast.error("Usuário não encontrado.");
-      throw new Error("Credenciais inválidas");
+      if (result.success && result.user) {
+        // Converte o retorno para o tipo User esperado (garantia de tipagem)
+        const userData: User = {
+          id: result.user.id,
+          nome: result.user.nome,
+          email: result.user.email,
+          role: result.user.role as any, // Cast seguro pois os enums batem
+          avatarUrl: result.user.avatarUrl || undefined,
+        };
+
+        setUser(userData);
+        toast.success(`Bem-vindo, ${userData.nome.split(" ")[0]}!`);
+        router.push("/dashboard"); // Redireciona para o dashboard
+      } else {
+        toast.error(result.message || "Credenciais inválidas");
+      }
+    } catch (error) {
+      toast.error("Erro de conexão ao tentar entrar.");
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   };
 
-  const logout = () => {
+  // --- NOVA LÓGICA: Logout ---
+  const logout = async () => {
+    await logoutAction(); // Limpa cookie no servidor
     setUser(null);
-    localStorage.removeItem("losscontrol_active_user_id");
   };
 
+  // --- LÓGICA MANTIDA: Permissões ---
   const hasPermission = (permission: Permission): boolean => {
     if (!user) return false;
 
@@ -219,7 +231,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return permissions.includes(permission);
   };
 
-  const navItems = React.useMemo(() => {
+  // --- LÓGICA MANTIDA: Itens do Menu ---
+  const navItems = useMemo(() => {
     const items: NavItem[] = [];
 
     if (hasPermission("dashboard:ver")) {
@@ -258,7 +271,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       items.push({ title: "Galeria", href: "/galeria", icon: "Images" });
     }
 
-    // ITEM DE MENU DAS NOTAS FISCAIS
     if (hasPermission("notas:ver")) {
       items.push({ title: "Notas Fiscais", href: "/notas", icon: "FileText" });
     }
