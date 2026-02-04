@@ -1,19 +1,12 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
-import {
-  Upload,
-  FileText,
-  FileCode,
-  X,
-  CheckCircle,
-  Plus,
-  AlertCircle,
-} from "lucide-react";
+import { useState, useRef, useCallback } from "react";
+import { Upload, FileText, FileCode, X, CheckCircle, Plus } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import { toast } from "sonner";
 import { NotaFiscal } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import { parsePdfInvoice } from "@/lib/pdf-parser";
 
 interface UploadZoneProps {
   onFilesSelected: (
@@ -32,8 +25,9 @@ export function UploadZone({ onFilesSelected, isUploading }: UploadZoneProps) {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Função auxiliar para processar XML
-  const parseXmlFile = (file: File) => {
+  // --- PROCESSAMENTO DE XML ---
+  // Recebe o PDF atual como argumento para evitar estado desatualizado
+  const parseXmlFile = (file: File, currentPdf: File | null) => {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
@@ -41,7 +35,6 @@ export function UploadZone({ onFilesSelected, isUploading }: UploadZoneProps) {
         const parser = new DOMParser();
         const xmlDoc = parser.parseFromString(text, "text/xml");
 
-        // Tratamento de erro de parser básico
         if (xmlDoc.getElementsByTagName("parsererror").length > 0) {
           throw new Error("XML inválido");
         }
@@ -70,60 +63,96 @@ export function UploadZone({ onFilesSelected, isUploading }: UploadZoneProps) {
             ide?.getElementsByTagName("natOp")[0]?.textContent || "",
         };
 
-        setPreviewData(data);
-        // Importante: Passa o NOVO XML e o PDF ATUAL (se houver)
-        onFilesSelected(file, pdfFile, data);
+        setPreviewData((prev) => {
+          const newData = { ...prev, ...data };
+          // FIX: setTimeout evita o erro "Cannot update component while rendering"
+          setTimeout(() => onFilesSelected(file, currentPdf, newData), 0);
+          return newData;
+        });
+
         toast.success("XML processado com sucesso!");
       } catch (error) {
         console.error("Erro XML:", error);
-        toast.error("Erro ao ler XML. Verifique o arquivo.");
-        // Mesmo com erro, permite subir o arquivo (sem dados extraídos)
-        onFilesSelected(file, pdfFile, {});
+        toast.error("Erro ao ler XML.");
+        // Mesmo com erro, envia os arquivos
+        setTimeout(() => onFilesSelected(file, currentPdf, previewData), 0);
       }
     };
     reader.readAsText(file);
   };
 
+  // --- PROCESSAMENTO DE PDF ---
+  // Recebe o XML atual como argumento
+  const processPdfFile = async (file: File, currentXml: File | null) => {
+    try {
+      const pdfData = await parsePdfInvoice(file);
+
+      setPreviewData((prev) => {
+        const newData = { ...pdfData, ...prev }; // XML (prev) tem prioridade, mas PDF preenche lacunas
+
+        if (!prev.emitente && pdfData.emitente) {
+          toast.success("Dados extraídos do PDF!");
+        }
+
+        // FIX: setTimeout para evitar o erro do React
+        setTimeout(() => onFilesSelected(currentXml, file, newData), 0);
+        return newData;
+      });
+    } catch (error) {
+      console.error("Erro ao ler PDF:", error);
+      setTimeout(() => onFilesSelected(currentXml, file, previewData), 0);
+    }
+  };
+
+  // Processa múltiplos arquivos (Drag & Drop ou Input)
   const processFiles = useCallback(
     (files: FileList | File[]) => {
       let newXml = xmlFile;
       let newPdf = pdfFile;
-      let foundNew = false;
+      let hasXml = false;
+      let hasPdf = false;
 
+      // 1. Identificar arquivos novos
       Array.from(files).forEach((file) => {
         if (
           file.type === "text/xml" ||
           file.name.toLowerCase().endsWith(".xml")
         ) {
           newXml = file;
-          setXmlFile(file);
-          parseXmlFile(file);
-          foundNew = true;
+          hasXml = true;
         } else if (
           file.type === "application/pdf" ||
           file.name.toLowerCase().endsWith(".pdf")
         ) {
           newPdf = file;
-          setPdfFile(file);
-          foundNew = true;
+          hasPdf = true;
         }
       });
 
-      if (!foundNew) {
+      if (!hasXml && !hasPdf) {
         toast.error("Apenas arquivos XML e PDF são aceitos.");
         return;
       }
 
-      // Se só atualizou PDF (sem XML novo), notificamos aqui
-      // Se atualizou XML, o reader.onload cuida da notificação
-      if (newPdf !== pdfFile && newXml === xmlFile) {
-        onFilesSelected(newXml, newPdf, previewData);
-      }
-    },
-    [xmlFile, pdfFile, previewData, onFilesSelected],
-  );
+      // 2. Atualizar estado local
+      setXmlFile(newXml);
+      setPdfFile(newPdf);
 
-  // Resetar input para permitir selecionar o mesmo arquivo novamente
+      // 3. Processar arquivos passando o contexto correto (o outro arquivo)
+      if (hasXml && newXml) {
+        parseXmlFile(newXml, newPdf);
+      }
+
+      if (hasPdf && newPdf) {
+        processPdfFile(newPdf, newXml);
+      }
+
+      // Se trocou apenas um arquivo e não precisa processar (ex: trocou PDF mas falhou leitura)
+      // a função de processamento acima cuida da notificação ao pai.
+    },
+    [xmlFile, pdfFile],
+  ); // eslint-disable-line
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.length) {
       processFiles(e.target.files);
@@ -134,15 +163,17 @@ export function UploadZone({ onFilesSelected, isUploading }: UploadZoneProps) {
   const removeFile = (type: "xml" | "pdf") => {
     if (type === "xml") {
       setXmlFile(null);
-      setPreviewData({}); // Limpa dados extraídos pois o XML se foi
-      onFilesSelected(null, pdfFile, {});
+      setPreviewData((prev) => {
+        const newData = { ...prev, xmlContent: undefined };
+        setTimeout(() => onFilesSelected(null, pdfFile, newData), 0);
+        return newData;
+      });
     } else {
       setPdfFile(null);
-      onFilesSelected(xmlFile, null, previewData);
+      setTimeout(() => onFilesSelected(xmlFile, null, previewData), 0);
     }
   };
 
-  // Eventos Drag & Drop
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -159,7 +190,7 @@ export function UploadZone({ onFilesSelected, isUploading }: UploadZoneProps) {
 
   return (
     <div className="space-y-4 w-full">
-      {/* Área Principal de Upload (Só aparece se faltar algum arquivo ou ambos) */}
+      {/* Área Principal de Upload */}
       <div
         onClick={() => fileInputRef.current?.click()}
         onDragOver={handleDragOver}
@@ -167,7 +198,6 @@ export function UploadZone({ onFilesSelected, isUploading }: UploadZoneProps) {
         onDrop={handleDrop}
         className={cn(
           "relative flex flex-col items-center justify-center w-full rounded-xl border-2 border-dashed transition-all cursor-pointer",
-          // Altura dinâmica: se já tem arquivos, fica menor ("compacto") para adicionar o que falta
           xmlFile || pdfFile
             ? "min-h-20 p-4 bg-muted/20"
             : "min-h-45 p-6 bg-muted/5",
@@ -211,7 +241,7 @@ export function UploadZone({ onFilesSelected, isUploading }: UploadZoneProps) {
         </div>
       </div>
 
-      {/* Lista de Arquivos (Layout corrigido com truncate e flex-shrink) */}
+      {/* Lista de Arquivos */}
       {(xmlFile || pdfFile) && (
         <div className="grid gap-2">
           {xmlFile && (
@@ -250,7 +280,7 @@ export function UploadZone({ onFilesSelected, isUploading }: UploadZoneProps) {
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-medium truncate">{pdfFile.name}</p>
                   <p className="text-[10px] text-red-600/80 dark:text-red-400">
-                    PDF Anexado
+                    PDF Processado
                   </p>
                 </div>
               </div>
@@ -270,11 +300,12 @@ export function UploadZone({ onFilesSelected, isUploading }: UploadZoneProps) {
         </div>
       )}
 
-      {/* Preview Compacto (Layout responsivo) */}
+      {/* Preview Compacto */}
       {previewData.emitente && (
         <div className="rounded-lg border p-3 bg-card text-xs shadow-sm">
           <h4 className="font-semibold mb-2 flex items-center gap-2 text-muted-foreground uppercase tracking-wider text-[10px]">
-            <CheckCircle className="h-3 w-3 text-green-500" /> Dados do XML
+            <CheckCircle className="h-3 w-3 text-green-500" />
+            {xmlFile ? "Dados do XML" : "Dados do PDF"}
           </h4>
           <div className="space-y-1">
             <div className="flex justify-between">
@@ -296,6 +327,10 @@ export function UploadZone({ onFilesSelected, isUploading }: UploadZoneProps) {
                   ? new Date(previewData.dataEmissao).toLocaleDateString()
                   : "-"}
               </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Número:</span>
+              <span className="font-medium">{previewData.numero || "-"}</span>
             </div>
           </div>
         </div>
