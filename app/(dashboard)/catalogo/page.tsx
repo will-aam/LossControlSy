@@ -135,7 +135,7 @@ export default function CatalogoPage() {
         custo: Number(i.custo) || 0, // Garante que venha o custo se existir
         precoVenda: Number(i.precoVenda), // Usa o campo correto mapeado na action
         status: i.status as "ativo" | "inativo",
-        imagemUrl: i.fotoUrl, // Mapeia fotoUrl do banco para imagemUrl da interface
+        imagemUrl: i.imagemUrl, // O campo no banco se chama imagemUrl, não fotoUrl
       }));
       setItems(mappedItems);
     } else {

@@ -106,11 +106,17 @@ export function ItemFormDialog({
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Cria o preview
       const objectUrl = URL.createObjectURL(file);
       setPreviewUrl(objectUrl);
-      // Nota: Para upload real de imagem no futuro, precisaríamos enviar o arquivo para o R2
-      // Por enquanto, salvamos a URL do blob apenas para preview local ou URL externa
-      handleInputChange("imagemUrl", objectUrl);
+
+      // Converte para Base64 para salvar
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        handleInputChange("imagemUrl", base64String);
+      };
+      reader.readAsDataURL(file);
     }
   };
 
