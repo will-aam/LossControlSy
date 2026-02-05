@@ -8,8 +8,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
@@ -32,8 +30,6 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import {
-  Area,
-  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
@@ -46,18 +42,20 @@ import {
   LineChart,
 } from "recharts";
 import { formatCurrency } from "@/lib/utils";
-import { StorageService } from "@/lib/storage";
+// Actions
+import { getEventos } from "@/app/actions/eventos";
 import { useAuth } from "@/lib/auth-context";
 import {
   AlertTriangle,
-  Download,
   TrendingDown,
   Calendar,
   Package,
   DollarSign,
   BarChart3,
+  Loader2,
 } from "lucide-react";
 import { Evento, Item } from "@/lib/types";
+import { Badge } from "@/components/ui/badge";
 
 const chartConfig = {
   custo: {
@@ -89,13 +87,48 @@ export default function RelatoriosPage() {
   >("mes");
   const [selectedTab, setSelectedTab] = useState("visao-geral");
   const [eventos, setEventos] = useState<Evento[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Estado para controlar qual card está na frente (0 a 3)
   const [activeCardIndex, setActiveCardIndex] = useState(0);
 
   // Carregar dados reais
   useEffect(() => {
-    setEventos(StorageService.getEventos());
+    async function loadData() {
+      setIsLoading(true);
+      const result = await getEventos();
+      if (result.success && result.data) {
+        // Mapeamento necessário
+        const mappedEventos: Evento[] = (result.data as any[]).map((ev) => ({
+          id: ev.id,
+          dataHora: ev.dataHora,
+          motivo: ev.motivo,
+          status: ev.status,
+          quantidade: Number(ev.quantidade),
+          unidade: ev.unidade,
+          custoSnapshot: Number(ev.custoSnapshot),
+          precoVendaSnapshot: Number(ev.precoVendaSnapshot),
+          item: ev.item
+            ? {
+                id: ev.item.id,
+                nome: ev.item.nome,
+                codigoInterno: ev.item.codigoInterno,
+                categoria: ev.item.categoria?.nome || "Sem Categoria",
+                unidade: ev.item.unidade,
+                custo: Number(ev.item.custo),
+                precoVenda: Number(ev.item.precoVenda),
+                status: ev.item.status,
+                imagemUrl: ev.item.imagemUrl,
+              }
+            : undefined,
+          criadoPor: ev.criadoPor,
+          evidencias: ev.evidencias,
+        }));
+        setEventos(mappedEventos);
+      }
+      setIsLoading(false);
+    }
+    loadData();
   }, []);
 
   // Define a aba correta para mobile no carregamento inicial
@@ -219,7 +252,7 @@ export default function RelatoriosPage() {
 
     const catMap: Record<string, { custo: number; venda: number }> = {};
     validEventos.forEach((ev) => {
-      const cat = ev.item?.categoria || "Outros";
+      const cat = (ev.item?.categoria as any) || "Outros"; // Cast para string
       if (!catMap[cat]) catMap[cat] = { custo: 0, venda: 0 };
       catMap[cat].custo += (ev.custoSnapshot || 0) * ev.quantidade;
       catMap[cat].venda += (ev.precoVendaSnapshot || 0) * ev.quantidade;
@@ -317,6 +350,15 @@ export default function RelatoriosPage() {
         <p className="text-muted-foreground">
           Você não tem permissão para ver os relatórios.
         </p>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground">Carregando dados...</p>
       </div>
     );
   }
