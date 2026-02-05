@@ -5,8 +5,10 @@ import { Search, Package, X, Check, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Item } from "@/lib/mock-data";
-import { StorageService } from "@/lib/storage";
+// REMOVIDO: import { Item } from "@/lib/mock-data";
+import { Item } from "@/lib/types"; // Importa o tipo correto
+// REMOVIDO: import { StorageService } from "@/lib/storage";
+import { getItens } from "@/app/actions/catalogo"; // Importa a action do banco
 import { cn } from "@/lib/utils";
 
 // Função auxiliar para remover acentos
@@ -36,9 +38,32 @@ export function ItemSearch({
 
   const [allItems, setAllItems] = useState<Item[]>([]);
 
-  // Carrega itens UMA VEZ
+  // Carrega itens UMA VEZ ao montar (do Banco de Dados)
   useEffect(() => {
-    setAllItems(StorageService.getItems());
+    async function fetchItems() {
+      try {
+        const result = await getItens();
+        if (result.success && result.data) {
+          // Mapeia para garantir compatibilidade de tipos se necessário
+          const mappedItems: Item[] = (result.data as any[]).map((i) => ({
+            id: i.id,
+            nome: i.nome,
+            codigoInterno: i.codigoInterno || "",
+            codigoBarras: i.codigoBarras || "",
+            categoria: i.categoria?.nome || "",
+            unidade: i.unidade,
+            custo: Number(i.custo) || 0,
+            precoVenda: Number(i.precoVenda) || 0,
+            status: i.status,
+            imagemUrl: i.fotoUrl, // Importante: Mapear fotoUrl para imagemUrl
+          }));
+          setAllItems(mappedItems);
+        }
+      } catch (error) {
+        console.error("Erro ao carregar itens para busca:", error);
+      }
+    }
+    fetchItems();
   }, []);
 
   // Lógica de Debounce (espera usuário parar de digitar)
@@ -163,9 +188,9 @@ export function ItemSearch({
       {isOpen && inputValue.length > 0 && (
         <div className="absolute top-[calc(100%+4px)] left-0 right-0 z-50 rounded-md border bg-popover shadow-md overflow-hidden">
           {/* CORREÇÃO DO SCROLL:
-             - max-h-60: Limita altura (aprox 240px)
-             - overflow-y-auto: Habilita scroll nativo vertical
-             - overscroll-contain: Evita rolar a página inteira junto
+              - max-h-60: Limita altura (aprox 240px)
+              - overflow-y-auto: Habilita scroll nativo vertical
+              - overscroll-contain: Evita rolar a página inteira junto
           */}
           <div className="max-h-60 overflow-y-auto overscroll-contain py-1">
             {isLoading ? (

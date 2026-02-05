@@ -13,11 +13,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ItemSearch } from "@/components/forms/item-search";
-// Importações Corrigidas
-import { Item, Evento } from "@/lib/types";
+// Importações Corrigidas e Actions
+import { Item } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
-import { StorageService } from "@/lib/storage";
+import { StorageService } from "@/lib/storage"; // Mantido apenas para Settings por enquanto
+import { createEvento, CreateEventoData } from "@/app/actions/eventos";
+
 import {
   Plus,
   Trash2,
@@ -26,6 +28,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   ImageIcon,
+  Loader2,
 } from "lucide-react";
 import {
   Dialog,
@@ -49,7 +52,7 @@ interface ItemLancamento {
   tempId: string;
   item: Item;
   quantidade: number;
-  unidade: string; // Atualizado para string para aceitar qualquer unidade do Item
+  unidade: string;
   fotoUrl?: string;
 }
 
@@ -63,11 +66,12 @@ export default function NovoEventoPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  // Estado para a configuração de exigir foto
+  // Estado para a configuração de exigir foto (Ainda via Storage Local por enquanto)
   const [exigirFoto, setExigirFoto] = useState(false);
 
   // Carregar configurações ao iniciar
   useEffect(() => {
+    // TODO: Migrar Settings para o Banco na próxima etapa
     const settings = StorageService.getSettings();
     setExigirFoto(settings.exigirFoto);
   }, []);
@@ -95,7 +99,7 @@ export default function NovoEventoPage() {
     setSelectedItem(null);
     setQuantidade("");
 
-    toast.success("Item adicionado");
+    toast.success("Item adicionado à lista");
   };
 
   const handleRemoveItem = (tempId: string) => {
@@ -104,7 +108,7 @@ export default function NovoEventoPage() {
 
   const handleAddPhoto = (tempId: string) => {
     // Em um app real, aqui abriria o input de arquivo ou câmera
-    // Simulando uma URL de foto para teste (ou usar upload real se implementado)
+    // Simulando uma URL de foto para teste
     const mockPhoto =
       "https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=400";
 
@@ -134,42 +138,36 @@ export default function NovoEventoPage() {
 
     setIsSubmitting(true);
 
-    // Simula delay de rede
-    await new Promise((resolve) => setTimeout(resolve, 800));
-
     try {
-      // Cria e salva cada evento individualmente
-      itemsList.forEach((entry) => {
-        const novoEvento: Evento = {
-          id: Math.random().toString(36).substr(2, 9),
-          dataHora: new Date().toISOString(),
-          item: entry.item,
+      // Envia cada item como um evento separado para o Banco de Dados
+      // Usamos Promise.all para enviar tudo em paralelo e esperar terminar
+      const promises = itemsList.map(async (entry) => {
+        const payload: CreateEventoData = {
+          itemId: entry.item.id,
           quantidade: entry.quantidade,
-          unidade: entry.unidade,
-          custoSnapshot: entry.item.custo,
-          precoVendaSnapshot: entry.item.precoVenda,
-          motivo: "Perda Operacional",
-          status: "enviado",
-          criadoPor: user,
-          evidencias: entry.fotoUrl
-            ? [
-                {
-                  id: Math.random().toString(36).substr(2, 9),
-                  url: entry.fotoUrl,
-                  dataUpload: new Date().toISOString(),
-                },
-              ]
-            : [],
+          motivo: "Perda Operacional", // Poderia vir de um select no futuro
+          fotos: entry.fotoUrl ? [entry.fotoUrl] : [],
         };
-
-        StorageService.saveEvento(novoEvento);
+        return createEvento(payload);
       });
 
-      setIsSubmitting(false);
-      setShowSuccess(true);
+      const results = await Promise.all(promises);
+
+      // Verifica se algum deu erro
+      const errors = results.filter((r) => !r.success);
+
+      if (errors.length > 0) {
+        toast.error(
+          `Erro ao salvar ${errors.length} itens. Verifique o console.`,
+        );
+        console.error(errors);
+      } else {
+        setShowSuccess(true);
+      }
     } catch (error) {
       console.error(error);
-      toast.error("Erro ao salvar eventos");
+      toast.error("Erro crítico ao salvar eventos.");
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -177,6 +175,7 @@ export default function NovoEventoPage() {
   const handleSuccessClose = () => {
     setShowSuccess(false);
     setItemsList([]);
+    router.push("/eventos"); // Redireciona para a lista de eventos
   };
 
   if (!hasPermission("eventos:criar")) {
@@ -205,7 +204,7 @@ export default function NovoEventoPage() {
           <span className="text-xl font-bold text-primary">
             {formatCurrency(
               itemsList.reduce(
-                (acc, cur) => acc + cur.item.custo * cur.quantidade,
+                (acc, cur) => acc + (cur.item.custo || 0) * cur.quantidade,
                 0,
               ),
             )}
@@ -220,6 +219,7 @@ export default function NovoEventoPage() {
             Produto
           </label>
           <div className="h-10">
+            {/* Componente de Busca - Já está conectado ao banco se o catalogo estiver ok */}
             <ItemSearch
               onSelect={handleItemSelect}
               selectedItem={selectedItem}
@@ -296,7 +296,9 @@ export default function NovoEventoPage() {
                       </span>
                     </TableCell>
                     <TableCell className="text-right py-2 text-muted-foreground text-sm">
-                      {formatCurrency(entry.item.custo * entry.quantidade)}
+                      {formatCurrency(
+                        (entry.item.custo || 0) * entry.quantidade,
+                      )}
                     </TableCell>
                     <TableCell className="text-center py-2">
                       <Button
@@ -379,7 +381,9 @@ export default function NovoEventoPage() {
               className="px-8 font-semibold"
             >
               {isSubmitting ? (
-                "Salvando..."
+                <>
+                  <Loader2 className="mr-2 h-3 w-3 animate-spin" /> Salvando...
+                </>
               ) : (
                 <>
                   <Send className="mr-2 h-3 w-3" /> Finalizar
@@ -398,12 +402,12 @@ export default function NovoEventoPage() {
             </div>
             <DialogTitle className="text-center">Sucesso!</DialogTitle>
             <DialogDescription className="text-center text-xs">
-              As perdas foram registradas e enviadas para aprovação.
+              As perdas foram registradas no sistema.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="sm:justify-center">
             <Button onClick={handleSuccessClose} className="w-full" size="sm">
-              Ok, continuar
+              Ok, ver lista
             </Button>
           </DialogFooter>
         </DialogContent>
