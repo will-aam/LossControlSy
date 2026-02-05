@@ -1,7 +1,7 @@
+// app/(dashboard)/eventos/page.tsx
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,9 +53,8 @@ import {
 } from "@/components/ui/command";
 import { Evento, EventoStatus } from "@/lib/types";
 import { formatCurrency, formatDate, getStatusColor } from "@/lib/utils";
-import { StorageService } from "@/lib/storage"; // Mantido apenas para settings por enquanto
 import { useAuth } from "@/lib/auth-context";
-// Importações das Actions
+// Importações das Actions (Substituindo StorageService)
 import {
   getEventos,
   updateEventoStatus,
@@ -113,7 +112,7 @@ const hideScrollClass =
   "[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]";
 
 export default function EventosPage() {
-  const { hasPermission } = useAuth();
+  const { hasPermission, settings } = useAuth(); // Pegamos settings do contexto
 
   // Estados de Navegação e Filtro
   const [viewMode, setViewMode] = useState<ViewMode>("pastas");
@@ -133,17 +132,12 @@ export default function EventosPage() {
   const [eventosDoBanco, setEventosDoBanco] = useState<Evento[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Configurações de Segurança
-  const [settings, setSettings] = useState<any>({ bloquearAprovados: false });
-
   // Ações
   const [eventoToDelete, setEventoToDelete] = useState<string | null>(null);
 
   // Carregar dados
   useEffect(() => {
     loadData();
-    // Carrega settings do storage local (migração futura)
-    setSettings(StorageService.getSettings());
   }, []);
 
   const loadData = async () => {
@@ -151,10 +145,10 @@ export default function EventosPage() {
     const result = await getEventos();
 
     if (result.success && result.data) {
-      // Mapeamento para garantir compatibilidade com a interface Evento
+      // Mapeamento para garantir compatibilidade
       const mappedEventos: Evento[] = (result.data as any[]).map((ev) => ({
         id: ev.id,
-        dataHora: ev.dataHora, // Date ou string ISO
+        dataHora: ev.dataHora,
         motivo: ev.motivo,
         status: ev.status as EventoStatus,
         quantidade: Number(ev.quantidade),
@@ -207,7 +201,7 @@ export default function EventosPage() {
         const matches =
           (evento.item?.nome || "").toLowerCase().includes(s) ||
           (evento.item?.codigoInterno || "").toLowerCase().includes(s) ||
-          evento.criadoPor?.nome.toLowerCase().includes(s); // Seguro contra null
+          evento.criadoPor?.nome.toLowerCase().includes(s);
         if (!matches) return false;
       }
       // 3. Status
@@ -300,17 +294,11 @@ export default function EventosPage() {
   // Ações Conectadas ao Banco
   const handleStatusChange = async (eventoId: string, novoStatus: string) => {
     const statusTyped = novoStatus as EventoStatus;
-
-    // Chamada ao Backend
     const result = await updateEventoStatus(eventoId, statusTyped);
 
     if (result.success) {
       toast.success("Status atualizado");
-      loadData(); // Recarrega do banco para garantir sincronia
-
-      // Se estiver dentro de um lote, atualiza visualmente o lote selecionado
-      // (a recarga global pode fechar o lote se não tratarmos,
-      // mas como o loteSelecionado é estado local, ele persiste se os dados baterem)
+      loadData();
     } else {
       toast.error(result.message);
     }
@@ -318,20 +306,16 @@ export default function EventosPage() {
 
   const handleAprovarLoteInteiro = async () => {
     if (!loteSelecionado) return;
-
-    // Aprova um por um (Promise.all seria melhor no backend, mas vamos usar o que temos)
     const promises = loteSelecionado.eventos.map((ev) =>
       updateEventoStatus(ev.id, "aprovado"),
     );
-
     await Promise.all(promises);
-
     toast.success("Lote aprovado!");
     loadData();
-    setLoteSelecionado(null); // Volta para a lista de lotes
+    setLoteSelecionado(null);
   };
 
-  // --- FUNÇÃO DE EXPORTAÇÃO CSV (Mantida Local pois processa dados já carregados) ---
+  // --- FUNÇÃO DE EXPORTAÇÃO CSV ---
   const handleExportar = () => {
     if (!loteSelecionado) return;
 
@@ -367,7 +351,6 @@ export default function EventosPage() {
 
       const clean = (str: string | undefined) =>
         `"${(str || "").replace(/"/g, '""')}"`;
-
       const fmtNum = (num: number) => num.toFixed(2).replace(".", ",");
 
       return [
@@ -387,7 +370,6 @@ export default function EventosPage() {
     const csvContent = "\uFEFF" + headers.join(";") + "\n" + rows.join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
-
     const link = document.createElement("a");
     link.href = url;
     link.setAttribute(
@@ -397,7 +379,6 @@ export default function EventosPage() {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-
     toast.success("Arquivo CSV baixado com sucesso!");
   };
 
@@ -414,16 +395,13 @@ export default function EventosPage() {
         return;
       }
 
-      // Chamada ao Backend
       const result = await deleteEvento(eventoToDelete);
-
       if (result.success) {
         toast.success("Evento excluído");
         loadData();
       } else {
         toast.error(result.message);
       }
-
       setEventoToDelete(null);
     }
   };
@@ -547,10 +525,8 @@ export default function EventosPage() {
     </Popover>
   );
 
-  // RENDER DETALHE DO LOTE
   if (loteSelecionado) {
     const isLoteAprovado = loteSelecionado.status === "aprovado";
-
     return (
       <div
         className={`flex flex-col h-[calc(100vh-2rem)] space-y-4 ${hideScrollClass}`}
@@ -594,14 +570,10 @@ export default function EventosPage() {
                 className={
                   !isLoteAprovado ? "opacity-50 cursor-not-allowed" : ""
                 }
-                title={
-                  !isLoteAprovado ? "Aprove todos os itens para baixar" : ""
-                }
               >
                 <Download className="mr-2 h-4 w-4" /> Baixar CSV
               </Button>
             )}
-
             {loteSelecionado.status === "pendente" &&
               hasPermission("eventos:aprovar") && (
                 <Button
@@ -753,7 +725,6 @@ export default function EventosPage() {
     );
   }
 
-  // RENDER PÁGINA PRINCIPAL
   return (
     <div
       className={`flex flex-col h-[calc(100vh-2rem)] space-y-4 overflow-hidden ${hideScrollClass}`}
@@ -803,7 +774,6 @@ export default function EventosPage() {
         </div>
       </div>
 
-      {/* FILTROS */}
       <div className="flex flex-col md:flex-row gap-3 items-end shrink-0 bg-background z-10 py-1">
         <div className="flex-1 w-full">
           <span className="text-xs font-medium mb-1.5 block text-muted-foreground ml-1">
@@ -860,7 +830,6 @@ export default function EventosPage() {
         )}
       </div>
 
-      {/* CONTEÚDO */}
       <div className="flex-1 min-h-0 border rounded-md bg-card relative overflow-hidden shadow-sm">
         <div
           className={`absolute inset-0 overflow-y-auto ${hideScrollClass} p-2`}
@@ -940,7 +909,6 @@ export default function EventosPage() {
               )}
             </div>
           ) : (
-            // TABELA LISTA COMPLETA (MODO LISTA)
             <table className="w-full caption-bottom text-sm">
               <TableHeader className="sticky top-0 bg-card z-10 shadow-sm">
                 <TableRow>
@@ -1047,7 +1015,6 @@ export default function EventosPage() {
 
       <PaginationControls />
 
-      {/* Alerta de Exclusão */}
       <AlertDialog
         open={!!eventoToDelete}
         onOpenChange={(open) => !open && setEventoToDelete(null)}
