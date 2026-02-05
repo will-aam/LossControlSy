@@ -1,8 +1,12 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { compare } from "bcryptjs";
-import { createSession, deleteSession, getSession } from "@/lib/session";
+import {
+  createSession,
+  deleteSession,
+  getSession,
+  verifyPassword,
+} from "@/lib/session";
 import { redirect } from "next/navigation";
 import { User } from "@/lib/types";
 
@@ -20,8 +24,9 @@ export async function loginAction(email: string, password?: string) {
       return { success: false, message: "Usuário não encontrado." };
     }
 
-    // Verifica a senha criptografada
-    const isPasswordValid = await compare(password, user.passwordHash);
+    // Verifica a senha usando nossa função padronizada (SHA-256)
+    // Em vez de 'compare' do bcrypt, usamos 'verifyPassword' do nosso lib
+    const isPasswordValid = await verifyPassword(password, user.passwordHash);
 
     if (!isPasswordValid) {
       return { success: false, message: "Senha incorreta." };
@@ -49,13 +54,11 @@ export async function logoutAction() {
   redirect("/login");
 }
 
-// 3. Função para "Re-hidratar" o usuário ao recarregar a página
-// O cliente chama isso no useEffect para saber quem está logado pelo Cookie
+// 3. Função para "Re-hidratar" o usuário
 export async function getClientSession() {
   const session = await getSession();
   if (!session) return null;
 
-  // Retorna os dados do usuário para o Contexto
   return {
     id: session.id,
     nome: session.nome,
