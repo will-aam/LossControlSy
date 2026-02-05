@@ -35,13 +35,24 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-// Importações corrigidas para Types e Utils
+
+// Tipos e Utils
 import { Item } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
-import { parseItemsCSV } from "@/lib/csv-parser";
 import { useAuth } from "@/lib/auth-context";
+
+// Novos Actions e Componentes
+import {
+  getItens,
+  deleteItem,
+  toggleItemStatus,
+  createItem,
+  updateItem,
+  CreateItemData,
+} from "@/app/actions/catalogo";
+import { getCategorias } from "@/app/actions/categorias";
 import { ItemFormDialog } from "@/components/catalogo/item-form-dialog";
-import { StorageService } from "@/lib/storage";
+
 import {
   Search,
   Plus,
@@ -58,6 +69,7 @@ import {
   Grid3X3,
   Trash2,
   Power,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -68,24 +80,28 @@ const hideScrollClass =
 
 export default function CatalogoPage() {
   const { hasPermission } = useAuth();
+
+  // Estados de Dados
   const [items, setItems] = useState<Item[]>([]);
-
-  // Lista de categorias dinâmica
   const [categoriasList, setCategoriasList] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
+  // Estados de Filtro
   const [searchQuery, setSearchQuery] = useState("");
   const [categoriaFilter, setCategoriaFilter] = useState<string>("todas");
   const [statusFilter, setStatusFilter] = useState<
     "todos" | "ativo" | "inativo"
   >("ativo");
 
+  // Estados de Ação
   const [showNewItemDialog, setShowNewItemDialog] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
-
-  // Estado para controlar o ID do item a ser excluído
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
+  // Paginação
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Importação (Desativada temporariamente)
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -94,11 +110,39 @@ export default function CatalogoPage() {
     loadData();
   }, []);
 
-  const loadData = () => {
-    setItems(StorageService.getItems());
-    // Atualiza a lista de categorias do filtro baseada no Storage
-    const cats = StorageService.getCategorias().map((c) => c.nome);
-    if (cats.length > 0) setCategoriasList(cats);
+  const loadData = async () => {
+    setIsLoading(true);
+
+    // 1. Busca Categorias
+    const catResult = await getCategorias();
+    if (catResult.success && catResult.data) {
+      setCategoriasList(catResult.data.map((c: any) => c.nome));
+    }
+
+    // 2. Busca Itens
+    const itemResult = await getItens();
+    if (itemResult.success) {
+      // Mapeia os dados do Prisma para o tipo Item da interface
+      const mappedItems: Item[] = (itemResult.data as any[]).map((i) => ({
+        id: i.id,
+        nome: i.nome,
+        codigoBarras: i.codigoBarras || "",
+        // CORREÇÃO AQUI: Usar o código interno real vindo do banco
+        // Se por algum motivo vier vazio do banco (legado), usa string vazia, mas NÃO gera fake do ID
+        codigoInterno: i.codigoInterno || "",
+        categoria: i.categoria?.nome || "Sem Categoria",
+        unidade: i.unidade,
+        custo: Number(i.custo) || 0, // Garante que venha o custo se existir
+        precoVenda: Number(i.precoVenda), // Usa o campo correto mapeado na action
+        status: i.status as "ativo" | "inativo",
+        imagemUrl: i.fotoUrl, // Mapeia fotoUrl do banco para imagemUrl da interface
+      }));
+      setItems(mappedItems);
+    } else {
+      toast.error("Erro ao carregar itens do catálogo.");
+    }
+
+    setIsLoading(false);
   };
 
   const filteredItems = useMemo(() => {
@@ -144,80 +188,83 @@ export default function CatalogoPage() {
   const handleFileUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    setIsImporting(true);
-    try {
-      const newItems = await parseItemsCSV(file);
-      if (newItems.length > 0) {
-        // 1. Salva os Itens
-        newItems.forEach((item) => StorageService.saveItem(item));
-
-        // 2. Extrai e Salva as Categorias Novas automaticamente
-        const uniqueCategories = Array.from(
-          new Set(newItems.map((i) => i.categoria)),
-        );
-        StorageService.syncCategories(uniqueCategories);
-
-        // 3. Recarrega tudo
-        loadData();
-
-        toast.success(
-          `${newItems.length} itens importados e categorias sincronizadas!`,
-        );
-      } else {
-        toast.warning("Arquivo inválido ou vazio.");
-      }
-    } catch (error) {
-      console.error(error);
-      toast.error("Erro na importação.");
-    } finally {
-      setIsImporting(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  };
-
-  const handleSaveItem = (itemData: Partial<Item>) => {
-    if (editingItem) {
-      const updatedItem = { ...editingItem, ...itemData } as Item;
-      StorageService.saveItem(updatedItem);
-      if (updatedItem.categoria)
-        StorageService.syncCategories([updatedItem.categoria]);
-
-      loadData();
-      toast.success("Item atualizado!");
-    } else {
-      const newItem: Item = {
-        id: Math.random().toString(36).substr(2, 9),
-        ...itemData,
-      } as Item;
-      StorageService.saveItem(newItem);
-      if (newItem.categoria) StorageService.syncCategories([newItem.categoria]);
-
-      loadData();
-      toast.success("Item criado com sucesso!");
-    }
-  };
-
-  const handleToggleStatus = (item: Item) => {
-    const novoStatus = item.status === "ativo" ? "inativo" : "ativo";
-    const updatedItem = { ...item, status: novoStatus } as Item;
-    StorageService.saveItem(updatedItem);
-
-    // Atualiza a lista localmente para refletir na hora sem reload pesado
-    setItems((prev) => prev.map((i) => (i.id === item.id ? updatedItem : i)));
-
-    toast.success(
-      `Item ${novoStatus === "ativo" ? "ativado" : "desativado"} com sucesso.`,
+    // Importação via CSV será reimplementada no backend posteriormente
+    toast.info(
+      "Importação via CSV em manutenção para migração ao Banco de Dados.",
     );
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const confirmDelete = () => {
-    if (itemToDelete) {
-      StorageService.deleteItem(itemToDelete);
+  const handleSaveItem = async (itemData: Partial<Item>) => {
+    // Busca ID da categoria pelo nome
+    const catResult = await getCategorias();
+    const categoriaEncontrada = catResult.data?.find(
+      (c: any) => c.nome === itemData.categoria,
+    );
+
+    if (!categoriaEncontrada) {
+      toast.error("Categoria inválida. Selecione uma categoria existente.");
+      return;
+    }
+
+    const payload: CreateItemData = {
+      nome: itemData.nome || "",
+      codigoBarras: itemData.codigoBarras,
+      // Importante: Passar o código interno digitado
+      codigoInterno: itemData.codigoInterno,
+      unidade: itemData.unidade || "UN",
+      preco: itemData.precoVenda || 0,
+      custo: itemData.custo || 0,
+      categoriaId: categoriaEncontrada.id,
+      fotoUrl: itemData.imagemUrl,
+    };
+
+    if (editingItem) {
+      // Editar
+      const result = await updateItem(editingItem.id, payload);
+      if (result.success) {
+        toast.success("Item atualizado!");
+        loadData();
+      } else {
+        toast.error(result.message);
+      }
+    } else {
+      // Criar
+      const result = await createItem(payload);
+      if (result.success) {
+        toast.success("Item criado com sucesso!");
+        loadData();
+      } else {
+        toast.error(result.message);
+      }
+    }
+
+    setShowNewItemDialog(false);
+    setEditingItem(null);
+  };
+
+  const handleToggleStatus = async (item: Item) => {
+    const result = await toggleItemStatus(item.id);
+
+    if (result.success) {
+      toast.success(`Status do item alterado.`);
       loadData();
-      toast.success("Item removido com sucesso");
-      setItemToDelete(null);
+    } else {
+      toast.error(result.message);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (itemToDelete) {
+      const result = await deleteItem(itemToDelete);
+
+      if (result.success) {
+        toast.success("Item removido com sucesso");
+        setItemToDelete(null);
+        loadData();
+      } else {
+        toast.error(result.message);
+      }
     }
   };
 
@@ -244,7 +291,7 @@ export default function CatalogoPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          {/* BOTÃO IMPORTAR - Apenas quem tem permissão explícita (Não funcionário) */}
+          {/* BOTÃO IMPORTAR */}
           {hasPermission("catalogo:importar") && (
             <>
               <input
@@ -265,7 +312,7 @@ export default function CatalogoPage() {
             </>
           )}
 
-          {/* BOTÃO NOVO ITEM - Funcionário, Fiscal, Gestor, Dono */}
+          {/* BOTÃO NOVO ITEM */}
           {hasPermission("catalogo:criar") && (
             <Button onClick={() => setShowNewItemDialog(true)}>
               <Plus className="mr-2 h-4 w-4" /> Novo Item
@@ -376,8 +423,8 @@ export default function CatalogoPage() {
                 <TableHead className="bg-card">Código</TableHead>
                 <TableHead className="bg-card">Categoria</TableHead>
                 <TableHead className="bg-card">Unidade</TableHead>
-                <TableHead className="text-right bg-card">Custo</TableHead>
-                <TableHead className="text-right bg-card">Venda</TableHead>
+                {/* <TableHead className="text-right bg-card">Custo</TableHead> */}
+                <TableHead className="text-right bg-card">Preço</TableHead>
                 <TableHead className="w-25 text-center bg-card">
                   Status
                 </TableHead>
@@ -385,7 +432,16 @@ export default function CatalogoPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedItems.length > 0 ? (
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="h-32 text-center">
+                    <div className="flex justify-center items-center gap-2 text-muted-foreground">
+                      <Loader2 className="h-6 w-6 animate-spin" /> Carregando
+                      itens...
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : paginatedItems.length > 0 ? (
                 paginatedItems.map((item) => (
                   <TableRow
                     key={item.id}
@@ -398,6 +454,7 @@ export default function CatalogoPage() {
                             <img
                               src={item.imagemUrl}
                               className="h-full w-full object-cover"
+                              alt={item.nome}
                             />
                           ) : (
                             <Package className="h-4 w-4 text-muted-foreground" />
@@ -416,6 +473,7 @@ export default function CatalogoPage() {
                         </div>
                       </div>
                     </TableCell>
+                    {/* Exibe o código interno real */}
                     <TableCell className="py-2 font-mono text-xs">
                       {item.codigoInterno}
                     </TableCell>
@@ -425,9 +483,9 @@ export default function CatalogoPage() {
                     <TableCell className="py-2 text-xs">
                       {item.unidade}
                     </TableCell>
-                    <TableCell className="py-2 text-right text-xs text-muted-foreground">
+                    {/* <TableCell className="py-2 text-right text-xs text-muted-foreground">
                       {formatCurrency(item.custo)}
-                    </TableCell>
+                    </TableCell> */}
                     <TableCell className="py-2 text-right text-sm font-medium">
                       {formatCurrency(item.precoVenda)}
                     </TableCell>
@@ -453,7 +511,6 @@ export default function CatalogoPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          {/* AÇÃO DE EDITAR - Apenas quem tem permissão completa */}
                           {hasPermission("catalogo:editar") && (
                             <DropdownMenuItem
                               onClick={() => setEditingItem(item)}
@@ -462,7 +519,6 @@ export default function CatalogoPage() {
                             </DropdownMenuItem>
                           )}
 
-                          {/* AÇÃO DE ATIVAR/DESATIVAR - Para Funcionário e todos */}
                           {hasPermission("catalogo:status") && (
                             <DropdownMenuItem
                               onClick={() => handleToggleStatus(item)}
@@ -472,7 +528,6 @@ export default function CatalogoPage() {
                             </DropdownMenuItem>
                           )}
 
-                          {/* AÇÃO DE EXCLUIR - Restrita */}
                           {hasPermission("catalogo:excluir") && (
                             <>
                               <DropdownMenuSeparator />

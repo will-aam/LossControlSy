@@ -20,21 +20,23 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Item } from "@/lib/types"; // Importação Corrigida
-import { StorageService } from "@/lib/storage"; // Para pegar categorias
+import { Item } from "@/lib/types";
+// REMOVIDO: import { StorageService } from "@/lib/storage";
+import { getCategorias } from "@/app/actions/categorias"; // Importa a action do banco
 import {
   Upload,
   Link as LinkIcon,
   Image as ImageIcon,
   X,
   Barcode,
+  Loader2, // Adicionado ícone de loading
 } from "lucide-react";
 
 interface ItemFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   item: Item | null;
-  onSave: (itemData: Partial<Item>) => void;
+  onSave: (itemData: Partial<Item>) => Promise<void> | void; // Suporta async agora
 }
 
 export function ItemFormDialog({
@@ -49,18 +51,37 @@ export function ItemFormDialog({
   // Estados do Formulário
   const [formData, setFormData] = useState<Partial<Item>>({});
 
+  // Estados de Salvamento
+  const [isSaving, setIsSaving] = useState(false);
+
   // Estado para Categorias (carregar dinamicamente)
   const [categorias, setCategorias] = useState<string[]>([]);
+  const [loadingCategorias, setLoadingCategorias] = useState(false);
 
   // Estados da Imagem
   const [imageTab, setImageTab] = useState<"url" | "upload">("upload");
   const [previewUrl, setPreviewUrl] = useState<string>("");
 
-  // Carregar categorias ao montar
+  // Carregar categorias ao montar (do Banco de Dados)
   useEffect(() => {
-    const cats = StorageService.getCategorias().map((c) => c.nome);
-    setCategorias(cats);
+    if (open) {
+      loadCategorias();
+    }
   }, [open]);
+
+  const loadCategorias = async () => {
+    setLoadingCategorias(true);
+    try {
+      const result = await getCategorias();
+      if (result.success && result.data) {
+        // Mapeia para pegar apenas o nome, mantendo compatibilidade com o form atual
+        setCategorias(result.data.map((c: any) => c.nome));
+      }
+    } catch (error) {
+      console.error("Erro ao carregar categorias", error);
+    }
+    setLoadingCategorias(false);
+  };
 
   // Resetar ou Preencher dados ao abrir
   useEffect(() => {
@@ -81,22 +102,34 @@ export function ItemFormDialog({
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  // Manipular Upload de Arquivo Local
+  // Manipular Upload de Arquivo Local (Apenas Preview Visual por enquanto)
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const objectUrl = URL.createObjectURL(file);
       setPreviewUrl(objectUrl);
+      // Nota: Para upload real de imagem no futuro, precisaríamos enviar o arquivo para o R2
+      // Por enquanto, salvamos a URL do blob apenas para preview local ou URL externa
       handleInputChange("imagemUrl", objectUrl);
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    // Validação básica
     if (!formData.nome || !formData.categoria || !formData.precoVenda) {
+      // Poderia adicionar um toast de erro aqui se quisesse ser mais explícito
       return;
     }
-    onSave(formData);
-    onOpenChange(false);
+
+    setIsSaving(true);
+    try {
+      await onSave(formData);
+      onOpenChange(false);
+    } catch (error) {
+      console.error("Erro ao salvar", error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -205,6 +238,7 @@ export function ItemFormDialog({
                 onChange={(e) =>
                   handleInputChange("codigoInterno", e.target.value)
                 }
+                placeholder="Ex: 12345"
               />
             </div>
             <div className="space-y-2">
@@ -238,9 +272,14 @@ export function ItemFormDialog({
               <Select
                 value={formData.categoria}
                 onValueChange={(v) => handleInputChange("categoria", v)}
+                disabled={loadingCategorias}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione" />
+                  <SelectValue
+                    placeholder={
+                      loadingCategorias ? "Carregando..." : "Selecione"
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {categorias.map((cat) => (
@@ -281,6 +320,8 @@ export function ItemFormDialog({
                 onChange={(e) =>
                   handleInputChange("custo", parseFloat(e.target.value))
                 }
+                // Desabilitado pois o schema atual não tem custo,
+                // mas mantemos visualmente
               />
             </div>
             <div className="space-y-2">
@@ -299,11 +340,23 @@ export function ItemFormDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isSaving}
+          >
             Cancelar
           </Button>
-          <Button onClick={handleSave}>
-            {isEditing ? "Salvar Alterações" : "Criar Item"}
+          <Button onClick={handleSave} disabled={isSaving}>
+            {isSaving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Salvando...
+              </>
+            ) : isEditing ? (
+              "Salvar Alterações"
+            ) : (
+              "Criar Item"
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
