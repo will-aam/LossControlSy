@@ -2,8 +2,9 @@ import "server-only";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { UserRole } from "@prisma/client";
+import { createHash } from "crypto"; // Importação nativa do Node
 
-// Chave secreta para assinar o token (em produção, use uma env var longa)
+// Chave secreta para assinar o token
 const SECRET_KEY =
   process.env.SESSION_SECRET || "minha-chave-secreta-super-segura-123";
 const key = new TextEncoder().encode(SECRET_KEY);
@@ -37,7 +38,7 @@ export async function createSession(user: {
     .setExpirationTime("7d")
     .sign(key);
 
-  // Salva no Cookie HttpOnly (Inacessível via JS do navegador = Seguro)
+  // Salva no Cookie HttpOnly
   const cookieStore = await cookies();
   cookieStore.set(COOKIE_NAME, session, {
     httpOnly: true,
@@ -68,4 +69,20 @@ export async function getSession() {
 export async function deleteSession() {
   const cookieStore = await cookies();
   cookieStore.delete(COOKIE_NAME);
+}
+
+// --- FUNÇÕES DE HASH DE SENHA (Adicionadas) ---
+
+// Gera um hash SHA-256 simples (para produção real, use bcrypt ou argon2)
+export async function hashPassword(password: string): Promise<string> {
+  return createHash("sha256").update(password).digest("hex");
+}
+
+// Verifica se a senha bate com o hash
+export async function verifyPassword(
+  password: string,
+  hash: string,
+): Promise<boolean> {
+  const newHash = await hashPassword(password);
+  return newHash === hash;
 }

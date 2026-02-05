@@ -34,12 +34,20 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-// Importações corrigidas
+// Importações
 import { User, UserRole } from "@/lib/types";
 import { getRoleLabel } from "@/lib/utils";
-import { StorageService, AppSettings } from "@/lib/storage";
 import { useAuth } from "@/lib/auth-context";
 import { UserFormDialog } from "@/components/configuracoes/user-form-dialog";
+// ACTIONS
+import {
+  getSettings,
+  saveSettings,
+  getUsers,
+  saveUser,
+  deleteUser,
+} from "@/app/actions/configuracoes";
+
 import {
   AlertTriangle,
   Building2,
@@ -49,6 +57,7 @@ import {
   Edit,
   Trash2,
   Plus,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -64,13 +73,14 @@ export default function ConfiguracoesPage() {
 
   // Estados de Dados
   const [users, setUsers] = useState<User[]>([]);
-  const [settings, setSettings] = useState<AppSettings>({
+  const [settings, setSettings] = useState<any>({
     empresaNome: "",
     exigirFoto: false,
     bloquearAprovados: true,
     limiteDiario: 1000,
-    permitirFuncionarioGaleria: false, // Inicializa com false (será sobrescrito pelo loadData)
+    permitirFuncionarioGaleria: false,
   });
+  const [isLoading, setIsLoading] = useState(true);
 
   // Estados de Modais
   const [showUserDialog, setShowUserDialog] = useState(false);
@@ -82,28 +92,52 @@ export default function ConfiguracoesPage() {
     loadData();
   }, []);
 
-  const loadData = () => {
-    setUsers(StorageService.getUsers());
-    setSettings(StorageService.getSettings());
+  const loadData = async () => {
+    setIsLoading(true);
+
+    // Carrega Users
+    const usersResult = await getUsers();
+    if (usersResult.success && usersResult.data) {
+      setUsers(usersResult.data as User[]);
+    }
+
+    // Carrega Configs
+    const settingsResult = await getSettings();
+    if (settingsResult.success && settingsResult.data) {
+      setSettings(settingsResult.data);
+    }
+
+    setIsLoading(false);
   };
 
   // --- AÇÕES DE CONFIGURAÇÃO GERAL ---
-  const handleSaveSettings = () => {
-    StorageService.saveSettings(settings);
-    // Força um reload suave ou notifica contexto se necessário, mas o toast já avisa
-    toast.success("Configurações salvas com sucesso!");
-    // O AuthContext vai pegar a mudança na próxima renderização/navegação
-    // ou podemos forçar reload da página se for crítico, mas aqui é SPA
+  const handleSaveSettings = async () => {
+    const result = await saveSettings(settings);
+    if (result.success) {
+      toast.success("Configurações salvas com sucesso!");
+      // O ideal aqui seria atualizar o contexto se ele usasse configs do banco em tempo real,
+      // mas por enquanto o reload de página garante a atualização.
+    } else {
+      toast.error(result.message);
+    }
   };
 
   // --- AÇÕES DE USUÁRIOS ---
-  const handleSaveUser = (user: User) => {
-    StorageService.saveUser(user);
-    loadData();
-    toast.success(
-      userToEdit ? "Usuário atualizado!" : "Usuário criado com sucesso!",
-    );
-    setUserToEdit(null);
+  const handleSaveUser = async (
+    userData: Partial<User> & { password?: string },
+  ) => {
+    const result = await saveUser(userData);
+
+    if (result.success) {
+      toast.success(
+        userToEdit ? "Usuário atualizado!" : "Usuário criado com sucesso!",
+      );
+      loadData();
+      setShowUserDialog(false);
+      setUserToEdit(null);
+    } else {
+      toast.error(result.message);
+    }
   };
 
   const handleEditUser = (user: User) => {
@@ -111,18 +145,22 @@ export default function ConfiguracoesPage() {
     setShowUserDialog(true);
   };
 
-  const handleDeleteUser = () => {
+  const handleDeleteUser = async () => {
     if (userToDelete) {
-      // Impede excluir a si mesmo
       if (userToDelete === currentUser?.id) {
         toast.error("Você não pode excluir sua própria conta.");
         setUserToDelete(null);
         return;
       }
 
-      StorageService.deleteUser(userToDelete);
-      loadData();
-      toast.success("Usuário removido.");
+      const result = await deleteUser(userToDelete);
+
+      if (result.success) {
+        toast.success("Usuário removido.");
+        loadData();
+      } else {
+        toast.error(result.message);
+      }
       setUserToDelete(null);
     }
   };
@@ -169,26 +207,39 @@ export default function ConfiguracoesPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="empresa">Nome da Empresa</Label>
-                  <Input
-                    id="empresa"
-                    value={settings.empresaNome}
-                    onChange={(e) =>
-                      setSettings({ ...settings, empresaNome: e.target.value })
-                    }
-                    placeholder="Supermercado Exemplo Ltda"
-                  />
+              {isLoading ? (
+                <div className="py-4 flex justify-center">
+                  <Loader2 className="animate-spin h-6 w-6" />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cnpj">CNPJ (Opcional)</Label>
-                  <Input id="cnpj" placeholder="00.000.000/0000-00" />
-                </div>
-              </div>
-              <div className="flex justify-end">
-                <Button onClick={handleSaveSettings}>Salvar Alterações</Button>
-              </div>
+              ) : (
+                <>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="empresa">Nome da Empresa</Label>
+                      <Input
+                        id="empresa"
+                        value={settings.empresaNome}
+                        onChange={(e) =>
+                          setSettings({
+                            ...settings,
+                            empresaNome: e.target.value,
+                          })
+                        }
+                        placeholder="Supermercado Exemplo Ltda"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="cnpj">CNPJ (Opcional)</Label>
+                      <Input id="cnpj" placeholder="00.000.000/0000-00" />
+                    </div>
+                  </div>
+                  <div className="flex justify-end">
+                    <Button onClick={handleSaveSettings}>
+                      Salvar Alterações
+                    </Button>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -237,7 +288,7 @@ export default function ConfiguracoesPage() {
               </div>
               <Separator />
 
-              {/* Regra 3: Acesso Galeria Funcionário (NOVO) */}
+              {/* Regra 3: Acesso Galeria Funcionário */}
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2">
