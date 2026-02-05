@@ -23,17 +23,22 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-// Importações corrigidas
-import { Evidencia, Evento } from "@/lib/types";
+// Importações
+import { Evidencia } from "@/lib/types";
 import {
   formatDate,
   formatDateTime,
   getStatusLabel,
   getStatusColor,
 } from "@/lib/utils";
-import { StorageService } from "@/lib/storage";
 import { useAuth } from "@/lib/auth-context";
 import { UploadDialog } from "@/components/galeria/upload-dialog";
+import {
+  getEvidencias,
+  createEvidenciaAvulsa,
+  deleteEvidencia,
+} from "@/app/actions/galeria";
+
 import {
   Search,
   Calendar,
@@ -41,12 +46,12 @@ import {
   ZoomIn,
   ChevronLeft,
   ChevronRight,
-  Package,
   X,
   Plus,
   Trash2,
   Camera,
   MoreVertical,
+  Loader2,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -56,9 +61,25 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 
-// Interface estendida para exibição
-interface EvidenciaDisplay extends Evidencia {
-  evento?: Evento;
+// Interface ajustada para aceitar dados parciais do banco sem reclamar
+interface EvidenciaDisplay {
+  id: string;
+  url: string;
+  dataUpload: string;
+  motivo?: string;
+  itemId?: string;
+  user?: { nome: string };
+  evento?: {
+    id: string;
+    status: string;
+    quantidade: number;
+    unidade: string;
+    motivo?: string;
+    item?: {
+      nome: string;
+      codigoInterno: string;
+    };
+  };
 }
 
 export default function GaleriaPage() {
@@ -66,13 +87,18 @@ export default function GaleriaPage() {
 
   // Dados
   const [evidencias, setEvidencias] = useState<EvidenciaDisplay[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Filtros e Seleção
   const [selectedDate, setSelectedDate] = useState<string>("todas");
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Controle do Modal de Visualização
   const [selectedPhoto, setSelectedPhoto] = useState<EvidenciaDisplay | null>(
     null,
   );
+  const [isViewerOpen, setIsViewerOpen] = useState(false);
+
   const [photoIndex, setPhotoIndex] = useState(0);
 
   // Modais e Upload
@@ -87,52 +113,89 @@ export default function GaleriaPage() {
     loadData();
   }, []);
 
-  const loadData = () => {
-    const allData = StorageService.getAllEvidencias();
-    setEvidencias(allData);
+  const loadData = async () => {
+    setIsLoading(true);
+    const result = await getEvidencias();
+
+    if (result.success && result.data) {
+      // Mapeamento com tipagem flexível para evitar erro de Evento incompleto
+      const mappedData: EvidenciaDisplay[] = (result.data as any[]).map(
+        (ev) => ({
+          id: ev.id,
+          url: ev.url,
+          dataUpload: ev.dataUpload,
+          motivo: ev.motivo,
+          itemId: ev.evento?.itemId,
+          user: ev.user,
+          evento: ev.evento
+            ? {
+                id: ev.evento.id,
+                status: ev.evento.status,
+                quantidade: Number(ev.evento.quantidade),
+                unidade: ev.evento.unidade,
+                motivo: ev.evento.motivo,
+                item: ev.evento.item
+                  ? {
+                      nome: ev.evento.item.nome,
+                      codigoInterno: ev.evento.item.codigoInterno,
+                    }
+                  : undefined,
+              }
+            : undefined,
+        }),
+      );
+      setEvidencias(mappedData);
+    } else {
+      toast.error("Erro ao carregar galeria.");
+    }
+    setIsLoading(false);
   };
 
   // --- AÇÕES DE UPLOAD ---
 
-  // 1. Upload Rápido (Apenas seleciona e salva com data)
   const handleQuickUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const url = URL.createObjectURL(file); // Em prod, usaria upload real
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64String = reader.result as string;
 
-      const novaEvidencia: Evidencia = {
-        id: Math.random().toString(36).substr(2, 9),
-        url: url,
-        dataUpload: new Date().toISOString(),
-        motivo: "Upload Rápido",
-        // Sem item vinculado
+        const result = await createEvidenciaAvulsa({
+          url: base64String,
+          motivo: "Upload Rápido",
+        });
+
+        if (result.success) {
+          toast.success("Foto adicionada à galeria");
+          loadData();
+        } else {
+          toast.error("Erro ao salvar foto.");
+        }
       };
-
-      StorageService.saveEvidenciaAvulsa(novaEvidencia);
-      loadData();
-      toast.success("Foto adicionada à galeria");
+      reader.readAsDataURL(file);
     }
-    // Limpa input
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  // 2. Upload Detalhado (Vem do Modal)
-  const handleDetailedSave = (data: Partial<Evidencia>) => {
-    const novaEvidencia: Evidencia = {
-      id: Math.random().toString(36).substr(2, 9),
-      url: data.url || "",
-      dataUpload: data.dataUpload || new Date().toISOString(),
-      motivo: data.motivo,
-      itemId: data.itemId,
-    };
+  const handleDetailedSave = async (data: Partial<Evidencia>) => {
+    if (!data.url) return;
 
-    StorageService.saveEvidenciaAvulsa(novaEvidencia);
-    loadData();
-    toast.success("Foto registrada com detalhes!");
+    const result = await createEvidenciaAvulsa({
+      url: data.url,
+      motivo: data.motivo,
+    });
+
+    if (result.success) {
+      toast.success("Foto registrada com detalhes!");
+      loadData();
+      setShowUploadDialog(false);
+    } else {
+      toast.error("Erro ao salvar.");
+    }
   };
 
   // --- AÇÃO DE EXCLUSÃO ---
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!photoToDelete) return;
 
     if (photoToDelete.evento) {
@@ -140,10 +203,19 @@ export default function GaleriaPage() {
         "Não é possível excluir fotos vinculadas a eventos auditados aqui.",
       );
     } else {
-      StorageService.deleteEvidenciaAvulsa(photoToDelete.id);
-      loadData();
-      toast.success("Foto removida.");
-      if (selectedPhoto?.id === photoToDelete.id) setSelectedPhoto(null);
+      const result = await deleteEvidencia(photoToDelete.id);
+
+      if (result.success) {
+        toast.success("Foto removida.");
+        loadData();
+        // Se apagou a foto que estava aberta no viewer, fecha o viewer
+        if (selectedPhoto?.id === photoToDelete.id) {
+          setIsViewerOpen(false);
+          setSelectedPhoto(null);
+        }
+      } else {
+        toast.error(result.message);
+      }
     }
     setPhotoToDelete(null);
   };
@@ -190,6 +262,7 @@ export default function GaleriaPage() {
   const handlePhotoClick = (photo: EvidenciaDisplay, index: number) => {
     setSelectedPhoto(photo);
     setPhotoIndex(index);
+    setIsViewerOpen(true);
   };
 
   const handlePrevPhoto = () => {
@@ -229,7 +302,6 @@ export default function GaleriaPage() {
         {/* BOTÕES DE UPLOAD (Protegidos por permissão) */}
         {hasPermission("galeria:upload") && (
           <div className="flex gap-2">
-            {/* Input Oculto para Upload Rápido */}
             <input
               type="file"
               accept="image/*"
@@ -282,7 +354,11 @@ export default function GaleriaPage() {
       </div>
 
       {/* Grid de Fotos */}
-      {filteredEvidencias.length > 0 ? (
+      {isLoading ? (
+        <div className="flex justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : filteredEvidencias.length > 0 ? (
         <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 pb-10">
           {filteredEvidencias.map((evidencia, index) => (
             <Card
@@ -310,33 +386,39 @@ export default function GaleriaPage() {
                 </div>
 
                 {/* Ícone de Zoom */}
-                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <div className="h-6 w-6 rounded-full bg-transparent hover:bg-black/70 p-1.5  text-white">
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                  <div className="h-6 w-6 rounded-full bg-transparent p-1.5 text-white">
                     <ZoomIn className="h-3 w-3" />
                   </div>
                 </div>
               </CardContent>
 
-              {/* Botão de Menu/Excluir (Protegido por Permissão) */}
+              {/* Botão de Menu/Excluir (ABSOLUTAMENTE ACIMA DE TUDO) */}
+              {/* Só mostra se NÃO for evento e tiver permissão */}
               {!evidencia.evento && hasPermission("galeria:excluir") && (
                 <div
-                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10"
-                  onClick={(e) => e.stopPropagation()}
+                  className="absolute top-2 right-2 z-20"
+                  onClick={(e) => {
+                    e.stopPropagation(); // Impede abrir o viewer ao clicar no menu
+                  }}
                 >
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="h-6 w-6 rounded-full bg-transparent hover:bg-black/70 text-white"
+                        className="h-8 w-8 rounded-full bg-black/40 hover:bg-black/60 text-white"
                       >
-                        <MoreVertical className="h-3 w-3" />
+                        <MoreVertical className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem
                         className="text-destructive focus:text-destructive text-xs"
-                        onClick={() => setPhotoToDelete(evidencia)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPhotoToDelete(evidencia);
+                        }}
                       >
                         <Trash2 className="mr-2 h-3 w-3" /> Excluir Foto
                       </DropdownMenuItem>
@@ -361,10 +443,7 @@ export default function GaleriaPage() {
       )}
 
       {/* Modal Visualizador */}
-      <Dialog
-        open={!!selectedPhoto}
-        onOpenChange={(open) => !open && setSelectedPhoto(null)}
-      >
+      <Dialog open={isViewerOpen} onOpenChange={setIsViewerOpen}>
         <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden bg-black/95 border-none [&>button]:hidden">
           <DialogTitle className="sr-only">
             Visualizar Evidência:{" "}
@@ -386,7 +465,7 @@ export default function GaleriaPage() {
                 variant="ghost"
                 size="icon"
                 className="rounded-full text-white hover:bg-white/20"
-                onClick={() => setSelectedPhoto(null)}
+                onClick={() => setIsViewerOpen(false)}
               >
                 <X className="h-5 w-5" />
               </Button>
@@ -442,9 +521,11 @@ export default function GaleriaPage() {
                         {selectedPhoto.evento.item?.codigoInterno}
                       </Badge>
                       <Badge
-                        className={getStatusColor(selectedPhoto.evento.status)}
+                        className={getStatusColor(
+                          selectedPhoto.evento.status as any,
+                        )}
                       >
-                        {getStatusLabel(selectedPhoto.evento.status)}
+                        {getStatusLabel(selectedPhoto.evento.status as any)}
                       </Badge>
                     </div>
                     <p className="text-sm">
@@ -472,14 +553,14 @@ export default function GaleriaPage() {
                   </div>
                 )}
 
-                {/* Botão de Excluir no Viewer (apenas avulsas e com permissão) */}
+                {/* Botão de Excluir no Viewer */}
                 {!selectedPhoto?.evento && hasPermission("galeria:excluir") && (
                   <Button
                     variant="destructive"
                     size="sm"
                     onClick={() => {
                       setPhotoToDelete(selectedPhoto);
-                      setSelectedPhoto(null);
+                      // Não fecha o viewer agora, espera confirmação
                     }}
                   >
                     <Trash2 className="mr-2 h-4 w-4" /> Excluir

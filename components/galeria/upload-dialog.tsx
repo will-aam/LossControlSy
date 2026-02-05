@@ -12,27 +12,25 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Upload, X, Image as ImageIcon, Loader2 } from "lucide-react";
+import { Upload, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { Evidencia, User } from "@/lib/types";
-import { StorageService } from "@/lib/storage";
-import { getPresignedUploadUrl } from "@/app/actions/storage";
-import imageCompression from "browser-image-compression";
+import { Evidencia } from "@/lib/types";
+// REMOVIDO: import { StorageService } from "@/lib/storage";
+// REMOVIDO: import { getPresignedUploadUrl } from "@/app/actions/storage";
+// REMOVIDO: import imageCompression from "browser-image-compression";
 
 interface UploadDialogProps {
-  children: React.ReactNode;
-  user: User | null;
-  onUploadSuccess: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (data: Partial<Evidencia>) => Promise<void>; // Agora é assíncrono
 }
 
 export function UploadDialog({
-  children,
-  user,
-  onUploadSuccess,
+  open,
+  onOpenChange,
+  onSave,
 }: UploadDialogProps) {
-  const [open, setOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
@@ -42,10 +40,20 @@ export function UploadDialog({
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       const newFiles = Array.from(e.target.files);
-      setFiles((prev) => [...prev, ...newFiles]);
+
+      // Limite simples de tamanho (ex: 5MB)
+      const validFiles = newFiles.filter((file) => {
+        if (file.size > 5 * 1024 * 1024) {
+          toast.error(`Arquivo ${file.name} muito grande (max 5MB)`);
+          return false;
+        }
+        return true;
+      });
+
+      setFiles((prev) => [...prev, ...validFiles]);
 
       // Criar previews locais
-      const newPreviews = newFiles.map((file) => URL.createObjectURL(file));
+      const newPreviews = validFiles.map((file) => URL.createObjectURL(file));
       setPreviews((prev) => [...prev, ...newPreviews]);
     }
   };
@@ -55,84 +63,50 @@ export function UploadDialog({
     setPreviews((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // Função de compressão
-  const compressImage = async (file: File) => {
-    const options = {
-      maxSizeMB: 0.8, // Máximo 800KB
-      maxWidthOrHeight: 1920, // Redimensiona para Full HD se for maior
-      useWebWorker: true,
-      fileType: "image/webp", // Converte para WebP (mais leve que JPEG)
-    };
-
-    try {
-      const compressedFile = await imageCompression(file, options);
-      return compressedFile;
-    } catch (error) {
-      console.error("Erro na compressão:", error);
-      return file; // Se falhar, usa o original
-    }
-  };
-
   const handleUpload = async () => {
-    if (files.length === 0 || !user) return;
+    if (files.length === 0) return;
 
     setIsUploading(true);
-    toast.info("Comprimindo e enviando fotos...");
+    toast.info("Processando fotos...");
 
     try {
-      // Processa cada arquivo sequencialmente
+      // Processa cada arquivo sequencialmente para não travar
       for (const file of files) {
-        // 1. Comprimir
-        const compressedFile = await compressImage(file);
-
-        // 2. Pegar URL assinada
-        // Usamos a extensão .webp pois a compressão converte
-        const fileName = file.name.replace(/\.[^/.]+$/, "") + ".webp";
-        const { uploadUrl, publicUrl } = await getPresignedUploadUrl(
-          fileName,
-          compressedFile.type,
-        );
-
-        // 3. Enviar para o R2
-        await fetch(uploadUrl, {
-          method: "PUT",
-          body: compressedFile,
-          headers: { "Content-Type": compressedFile.type },
+        // Converte para Base64
+        const base64String = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
         });
 
-        // 4. Salvar Metadados (Link) no "Banco"
-        const novaEvidencia: Evidencia = {
-          id: Math.random().toString(36).substr(2, 9),
-          url: publicUrl, // Salva o link da nuvem
+        // Chama a função de salvar passada pelo pai (que chama a Server Action)
+        await onSave({
+          url: base64String,
+          motivo: motivo || "Upload Detalhado",
           dataUpload: new Date().toISOString(),
-          motivo: motivo || "Upload avulso na galeria",
-        };
-
-        StorageService.saveEvidenciaAvulsa(novaEvidencia);
+        });
       }
 
-      toast.success(`${files.length} fotos enviadas com sucesso!`);
       setFiles([]);
       setPreviews([]);
       setMotivo("");
-      setOpen(false);
-      onUploadSuccess();
+      // Não fechamos o modal aqui, o pai fecha após sucesso
     } catch (error) {
       console.error("Erro no upload:", error);
-      toast.error("Erro ao enviar fotos. Tente novamente.");
+      toast.error("Erro ao processar fotos.");
     } finally {
       setIsUploading(false);
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Nova Evidência</DialogTitle>
           <DialogDescription>
-            Fotos serão comprimidas e salvas na nuvem.
+            Fotos serão salvas na galeria do sistema.
           </DialogDescription>
         </DialogHeader>
 
@@ -155,7 +129,7 @@ export function UploadDialog({
             </div>
             <p className="text-sm font-medium">Clique para selecionar fotos</p>
             <p className="text-xs text-muted-foreground">
-              Suporta JPG, PNG, WEBP
+              Suporta JPG, PNG, WEBP (Max 5MB)
             </p>
           </div>
 
@@ -197,7 +171,7 @@ export function UploadDialog({
         <DialogFooter>
           <Button
             variant="outline"
-            onClick={() => setOpen(false)}
+            onClick={() => onOpenChange(false)}
             disabled={isUploading}
           >
             Cancelar
@@ -209,7 +183,7 @@ export function UploadDialog({
             {isUploading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Enviando...
+                Salvando...
               </>
             ) : (
               "Salvar Fotos"

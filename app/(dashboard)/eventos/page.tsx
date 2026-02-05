@@ -51,11 +51,17 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
-// Importações corrigidas
 import { Evento, EventoStatus } from "@/lib/types";
 import { formatCurrency, formatDate, getStatusColor } from "@/lib/utils";
-import { StorageService } from "@/lib/storage";
+import { StorageService } from "@/lib/storage"; // Mantido apenas para settings por enquanto
 import { useAuth } from "@/lib/auth-context";
+// Importações das Actions
+import {
+  getEventos,
+  updateEventoStatus,
+  deleteEvento,
+} from "@/app/actions/eventos";
+
 import {
   FileText,
   Search,
@@ -73,8 +79,8 @@ import {
   Eye,
   Edit,
   Trash2,
-  Plus,
   Lock,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { DateRange } from "react-day-picker";
@@ -123,8 +129,9 @@ export default function EventosPage() {
   // Paginação
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Dados Locais (Inicialmente vazio)
-  const [eventosLocais, setEventosLocais] = useState<Evento[]>([]);
+  // Dados do Banco
+  const [eventosDoBanco, setEventosDoBanco] = useState<Evento[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Configurações de Segurança
   const [settings, setSettings] = useState<any>({ bloquearAprovados: false });
@@ -132,11 +139,52 @@ export default function EventosPage() {
   // Ações
   const [eventoToDelete, setEventoToDelete] = useState<string | null>(null);
 
-  // Carregar dados do Storage
+  // Carregar dados
   useEffect(() => {
-    setEventosLocais(StorageService.getEventos());
+    loadData();
+    // Carrega settings do storage local (migração futura)
     setSettings(StorageService.getSettings());
   }, []);
+
+  const loadData = async () => {
+    setIsLoading(true);
+    const result = await getEventos();
+
+    if (result.success && result.data) {
+      // Mapeamento para garantir compatibilidade com a interface Evento
+      const mappedEventos: Evento[] = (result.data as any[]).map((ev) => ({
+        id: ev.id,
+        dataHora: ev.dataHora, // Date ou string ISO
+        motivo: ev.motivo,
+        status: ev.status as EventoStatus,
+        quantidade: Number(ev.quantidade),
+        unidade: ev.unidade,
+        custoSnapshot: Number(ev.custoSnapshot),
+        precoVendaSnapshot: Number(ev.precoVendaSnapshot),
+        item: ev.item
+          ? {
+              id: ev.item.id,
+              nome: ev.item.nome,
+              codigoInterno: ev.item.codigoInterno,
+              codigoBarras: ev.item.codigoBarras,
+              categoria: ev.item.categoria?.nome || "Sem Categoria",
+              unidade: ev.item.unidade,
+              custo: Number(ev.item.custo),
+              precoVenda: Number(ev.item.precoVenda),
+              status: ev.item.status,
+              imagemUrl: ev.item.imagemUrl,
+            }
+          : undefined,
+        criadoPor: ev.criadoPor,
+        evidencias: ev.evidencias,
+      }));
+
+      setEventosDoBanco(mappedEventos);
+    } else {
+      toast.error("Erro ao carregar eventos.");
+    }
+    setIsLoading(false);
+  };
 
   // Resetar página quando mudar filtros
   useEffect(() => {
@@ -145,7 +193,7 @@ export default function EventosPage() {
 
   // Lógica de Filtragem
   const eventosFiltradosGlobalmente = useMemo(() => {
-    return eventosLocais.filter((evento) => {
+    return eventosDoBanco.filter((evento) => {
       // 1. Data
       if (dateRange?.from) {
         const eventoDate = new Date(evento.dataHora);
@@ -159,19 +207,21 @@ export default function EventosPage() {
         const matches =
           (evento.item?.nome || "").toLowerCase().includes(s) ||
           (evento.item?.codigoInterno || "").toLowerCase().includes(s) ||
-          evento.criadoPor.nome.toLowerCase().includes(s);
+          evento.criadoPor?.nome.toLowerCase().includes(s); // Seguro contra null
         if (!matches) return false;
       }
-      // 3. Status (Agora aplica em AMBOS os modos se selecionado)
+      // 3. Status
       if (statusFilter !== "todos") {
-        // Mapeamento visual: 'pendente' na UI = 'enviado' no banco
         const targetStatus =
           statusFilter === "pendente" ? "enviado" : statusFilter;
+        // Se filtro for pendente, aceita rascunho e enviado
+        if (targetStatus === "enviado" && evento.status === "rascunho")
+          return true;
         if (evento.status !== targetStatus) return false;
       }
       return true;
     });
-  }, [eventosLocais, dateRange, globalSearch, statusFilter]);
+  }, [eventosDoBanco, dateRange, globalSearch, statusFilter]);
 
   // Lógica de Agrupamento (Lotes)
   const lotesDiarios = useMemo(() => {
@@ -205,7 +255,7 @@ export default function EventosPage() {
             0,
           ),
           status,
-          autor: eventos[0].criadoPor.nome,
+          autor: eventos[0].criadoPor?.nome || "Sistema",
         } as LoteDiario;
       })
       .sort((a, b) => b.dataOriginal.getTime() - a.dataOriginal.getTime());
@@ -214,7 +264,7 @@ export default function EventosPage() {
   // Paginação
   const dadosPaginados = useMemo(() => {
     let dados: any[] = [];
-    const itemsPerPage = viewMode === "pastas" && !loteSelecionado ? 10 : 15; // Mais itens na lista
+    const itemsPerPage = viewMode === "pastas" && !loteSelecionado ? 10 : 15;
 
     if (loteSelecionado) {
       dados = loteSelecionado.eventos.filter((e) => {
@@ -247,78 +297,44 @@ export default function EventosPage() {
     globalSearch,
   ]);
 
-  // Ações
-  const handleStatusChange = (eventoId: string, novoStatus: string) => {
+  // Ações Conectadas ao Banco
+  const handleStatusChange = async (eventoId: string, novoStatus: string) => {
     const statusTyped = novoStatus as EventoStatus;
 
-    // Atualiza estado local
-    const novosEventos = eventosLocais.map((ev) =>
-      ev.id === eventoId ? { ...ev, status: statusTyped } : ev,
-    );
-    setEventosLocais(novosEventos);
+    // Chamada ao Backend
+    const result = await updateEventoStatus(eventoId, statusTyped);
 
-    // Salva no Storage
-    const eventoAlterado = novosEventos.find((ev) => ev.id === eventoId);
-    if (eventoAlterado) StorageService.saveEvento(eventoAlterado);
+    if (result.success) {
+      toast.success("Status atualizado");
+      loadData(); // Recarrega do banco para garantir sincronia
 
-    // Atualiza lote selecionado se existir
-    if (loteSelecionado) {
-      setLoteSelecionado((prev) => {
-        if (!prev) return null;
-        const eventosLote = prev.eventos.map((ev) =>
-          ev.id === eventoId ? { ...ev, status: statusTyped } : ev,
-        );
-
-        const todosOk = eventosLote.every((e) =>
-          ["aprovado", "exportado"].includes(e.status),
-        );
-        const temRejeitado = eventosLote.some((e) => e.status === "rejeitado");
-        const status = todosOk
-          ? "aprovado"
-          : temRejeitado
-            ? "rejeitado"
-            : "pendente";
-
-        return { ...prev, eventos: eventosLote, status };
-      });
+      // Se estiver dentro de um lote, atualiza visualmente o lote selecionado
+      // (a recarga global pode fechar o lote se não tratarmos,
+      // mas como o loteSelecionado é estado local, ele persiste se os dados baterem)
+    } else {
+      toast.error(result.message);
     }
-    toast.success("Status atualizado");
   };
 
-  const handleAprovarLoteInteiro = () => {
+  const handleAprovarLoteInteiro = async () => {
     if (!loteSelecionado) return;
 
-    const novosEventos = eventosLocais.map((ev) => {
-      if (loteSelecionado.eventos.some((le) => le.id === ev.id)) {
-        const atualizado = { ...ev, status: "aprovado" as EventoStatus };
-        // Salva cada um no storage
-        StorageService.saveEvento(atualizado);
-        return atualizado;
-      }
-      return ev;
-    });
-
-    setEventosLocais(novosEventos);
-    setLoteSelecionado((prev) =>
-      prev
-        ? {
-            ...prev,
-            eventos: prev.eventos.map((e) => ({
-              ...e,
-              status: "aprovado" as EventoStatus,
-            })),
-            status: "aprovado",
-          }
-        : null,
+    // Aprova um por um (Promise.all seria melhor no backend, mas vamos usar o que temos)
+    const promises = loteSelecionado.eventos.map((ev) =>
+      updateEventoStatus(ev.id, "aprovado"),
     );
+
+    await Promise.all(promises);
+
     toast.success("Lote aprovado!");
+    loadData();
+    setLoteSelecionado(null); // Volta para a lista de lotes
   };
 
-  // --- FUNÇÃO DE EXPORTAÇÃO CSV ---
+  // --- FUNÇÃO DE EXPORTAÇÃO CSV (Mantida Local pois processa dados já carregados) ---
   const handleExportar = () => {
     if (!loteSelecionado) return;
 
-    // 1. Validar se todos estão aprovados
     const todosAprovados = loteSelecionado.eventos.every(
       (e) => e.status === "aprovado" || e.status === "exportado",
     );
@@ -330,7 +346,6 @@ export default function EventosPage() {
       return;
     }
 
-    // 2. Montar cabeçalhos (Ponto e vírgula para Excel Brasil)
     const headers = [
       "Item",
       "Código Interno",
@@ -344,20 +359,15 @@ export default function EventosPage() {
       "Venda Total",
     ];
 
-    // 3. Montar linhas
     const rows = loteSelecionado.eventos.map((ev) => {
       const custoUnit = ev.custoSnapshot || 0;
       const vendaUnit = ev.precoVendaSnapshot || 0;
       const custoTotal = custoUnit * ev.quantidade;
       const vendaTotal = vendaUnit * ev.quantidade;
 
-      // Função para limpar string e evitar quebrar o CSV
       const clean = (str: string | undefined) =>
         `"${(str || "").replace(/"/g, '""')}"`;
 
-      // Formatar número para padrão BR (com vírgula) se desejar, ou manter ponto
-      // Para CSV universal, manter ponto é mais seguro, mas Excel BR prefere vírgula.
-      // Vamos usar replace('.', ',') para compatibilidade com Excel em PT-BR.
       const fmtNum = (num: number) => num.toFixed(2).replace(".", ",");
 
       return [
@@ -374,12 +384,10 @@ export default function EventosPage() {
       ].join(";");
     });
 
-    // 4. Criar Blob com BOM para acentos funcionarem no Excel
     const csvContent = "\uFEFF" + headers.join(";") + "\n" + rows.join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
 
-    // 5. Download
     const link = document.createElement("a");
     link.href = url;
     link.setAttribute(
@@ -390,14 +398,12 @@ export default function EventosPage() {
     link.click();
     document.body.removeChild(link);
 
-    // Opcional: Marcar como exportado
-    // handleStatusChange(ev.id, 'exportado') ... se desejar mudar o status após baixar
     toast.success("Arquivo CSV baixado com sucesso!");
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (eventoToDelete) {
-      const evento = eventosLocais.find((e) => e.id === eventoToDelete);
+      const evento = eventosDoBanco.find((e) => e.id === eventoToDelete);
       if (
         evento &&
         settings?.bloquearAprovados &&
@@ -408,25 +414,17 @@ export default function EventosPage() {
         return;
       }
 
-      const novosEventos = eventosLocais.filter((e) => e.id !== eventoToDelete);
-      setEventosLocais(novosEventos);
+      // Chamada ao Backend
+      const result = await deleteEvento(eventoToDelete);
 
-      // Simulação de persistência
-      StorageService.saveEvento({ ...evento, status: "rejeitado" } as Evento); // Ou realmente deletar do storage se tiver método
-
-      toast.success("Evento excluído");
-      setEventoToDelete(null);
-
-      if (loteSelecionado) {
-        setLoteSelecionado((prev) =>
-          prev
-            ? {
-                ...prev,
-                eventos: prev.eventos.filter((e) => e.id !== eventoToDelete),
-              }
-            : null,
-        );
+      if (result.success) {
+        toast.success("Evento excluído");
+        loadData();
+      } else {
+        toast.error(result.message);
       }
+
+      setEventoToDelete(null);
     }
   };
 
@@ -587,13 +585,12 @@ export default function EventosPage() {
             </div>
           </div>
           <div className="flex gap-2">
-            {/* BOTÃO EXPORTAR: Só aparece aqui e só habilita se aprovado */}
             {hasPermission("eventos:exportar") && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleExportar}
-                disabled={!isLoteAprovado} // Desabilita visualmente se não estiver aprovado
+                disabled={!isLoteAprovado}
                 className={
                   !isLoteAprovado ? "opacity-50 cursor-not-allowed" : ""
                 }
@@ -654,10 +651,10 @@ export default function EventosPage() {
                         )}
                       </TableCell>
                       <TableCell>
-                        {/* Select de Status - Desabilitado para Fiscal */}
                         <Select
                           value={
-                            evento.status === "enviado"
+                            evento.status === "enviado" ||
+                            evento.status === "rascunho"
                               ? "pendente"
                               : evento.status
                           }
@@ -702,21 +699,6 @@ export default function EventosPage() {
                             <DropdownMenuItem>
                               <Eye className="mr-2 h-4 w-4" /> Ver Detalhes
                             </DropdownMenuItem>
-                            {hasPermission("eventos:editar") && (
-                              <DropdownMenuItem
-                                disabled={isLocked}
-                                title={isLocked ? "Bloqueado" : ""}
-                              >
-                                {isLocked ? (
-                                  <Lock className="mr-2 h-4 w-4 opacity-50" />
-                                ) : (
-                                  <Edit className="mr-2 h-4 w-4" />
-                                )}
-                                <span className={isLocked ? "opacity-50" : ""}>
-                                  Editar
-                                </span>
-                              </DropdownMenuItem>
-                            )}
                             {hasPermission("eventos:excluir") && (
                               <DropdownMenuItem
                                 className={`focus:text-destructive ${isLocked ? "opacity-50 cursor-not-allowed" : "text-destructive"}`}
@@ -745,7 +727,6 @@ export default function EventosPage() {
         </div>
         <PaginationControls />
 
-        {/* Alerta de Exclusão */}
         <AlertDialog
           open={!!eventoToDelete}
           onOpenChange={(open) => !open && setEventoToDelete(null)}
@@ -788,8 +769,6 @@ export default function EventosPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* BOTÃO EXPORTAR REMOVIDO DAQUI (Só faz sentido dentro do lote) */}
-
           <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg border">
             <Button
               variant="ghost"
@@ -886,7 +865,11 @@ export default function EventosPage() {
         <div
           className={`absolute inset-0 overflow-y-auto ${hideScrollClass} p-2`}
         >
-          {viewMode === "pastas" ? (
+          {isLoading ? (
+            <div className="flex justify-center items-center h-full gap-2 text-muted-foreground">
+              <Loader2 className="h-6 w-6 animate-spin" /> Carregando perdas...
+            </div>
+          ) : viewMode === "pastas" ? (
             <div className="flex flex-col gap-2">
               {dadosPaginados.currentItems.map((lote: LoteDiario) => (
                 <div
@@ -1003,7 +986,8 @@ export default function EventosPage() {
                                 : "secondary"
                           }
                         >
-                          {evento.status === "enviado"
+                          {evento.status === "enviado" ||
+                          evento.status === "rascunho"
                             ? "Pendente"
                             : evento.status}
                         </Badge>
@@ -1023,21 +1007,6 @@ export default function EventosPage() {
                             <DropdownMenuItem>
                               <Eye className="mr-2 h-4 w-4" /> Ver Detalhes
                             </DropdownMenuItem>
-                            {hasPermission("eventos:editar") && (
-                              <DropdownMenuItem
-                                disabled={isLocked}
-                                title={isLocked ? "Bloqueado" : ""}
-                              >
-                                {isLocked ? (
-                                  <Lock className="mr-2 h-4 w-4 opacity-50" />
-                                ) : (
-                                  <Edit className="mr-2 h-4 w-4" />
-                                )}
-                                <span className={isLocked ? "opacity-50" : ""}>
-                                  Editar
-                                </span>
-                              </DropdownMenuItem>
-                            )}
                             {hasPermission("eventos:excluir") && (
                               <DropdownMenuItem
                                 className={`focus:text-destructive ${isLocked ? "opacity-50 cursor-not-allowed" : "text-destructive"}`}

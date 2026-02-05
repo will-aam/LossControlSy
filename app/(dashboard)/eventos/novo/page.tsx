@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,11 +13,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ItemSearch } from "@/components/forms/item-search";
-// Importações Corrigidas e Actions
 import { Item } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
-import { StorageService } from "@/lib/storage"; // Mantido apenas para Settings por enquanto
+import { StorageService } from "@/lib/storage";
 import { createEvento, CreateEventoData } from "@/app/actions/eventos";
 
 import {
@@ -29,6 +28,7 @@ import {
   AlertTriangle,
   ImageIcon,
   Loader2,
+  Upload,
 } from "lucide-react";
 import {
   Dialog,
@@ -40,11 +40,9 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 
-// CSS para esconder as setas do input number
 const numberInputClass =
   "text-lg h-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
 
-// CSS Customizado para a Scrollbar da Tabela (Fina e Discreta)
 const customScrollbarClass =
   "overflow-y-auto [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 hover:[&::-webkit-scrollbar-thumb]:bg-muted-foreground/40 [&::-webkit-scrollbar-thumb]:rounded-full";
 
@@ -53,12 +51,18 @@ interface ItemLancamento {
   item: Item;
   quantidade: number;
   unidade: string;
-  fotoUrl?: string;
+  fotoUrl?: string; // Aqui ficará o Base64 da imagem
 }
 
 export default function NovoEventoPage() {
   const router = useRouter();
   const { user, hasPermission } = useAuth();
+
+  // Refs para manipulação de arquivo
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [activeItemIdForPhoto, setActiveItemIdForPhoto] = useState<
+    string | null
+  >(null);
 
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [quantidade, setQuantidade] = useState("");
@@ -66,12 +70,9 @@ export default function NovoEventoPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
 
-  // Estado para a configuração de exigir foto (Ainda via Storage Local por enquanto)
   const [exigirFoto, setExigirFoto] = useState(false);
 
-  // Carregar configurações ao iniciar
   useEffect(() => {
-    // TODO: Migrar Settings para o Banco na próxima etapa
     const settings = StorageService.getSettings();
     setExigirFoto(settings.exigirFoto);
   }, []);
@@ -94,11 +95,8 @@ export default function NovoEventoPage() {
     };
 
     setItemsList([novoLancamento, ...itemsList]);
-
-    // Reset inteligente
     setSelectedItem(null);
     setQuantidade("");
-
     toast.success("Item adicionado à lista");
   };
 
@@ -106,60 +104,84 @@ export default function NovoEventoPage() {
     setItemsList(itemsList.filter((i) => i.tempId !== tempId));
   };
 
-  const handleAddPhoto = (tempId: string) => {
-    // Em um app real, aqui abriria o input de arquivo ou câmera
-    // Simulando uma URL de foto para teste
-    const mockPhoto =
-      "https://images.unsplash.com/photo-1571771894821-ce9b6c11b08e?w=400";
+  // --- LÓGICA DE FOTO REAL (Câmera ou Upload) ---
 
-    setItemsList(
-      itemsList.map((entry) => {
-        if (entry.tempId === tempId) return { ...entry, fotoUrl: mockPhoto };
-        return entry;
-      }),
-    );
-    toast.success("Foto anexada (Simulação)");
+  // 1. Ao clicar no botão da câmera, ativa o input oculto
+  const triggerPhotoInput = (tempId: string) => {
+    setActiveItemIdForPhoto(tempId);
+    // Dá um pequeno delay para garantir que o state atualizou antes do clique
+    setTimeout(() => {
+      fileInputRef.current?.click();
+    }, 50);
   };
+
+  // 2. Quando o usuário seleciona/tira a foto
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && activeItemIdForPhoto) {
+      // Verifica tamanho (opcional, ex: max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("A imagem é muito grande (Máx 5MB).");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+
+        // Atualiza a lista com a nova foto
+        setItemsList((prev) =>
+          prev.map((item) => {
+            if (item.tempId === activeItemIdForPhoto) {
+              return { ...item, fotoUrl: base64String };
+            }
+            return item;
+          }),
+        );
+        toast.success("Evidência anexada com sucesso!");
+
+        // Limpa o input para permitir selecionar a mesma foto novamente se precisar
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        setActiveItemIdForPhoto(null);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // ----------------------------------------------
 
   const handleSubmit = async () => {
     if (itemsList.length === 0 || !user) return;
 
-    // --- VALIDAÇÃO DA REGRA DE NEGÓCIO ---
     if (exigirFoto) {
       const itensSemFoto = itemsList.filter((i) => !i.fotoUrl);
       if (itensSemFoto.length > 0) {
         toast.error(
           `A empresa exige foto para todos os itens. Faltam ${itensSemFoto.length} fotos.`,
         );
-        return; // Interrompe o envio
+        return;
       }
     }
-    // -------------------------------------
 
     setIsSubmitting(true);
 
     try {
-      // Envia cada item como um evento separado para o Banco de Dados
-      // Usamos Promise.all para enviar tudo em paralelo e esperar terminar
       const promises = itemsList.map(async (entry) => {
         const payload: CreateEventoData = {
           itemId: entry.item.id,
           quantidade: entry.quantidade,
-          motivo: "Perda Operacional", // Poderia vir de um select no futuro
+          motivo: "Perda Operacional",
+          // Envia o Base64 real da foto tirada/upload
           fotos: entry.fotoUrl ? [entry.fotoUrl] : [],
         };
         return createEvento(payload);
       });
 
       const results = await Promise.all(promises);
-
-      // Verifica se algum deu erro
       const errors = results.filter((r) => !r.success);
 
       if (errors.length > 0) {
-        toast.error(
-          `Erro ao salvar ${errors.length} itens. Verifique o console.`,
-        );
+        toast.error(`Erro ao salvar ${errors.length} itens.`);
         console.error(errors);
       } else {
         setShowSuccess(true);
@@ -175,7 +197,7 @@ export default function NovoEventoPage() {
   const handleSuccessClose = () => {
     setShowSuccess(false);
     setItemsList([]);
-    router.push("/eventos"); // Redireciona para a lista de eventos
+    router.push("/eventos");
   };
 
   if (!hasPermission("eventos:criar")) {
@@ -189,6 +211,16 @@ export default function NovoEventoPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 max-w-6xl mx-auto w-full overflow-hidden">
+      {/* INPUT OCULTO GLOBAL PARA FOTOS */}
+      <input
+        type="file"
+        accept="image/*"
+        ref={fileInputRef}
+        className="hidden"
+        onChange={handleFileChange}
+        // Nota: Em mobile, isso abrirá o menu nativo "Câmera ou Arquivos"
+      />
+
       {/* 1. Header */}
       <div className="flex items-center justify-between shrink-0 px-1">
         <div>
@@ -219,7 +251,6 @@ export default function NovoEventoPage() {
             Produto
           </label>
           <div className="h-10">
-            {/* Componente de Busca - Já está conectado ao banco se o catalogo estiver ok */}
             <ItemSearch
               onSelect={handleItemSelect}
               selectedItem={selectedItem}
@@ -273,7 +304,7 @@ export default function NovoEventoPage() {
                 <TableHead className="w-auto">Produto</TableHead>
                 <TableHead className="text-right">Qtd.</TableHead>
                 <TableHead className="text-right">Total</TableHead>
-                <TableHead className="text-center w-20">Foto</TableHead>
+                <TableHead className="text-center w-20">Evidência</TableHead>
                 <TableHead className="w-12.5"></TableHead>
               </TableRow>
             </TableHeader>
@@ -300,29 +331,35 @@ export default function NovoEventoPage() {
                         (entry.item.custo || 0) * entry.quantidade,
                       )}
                     </TableCell>
+
+                    {/* COLUNA DA FOTO/EVIDÊNCIA */}
                     <TableCell className="text-center py-2">
                       <Button
                         variant="ghost"
                         size="icon"
                         className={`h-8 w-8 ${
                           entry.fotoUrl
-                            ? "text-primary bg-primary/10"
-                            : "text-muted-foreground/30 hover:text-primary"
+                            ? "text-primary bg-primary/10 hover:bg-primary/20"
+                            : "text-muted-foreground/40 hover:text-primary hover:bg-muted"
                         } ${exigirFoto && !entry.fotoUrl ? "animate-pulse text-orange-500" : ""}`}
-                        onClick={() => handleAddPhoto(entry.tempId)}
+                        // AQUI ESTÁ A MÁGICA: CHAMA O INPUT REAL
+                        onClick={() => triggerPhotoInput(entry.tempId)}
                         title={
                           exigirFoto && !entry.fotoUrl
-                            ? "Foto Obrigatória"
-                            : "Adicionar Foto"
+                            ? "Evidência Obrigatória"
+                            : "Adicionar Evidência (Câmera/Arquivo)"
                         }
                       >
                         {entry.fotoUrl ? (
+                          // Se já tem foto, mostra ícone de check ou imagem
                           <ImageIcon className="h-4 w-4" />
                         ) : (
+                          // Se não tem, mostra câmera
                           <Camera className="h-4 w-4" />
                         )}
                       </Button>
                     </TableCell>
+
                     <TableCell className="py-2">
                       <Button
                         variant="ghost"
@@ -402,7 +439,7 @@ export default function NovoEventoPage() {
             </div>
             <DialogTitle className="text-center">Sucesso!</DialogTitle>
             <DialogDescription className="text-center text-xs">
-              As perdas foram registradas no sistema.
+              As perdas foram registradas e as evidências salvas.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="sm:justify-center">
