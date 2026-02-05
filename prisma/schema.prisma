@@ -173,6 +173,14 @@ model NotaFiscal {
 
   @@map("notas_fiscais")
 }
+model Motivo {
+  id        String   @id @default(uuid())
+  nome      String   @unique // O texto do motivo (ex: "Validade Vencida")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("motivos")
+}
 
 // Configurações do Sistema (Singleton)
 model Configuracao {

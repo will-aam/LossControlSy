@@ -25,10 +25,11 @@ import {
   Tags,
   PlusCircle,
   FileText,
+  MessageSquareWarning, // <--- ÍCONE IMPORTADO
 } from "lucide-react";
 import { toast } from "sonner";
 
-// --- DEFINIÇÃO DE PERMISSÕES (Mantida a sua original) ---
+// --- DEFINIÇÃO DE PERMISSÕES ---
 type Permission =
   | "dashboard:ver"
   | "eventos:ver_todos"
@@ -47,6 +48,10 @@ type Permission =
   | "categorias:criar"
   | "categorias:editar"
   | "categorias:excluir"
+  | "motivos:ver" // <--- NOVA PERMISSÃO
+  | "motivos:criar" // <--- NOVA PERMISSÃO
+  | "motivos:editar" // <--- NOVA PERMISSÃO
+  | "motivos:excluir" // <--- NOVA PERMISSÃO
   | "galeria:ver"
   | "galeria:upload"
   | "galeria:excluir"
@@ -75,6 +80,10 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "categorias:criar",
     "categorias:editar",
     "categorias:excluir",
+    "motivos:ver", // <--- ADICIONADO
+    "motivos:criar", // <--- ADICIONADO
+    "motivos:editar", // <--- ADICIONADO
+    "motivos:excluir", // <--- ADICIONADO
     "galeria:ver",
     "galeria:upload",
     "galeria:excluir",
@@ -102,6 +111,10 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "categorias:criar",
     "categorias:editar",
     "categorias:excluir",
+    "motivos:ver", // <--- ADICIONADO
+    "motivos:criar", // <--- ADICIONADO
+    "motivos:editar", // <--- ADICIONADO
+    "motivos:excluir", // <--- ADICIONADO
     "galeria:ver",
     "galeria:upload",
     "galeria:excluir",
@@ -124,6 +137,7 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "categorias:criar",
     "categorias:editar",
     "categorias:excluir",
+    "motivos:ver", // Opcional: Fiscal pode ver motivos? Se sim, deixe.
     "galeria:ver",
     "galeria:upload",
     "notas:ver",
@@ -138,6 +152,7 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "categorias:ver",
     "categorias:criar",
     "categorias:editar",
+    // Funcionário NÃO gerencia motivos
   ],
 };
 
@@ -156,19 +171,17 @@ const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [settings, setSettings] = useState(StorageService.getSettings()); // Mantendo settings locais por enquanto
+  const [settings, setSettings] = useState(StorageService.getSettings());
   const router = useRouter();
 
-  // Atualiza settings se o usuário mudar (compatibilidade)
   useEffect(() => {
     setSettings(StorageService.getSettings());
   }, [user]);
 
-  // --- NOVA LÓGICA: Verifica Sessão no Servidor ao Carregar ---
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const sessionUser = await getClientSession(); // Pergunta ao servidor: "Quem sou eu?"
+        const sessionUser = await getClientSession();
         if (sessionUser) {
           setUser(sessionUser);
         }
@@ -181,25 +194,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkAuth();
   }, []);
 
-  // --- NOVA LÓGICA: Login via Server Action ---
   const login = async (email: string, password?: string) => {
     setIsLoading(true);
     try {
       const result = await loginAction(email, password);
 
       if (result.success && result.user) {
-        // Converte o retorno para o tipo User esperado (garantia de tipagem)
         const userData: User = {
           id: result.user.id,
           nome: result.user.nome,
           email: result.user.email,
-          role: result.user.role as any, // Cast seguro pois os enums batem
+          role: result.user.role as any,
           avatarUrl: result.user.avatarUrl || undefined,
         };
 
         setUser(userData);
         toast.success(`Bem-vindo, ${userData.nome.split(" ")[0]}!`);
-        router.push("/dashboard"); // Redireciona para o dashboard
+        router.push("/dashboard");
       } else {
         toast.error(result.message || "Credenciais inválidas");
       }
@@ -210,13 +221,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // --- NOVA LÓGICA: Logout ---
   const logout = async () => {
-    await logoutAction(); // Limpa cookie no servidor
+    await logoutAction();
     setUser(null);
   };
 
-  // --- LÓGICA MANTIDA: Permissões ---
   const hasPermission = (permission: Permission): boolean => {
     if (!user) return false;
 
@@ -231,7 +240,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return permissions.includes(permission);
   };
 
-  // --- LÓGICA MANTIDA: Itens do Menu ---
   const navItems = useMemo(() => {
     const items: NavItem[] = [];
 
@@ -266,6 +274,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (hasPermission("categorias:ver")) {
       items.push({ title: "Categorias", href: "/categorias", icon: "Tags" });
     }
+
+    // --- NOVO ITEM: MOTIVOS ---
+    if (hasPermission("motivos:ver")) {
+      items.push({
+        title: "Motivos de Perda",
+        href: "/motivos",
+        icon: "MessageSquareWarning",
+      });
+    }
+    // --------------------------
 
     if (hasPermission("galeria:ver")) {
       items.push({ title: "Galeria", href: "/galeria", icon: "Images" });

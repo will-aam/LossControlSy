@@ -9,6 +9,10 @@ export type Permission =
   | "eventos:editar"
   | "eventos:exportar"
   | "eventos:excluir"
+  | "motivos:ver"
+  | "motivos:criar"
+  | "motivos:editar"
+  | "motivos:excluir"
 
   // Catálogo
   | "catalogo:ver"
@@ -75,6 +79,10 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     "notas:excluir", // NOVO
     "relatorios:ver",
     "dashboard:ver",
+    "motivos:ver",
+    "motivos:criar",
+    "motivos:editar",
+    "motivos:excluir",
   ],
   fiscal: [
     "eventos:ver_todos",
@@ -123,6 +131,10 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     "dashboard:ver",
     "configuracoes:ver",
     "usuarios:gerenciar",
+    "motivos:ver",
+    "motivos:criar",
+    "motivos:editar",
+    "motivos:excluir",
   ],
 };
 

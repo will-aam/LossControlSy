@@ -17,6 +17,7 @@ import {
   LogOut,
   ShieldCheck,
   Sparkles,
+  MessageSquareWarning,
 } from "lucide-react";
 import {
   Sidebar,
@@ -41,8 +42,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth-context";
-import { getRoleLabel } from "@/lib/utils"; // Importação corrigida
-import { UserRole } from "@/lib/types"; // Importação corrigida
+import { getRoleLabel } from "@/lib/utils";
+import { UserRole } from "@/lib/types";
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   LayoutDashboard,
@@ -54,9 +55,9 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   BarChart3,
   Settings,
   Tags,
+  MessageSquareWarning,
 };
 
-// Cores mais suaves e modernas para os avatares
 const roleColors: Record<UserRole, string> = {
   funcionario: "bg-blue-500 text-white",
   gestor: "bg-purple-500 text-white",
@@ -80,7 +81,6 @@ export function AppSidebar() {
     .slice(0, 2);
 
   const handleLogout = () => {
-    // Limpa o estado e redireciona (Simples)
     setUser(null);
     localStorage.removeItem("losscontrol_active_user_id");
     router.push("/login");
@@ -88,7 +88,6 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      {/* --- CABEÇALHO (LOGO) --- */}
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
@@ -111,7 +110,6 @@ export function AppSidebar() {
       </SidebarHeader>
 
       <SidebarContent>
-        {/* --- MENU PRINCIPAL --- */}
         <SidebarGroup>
           <SidebarGroupLabel>Plataforma</SidebarGroupLabel>
           <SidebarGroupContent>
@@ -142,7 +140,6 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* --- MENU SECUNDÁRIO --- */}
         <SidebarGroup className="mt-auto">
           <SidebarGroupContent>
             <SidebarMenu>
@@ -160,7 +157,6 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      {/* --- RODAPÉ (PERFIL) --- */}
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
@@ -171,8 +167,9 @@ export function AppSidebar() {
                   className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                 >
                   <Avatar className="h-8 w-8 rounded-lg">
-                    {user.avatar ? (
-                      <AvatarImage src={user.avatar} alt={user.nome} />
+                    {/* CORREÇÃO AQUI: user.avatarUrl em vez de user.avatar */}
+                    {user.avatarUrl ? (
+                      <AvatarImage src={user.avatarUrl} alt={user.nome} />
                     ) : null}
                     <AvatarFallback
                       className={`rounded-lg ${roleColors[user.role]}`}
