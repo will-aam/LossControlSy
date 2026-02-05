@@ -8,12 +8,12 @@ import React, {
   useMemo,
 } from "react";
 import { User, NavItem } from "@/lib/types";
-import { StorageService } from "@/lib/storage";
 import {
   loginAction,
   logoutAction,
   getClientSession,
 } from "@/app/actions/auth";
+import { getSettings } from "@/app/actions/configuracoes"; // Importa a action
 import { useRouter } from "next/navigation";
 import {
   LayoutDashboard,
@@ -25,7 +25,7 @@ import {
   Tags,
   PlusCircle,
   FileText,
-  MessageSquareWarning, // <--- ÍCONE IMPORTADO
+  MessageSquareWarning,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -48,10 +48,10 @@ type Permission =
   | "categorias:criar"
   | "categorias:editar"
   | "categorias:excluir"
-  | "motivos:ver" // <--- NOVA PERMISSÃO
-  | "motivos:criar" // <--- NOVA PERMISSÃO
-  | "motivos:editar" // <--- NOVA PERMISSÃO
-  | "motivos:excluir" // <--- NOVA PERMISSÃO
+  | "motivos:ver"
+  | "motivos:criar"
+  | "motivos:editar"
+  | "motivos:excluir"
   | "galeria:ver"
   | "galeria:upload"
   | "galeria:excluir"
@@ -80,10 +80,10 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "categorias:criar",
     "categorias:editar",
     "categorias:excluir",
-    "motivos:ver", // <--- ADICIONADO
-    "motivos:criar", // <--- ADICIONADO
-    "motivos:editar", // <--- ADICIONADO
-    "motivos:excluir", // <--- ADICIONADO
+    "motivos:ver",
+    "motivos:criar",
+    "motivos:editar",
+    "motivos:excluir",
     "galeria:ver",
     "galeria:upload",
     "galeria:excluir",
@@ -111,10 +111,10 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "categorias:criar",
     "categorias:editar",
     "categorias:excluir",
-    "motivos:ver", // <--- ADICIONADO
-    "motivos:criar", // <--- ADICIONADO
-    "motivos:editar", // <--- ADICIONADO
-    "motivos:excluir", // <--- ADICIONADO
+    "motivos:ver",
+    "motivos:criar",
+    "motivos:editar",
+    "motivos:excluir",
     "galeria:ver",
     "galeria:upload",
     "galeria:excluir",
@@ -137,7 +137,7 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "categorias:criar",
     "categorias:editar",
     "categorias:excluir",
-    "motivos:ver", // Opcional: Fiscal pode ver motivos? Se sim, deixe.
+    "motivos:ver",
     "galeria:ver",
     "galeria:upload",
     "notas:ver",
@@ -152,12 +152,20 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "categorias:ver",
     "categorias:criar",
     "categorias:editar",
-    // Funcionário NÃO gerencia motivos
   ],
 };
 
+// Tipo para as configurações globais
+interface AppSettings {
+  empresaNome: string;
+  exigirFoto: boolean;
+  bloquearAprovados: boolean;
+  permitirFuncionarioGaleria: boolean;
+}
+
 interface AuthContextType {
   user: User | null;
+  settings: AppSettings; // Agora exportamos as settings
   isLoading: boolean;
   login: (email: string, password?: string) => Promise<void>;
   logout: () => void;
@@ -171,28 +179,46 @@ const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [settings, setSettings] = useState(StorageService.getSettings());
+
+  // Estado padrão das configurações
+  const [settings, setSettings] = useState<AppSettings>({
+    empresaNome: "Minha Empresa",
+    exigirFoto: false,
+    bloquearAprovados: true,
+    permitirFuncionarioGaleria: false,
+  });
+
   const router = useRouter();
 
+  // Carrega Usuário e Configurações do Banco
   useEffect(() => {
-    setSettings(StorageService.getSettings());
-  }, [user]);
-
-  useEffect(() => {
-    const checkAuth = async () => {
+    const init = async () => {
       try {
+        // 1. Carrega Sessão
         const sessionUser = await getClientSession();
         if (sessionUser) {
           setUser(sessionUser);
         }
+
+        // 2. Carrega Configurações
+        const configResult = await getSettings();
+        if (configResult.success && configResult.data) {
+          setSettings({
+            empresaNome: configResult.data.empresaNome,
+            exigirFoto: configResult.data.exigirFoto,
+            bloquearAprovados: configResult.data.bloquearAprovados,
+            permitirFuncionarioGaleria:
+              configResult.data.permitirFuncionarioGaleria,
+          });
+        }
       } catch (error) {
-        console.error("Erro ao verificar sessão:", error);
+        console.error("Erro na inicialização:", error);
       } finally {
         setIsLoading(false);
       }
     };
-    checkAuth();
-  }, []);
+    init();
+  }, []); // Executa apenas uma vez no mount
 
   const login = async (email: string, password?: string) => {
     setIsLoading(true);
@@ -209,6 +235,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
 
         setUser(userData);
+
+        // Recarrega configs ao logar
+        const configResult = await getSettings();
+        if (configResult.success && configResult.data) {
+          setSettings(configResult.data as any);
+        }
+
         toast.success(`Bem-vindo, ${userData.nome.split(" ")[0]}!`);
         router.push("/dashboard");
       } else {
@@ -275,7 +308,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       items.push({ title: "Categorias", href: "/categorias", icon: "Tags" });
     }
 
-    // --- NOVO ITEM: MOTIVOS ---
     if (hasPermission("motivos:ver")) {
       items.push({
         title: "Motivos de Perda",
@@ -283,7 +315,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         icon: "MessageSquareWarning",
       });
     }
-    // --------------------------
 
     if (hasPermission("galeria:ver")) {
       items.push({ title: "Galeria", href: "/galeria", icon: "Images" });
@@ -316,6 +347,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
+        settings, // Exportando settings para quem precisar
         isLoading,
         login,
         logout,

@@ -29,9 +29,8 @@ import { ItemSearch } from "@/components/forms/item-search";
 import { Item } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
-import { StorageService } from "@/lib/storage";
 import { createEvento, CreateEventoData } from "@/app/actions/eventos";
-import { getMotivos, createMotivo } from "@/app/actions/motivos"; // Actions de motivos
+import { getMotivos, createMotivo } from "@/app/actions/motivos";
 
 import {
   Plus,
@@ -68,12 +67,12 @@ interface ItemLancamento {
   quantidade: number;
   unidade: string;
   fotoUrl?: string;
-  motivo: string; // Motivo agora é obrigatório no item local
+  motivo: string;
 }
 
 export default function NovoEventoPage() {
   const router = useRouter();
-  const { user, hasPermission } = useAuth();
+  const { user, hasPermission, settings } = useAuth(); // Pegando settings do AuthContext
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeItemIdForPhoto, setActiveItemIdForPhoto] = useState<
@@ -85,8 +84,8 @@ export default function NovoEventoPage() {
 
   // Controle de Motivos
   const [motivos, setMotivos] = useState<{ id: string; nome: string }[]>([]);
-  const [selectedMotivo, setSelectedMotivo] = useState(""); // Texto do motivo
-  const [openMotivo, setOpenMotivo] = useState(false); // Popover state
+  const [selectedMotivo, setSelectedMotivo] = useState("");
+  const [openMotivo, setOpenMotivo] = useState(false);
 
   const [itemsList, setItemsList] = useState<ItemLancamento[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -95,10 +94,12 @@ export default function NovoEventoPage() {
 
   // Carrega Motivos e Configs
   useEffect(() => {
-    const settings = StorageService.getSettings();
-    setExigirFoto(settings.exigirFoto);
+    // Sincroniza configs do contexto
+    if (settings) {
+      setExigirFoto(settings.exigirFoto);
+    }
     loadMotivos();
-  }, []);
+  }, [settings]);
 
   const loadMotivos = async () => {
     const result = await getMotivos();
@@ -123,8 +124,9 @@ export default function NovoEventoPage() {
     const motivoExistente = motivos.find(
       (m) => m.nome.toLowerCase() === motivoFinal.toLowerCase(),
     );
-    if (!motivoExistente && motivoFinal) {
-      // Dispara criação assíncrona (não precisa travar a UI)
+
+    if (!motivoExistente && motivoFinal !== "Perda Operacional") {
+      // Dispara criação assíncrona sem travar a UI
       createMotivo(motivoFinal).then(() => loadMotivos());
     }
 
@@ -162,6 +164,7 @@ export default function NovoEventoPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && activeItemIdForPhoto) {
+      // Limite de 5MB
       if (file.size > 5 * 1024 * 1024) {
         toast.error("A imagem é muito grande (Máx 5MB).");
         return;
@@ -204,7 +207,7 @@ export default function NovoEventoPage() {
         const payload: CreateEventoData = {
           itemId: entry.item.id,
           quantidade: entry.quantidade,
-          motivo: entry.motivo, // Usa o motivo específico do item
+          motivo: entry.motivo,
           fotos: entry.fotoUrl ? [entry.fotoUrl] : [],
         };
         return createEvento(payload);
@@ -290,7 +293,7 @@ export default function NovoEventoPage() {
           </div>
         </div>
 
-        {/* Motivo (Novo Componente) */}
+        {/* Motivo (Com Busca e Criação) */}
         <div className="w-full xl:w-64">
           <label className="text-xs font-medium text-muted-foreground mb-1.5 ml-1 block">
             Motivo
@@ -312,8 +315,8 @@ export default function NovoEventoPage() {
                 <CommandInput
                   placeholder="Buscar ou criar motivo..."
                   onValueChange={(val) => {
-                    // Permite digitar novo motivo livremente
-                    if (val) setSelectedMotivo(val);
+                    // Atualiza o estado local com o que foi digitado
+                    setSelectedMotivo(val);
                   }}
                 />
                 <CommandList>
@@ -328,7 +331,15 @@ export default function NovoEventoPage() {
                         key={motivo.id}
                         value={motivo.nome}
                         onSelect={(currentValue) => {
-                          setSelectedMotivo(currentValue);
+                          // Define o motivo selecionado
+                          // Nota: O valor do CommandItem é normalizado (lowercase), então pegamos o nome original do array
+                          const originalName =
+                            motivos.find(
+                              (m) =>
+                                m.nome.toLowerCase() ===
+                                currentValue.toLowerCase(),
+                            )?.nome || currentValue;
+                          setSelectedMotivo(originalName);
                           setOpenMotivo(false);
                         }}
                       >

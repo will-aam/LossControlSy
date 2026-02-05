@@ -21,11 +21,18 @@ import {
   Cell,
   Tooltip,
 } from "recharts";
-import { TrendingDown, AlertTriangle, DollarSign, Package } from "lucide-react";
+import {
+  TrendingDown,
+  AlertTriangle,
+  DollarSign,
+  Package,
+  Loader2,
+} from "lucide-react";
 import { Evento, Item } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
-import { StorageService } from "@/lib/storage";
+// Action
+import { getEventos } from "@/app/actions/eventos";
 
 const chartConfig = {
   custo: {
@@ -49,19 +56,55 @@ const categoryColors = [
 export default function DashboardPage() {
   const { hasPermission } = useAuth();
   const [eventos, setEventos] = useState<Evento[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Estado para controlar qual card está na frente (0 a 3)
   const [activeCardIndex, setActiveCardIndex] = useState(0);
 
+  // Carregar dados
   useEffect(() => {
-    setEventos(StorageService.getEventos());
+    async function loadData() {
+      setIsLoading(true);
+      const result = await getEventos();
+      if (result.success && result.data) {
+        // Mapeamento necessário
+        const mappedEventos: Evento[] = (result.data as any[]).map((ev) => ({
+          id: ev.id,
+          dataHora: ev.dataHora,
+          motivo: ev.motivo,
+          status: ev.status,
+          quantidade: Number(ev.quantidade),
+          unidade: ev.unidade,
+          custoSnapshot: Number(ev.custoSnapshot),
+          precoVendaSnapshot: Number(ev.precoVendaSnapshot),
+          item: ev.item
+            ? {
+                id: ev.item.id,
+                nome: ev.item.nome,
+                codigoInterno: ev.item.codigoInterno,
+                categoria: ev.item.categoria?.nome || "Sem Categoria",
+                unidade: ev.item.unidade,
+                custo: Number(ev.item.custo),
+                precoVenda: Number(ev.item.precoVenda),
+                status: ev.item.status,
+                imagemUrl: ev.item.imagemUrl,
+              }
+            : undefined,
+          criadoPor: ev.criadoPor,
+          evidencias: ev.evidencias,
+        }));
+        setEventos(mappedEventos);
+      }
+      setIsLoading(false);
+    }
+    loadData();
   }, []);
 
   // Rotação automática dos cards (Deck)
   useEffect(() => {
     const interval = setInterval(() => {
-      setActiveCardIndex((prev) => (prev + 1) % 4); // 4 é o número de cards
-    }, 5000); // 5 segundos
+      setActiveCardIndex((prev) => (prev + 1) % 4);
+    }, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -88,6 +131,7 @@ export default function DashboardPage() {
     > = {};
     const tendenciaMap: Record<string, { custo: number; venda: number }> = {};
 
+    // Inicializa últimos 7 dias
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
@@ -117,9 +161,15 @@ export default function DashboardPage() {
           const diaKey = dataEv.toLocaleDateString("pt-BR", {
             weekday: "short",
           });
-          if (tendenciaMap[diaKey]) {
-            tendenciaMap[diaKey].custo += custoTotal;
-            tendenciaMap[diaKey].venda += vendaTotal;
+          // Ajuste para garantir que a chave exista (caso o locale mude ou dia vire)
+          // Mas como inicializamos com base no 'hoje' real, deve bater.
+          // Se não bater, ignoramos ou somamos no dia mais próximo.
+          const keyEncontrada = Object.keys(tendenciaMap).find(
+            (k) => k === diaKey,
+          );
+          if (keyEncontrada) {
+            tendenciaMap[keyEncontrada].custo += custoTotal;
+            tendenciaMap[keyEncontrada].venda += vendaTotal;
           }
         }
       }
@@ -128,7 +178,7 @@ export default function DashboardPage() {
         perdasMes.custo += custoTotal;
         perdasMes.venda += vendaTotal;
 
-        const cat = ev.item?.categoria || "Outros";
+        const cat = (ev.item?.categoria as any) || "Outros";
         perdasPorCatMap[cat] = (perdasPorCatMap[cat] || 0) + custoTotal;
 
         if (ev.item) {
@@ -222,6 +272,15 @@ export default function DashboardPage() {
     );
   }
 
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-muted-foreground">Carregando dashboard...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 pb-8">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -235,46 +294,34 @@ export default function DashboardPage() {
 
       {/* --- MOBILE: STACKED DECK (BARALHO) --- */}
       <div className="block md:hidden py-4 px-2">
-        <div
-          className="relative w-full h-40" // Altura fixa para o container do baralho
-          onClick={handleCardClick}
-        >
+        <div className="relative w-full h-40" onClick={handleCardClick}>
           {cardsData.map((card, index) => {
-            // Calcula a posição relativa ao card ativo
-            // 0 = ativo, 1 = próximo, 2 = seguinte...
             const position = (index - activeCardIndex + 4) % 4;
-
-            // Define estilos baseados na posição
             let zIndex = 0;
             let scale = 1;
             let translateX = 0;
             let opacity = 1;
-            let rotate = 0; // Opcional: leve rotação para dar charme
 
             if (position === 0) {
-              // Card Ativo (Frente)
               zIndex = 30;
               scale = 1;
               translateX = 0;
               opacity = 1;
             } else if (position === 1) {
-              // Card 2 (Atrás)
               zIndex = 20;
               scale = 0.95;
-              translateX = 12; // Desloca levemente para direita
+              translateX = 12;
               opacity = 0.9;
             } else if (position === 2) {
-              // Card 3 (Fundo)
               zIndex = 10;
               scale = 0.9;
-              translateX = 24; // Desloca mais para direita
+              translateX = 24;
               opacity = 0.7;
             } else {
-              // Card 4 (Escondido atrás do ativo, pronto para aparecer)
               zIndex = 0;
               scale = 0.85;
               translateX = 0;
-              opacity = 0; // Invisível para não atrapalhar
+              opacity = 0;
             }
 
             return (
@@ -305,7 +352,6 @@ export default function DashboardPage() {
             );
           })}
         </div>
-        {/* Indicador de instrução sutil */}
         <p className="text-[10px] text-center text-muted-foreground mt-2 opacity-50">
           Toque no cartão para ver o próximo
         </p>
