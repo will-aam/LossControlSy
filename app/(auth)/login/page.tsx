@@ -9,12 +9,11 @@ import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Loader2, Lock, Mail, ShieldCheck } from "lucide-react";
+import { Loader2, Lock, Mail } from "lucide-react";
 
 // Componente interno para isolar o uso de useSearchParams
 function LoginForm() {
@@ -29,6 +28,10 @@ function LoginForm() {
     const emailParam = searchParams.get("email");
     if (emailParam) {
       setEmail(emailParam);
+      // Foca no campo de senha automaticamente se o email vier preenchido
+      setTimeout(() => {
+        document.getElementById("password")?.focus();
+      }, 100);
     }
   }, [searchParams]);
 
@@ -62,6 +65,8 @@ function LoginForm() {
                 <Mail className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
                 <Input
                   id="email"
+                  name="email" // Importante para o navegador salvar
+                  autoComplete="username" // Diz ao navegador que este é o login
                   type="email"
                   placeholder="nome@empresa.com"
                   className="border-border/50 bg-secondary/30 pl-11 text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:ring-offset-0 transition-all"
@@ -84,6 +89,8 @@ function LoginForm() {
                 <Lock className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
                 <Input
                   id="password"
+                  name="password" // Importante para o navegador salvar
+                  autoComplete="current-password" // Diz ao navegador para preencher a senha salva
                   type="password"
                   className="border-border/50 bg-secondary/30 pl-11 text-foreground placeholder:text-muted-foreground/50 focus:border-primary focus:ring-2 focus:ring-primary/20 focus:ring-offset-0 transition-all"
                   value={password}
