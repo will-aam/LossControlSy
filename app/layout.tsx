@@ -8,25 +8,31 @@ import { AuthProvider } from "@/lib/auth-context";
 const inter = Inter({ subsets: ["latin"] });
 
 export const viewport: Viewport = {
-  themeColor: "#ffffff",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#09090b" }, // Ajustado para o fundo dark padrão do shadcn
+  ],
+  viewportFit: "cover",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  userScalable: false, // Impede zoom de pinça (sensação de app nativo)
-  interactiveWidget: "resizes-content", // Melhora o teclado virtual no Android
+  userScalable: false,
 };
 
 export const metadata: Metadata = {
-  title: "Loss Control",
-  description: "Sistema de Controle de Perdas",
-  manifest: "/manifest.json", // Link para o PWA
+  title: "LossControlSy - Controle de Perdas",
+  description: "Sistema web para controle de perda de estoque.",
+  manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Loss Control",
+    title: "LossControlSy",
+  },
+  formatDetection: {
+    telephone: false,
   },
   icons: {
-    icon: "/icon.svg",
+    icon: "/icon.png",
     apple: "/apple-icon.png",
   },
 };
