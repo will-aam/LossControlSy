@@ -33,13 +33,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-// Importações
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { User, UserRole } from "@/lib/types";
 import { getRoleLabel } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import { UserFormDialog } from "@/components/configuracoes/user-form-dialog";
-// ACTIONS
 import {
   getSettings,
   saveSettings,
@@ -47,7 +45,6 @@ import {
   saveUser,
   deleteUser,
 } from "@/app/actions/configuracoes";
-
 import {
   AlertTriangle,
   Building2,
@@ -71,7 +68,6 @@ const roleColors: Record<UserRole, string> = {
 export default function ConfiguracoesPage() {
   const { hasPermission, user: currentUser } = useAuth();
 
-  // Estados de Dados
   const [users, setUsers] = useState<User[]>([]);
   const [settings, setSettings] = useState<any>({
     empresaNome: "",
@@ -82,12 +78,10 @@ export default function ConfiguracoesPage() {
   });
   const [isLoading, setIsLoading] = useState(true);
 
-  // Estados de Modais
   const [showUserDialog, setShowUserDialog] = useState(false);
   const [userToEdit, setUserToEdit] = useState<User | null>(null);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
 
-  // Carregar dados ao iniciar
   useEffect(() => {
     loadData();
   }, []);
@@ -95,22 +89,20 @@ export default function ConfiguracoesPage() {
   const loadData = async () => {
     setIsLoading(true);
 
-    // Carrega Users
     const usersResult = await getUsers();
     if (usersResult.success && usersResult.data) {
-      // Mapeamento correto para garantir compatibilidade com a interface User
       const mappedUsers: User[] = (usersResult.data as any[]).map((u) => ({
         id: u.id,
         nome: u.nome,
         email: u.email,
         role: u.role as UserRole,
         avatarUrl: u.avatarUrl,
-        avatar: u.avatarUrl, // Compatibilidade
+        ativo: u.ativo, // Importante: Mapeando o status do banco
+        ownerId: u.ownerId,
       }));
       setUsers(mappedUsers);
     }
 
-    // Carrega Configs
     const settingsResult = await getSettings();
     if (settingsResult.success && settingsResult.data) {
       setSettings(settingsResult.data);
@@ -119,7 +111,6 @@ export default function ConfiguracoesPage() {
     setIsLoading(false);
   };
 
-  // --- AÇÕES DE CONFIGURAÇÃO GERAL ---
   const handleSaveSettings = async () => {
     const result = await saveSettings(settings);
     if (result.success) {
@@ -129,8 +120,6 @@ export default function ConfiguracoesPage() {
     }
   };
 
-  // --- AÇÕES DE USUÁRIOS ---
-  // Tipagem ajustada para casar com o que o Dialog envia
   const handleSaveUser = async (userData: {
     id?: string;
     nome: string;
@@ -138,8 +127,8 @@ export default function ConfiguracoesPage() {
     role: UserRole;
     password?: string;
     avatarUrl?: string;
+    ativo?: boolean;
   }) => {
-    // Garantimos que 'nome' e 'email' sempre existem antes de enviar
     if (!userData.nome || !userData.email) {
       toast.error("Nome e Email são obrigatórios");
       return;
@@ -198,7 +187,6 @@ export default function ConfiguracoesPage() {
 
   return (
     <div className="space-y-6 pb-20 md:pb-0">
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Configurações</h1>
         <p className="text-muted-foreground">
@@ -213,7 +201,6 @@ export default function ConfiguracoesPage() {
           <TabsTrigger value="notificacoes">Notificações</TabsTrigger>
         </TabsList>
 
-        {/* --- GERAL TAB --- */}
         <TabsContent value="geral" className="space-y-6">
           <Card>
             <CardHeader>
@@ -309,6 +296,9 @@ export default function ConfiguracoesPage() {
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2">
                     <Label>Permitir funcionários na Galeria</Label>
+                    <Badge variant="outline" className="text-[10px] h-5">
+                      Novo
+                    </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">
                     Se ativo, funcionários poderão acessar a aba Galeria e
@@ -335,7 +325,6 @@ export default function ConfiguracoesPage() {
           </Card>
         </TabsContent>
 
-        {/* --- USUÁRIOS TAB --- */}
         <TabsContent value="usuarios" className="space-y-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
@@ -378,8 +367,13 @@ export default function ConfiguracoesPage() {
                       .toUpperCase()
                       .slice(0, 2);
 
+                    const isSelf = user.id === currentUser?.id;
+
                     return (
-                      <TableRow key={user.id}>
+                      <TableRow
+                        key={user.id}
+                        className={!user.ativo ? "opacity-60 bg-muted/30" : ""}
+                      >
                         <TableCell>
                           <div className="flex items-center gap-3">
                             <Avatar className="h-8 w-8">
@@ -393,7 +387,16 @@ export default function ConfiguracoesPage() {
                                 {initials}
                               </AvatarFallback>
                             </Avatar>
-                            <span className="font-medium">{user.nome}</span>
+                            <div className="flex flex-col">
+                              <span className="font-medium">
+                                {user.nome} {isSelf && "(Você)"}
+                              </span>
+                              {!user.ativo && (
+                                <span className="text-[10px] text-destructive font-semibold">
+                                  ACESSO BLOQUEADO
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
@@ -405,7 +408,13 @@ export default function ConfiguracoesPage() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Badge variant="default">Ativo</Badge>
+                          {user.ativo ? (
+                            <Badge className="bg-emerald-600 hover:bg-emerald-700">
+                              Ativo
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary">Inativo</Badge>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
@@ -422,7 +431,12 @@ export default function ConfiguracoesPage() {
                               size="icon"
                               className="h-8 w-8 text-destructive hover:text-destructive"
                               onClick={() => setUserToDelete(user.id)}
-                              disabled={user.id === currentUser?.id}
+                              disabled={isSelf} // Não pode se excluir
+                              title={
+                                isSelf
+                                  ? "Você não pode excluir sua própria conta"
+                                  : "Excluir usuário"
+                              }
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -437,7 +451,6 @@ export default function ConfiguracoesPage() {
           </Card>
         </TabsContent>
 
-        {/* --- NOTIFICAÇÕES TAB --- */}
         <TabsContent value="notificacoes" className="space-y-6">
           <Card>
             <CardHeader>
@@ -474,7 +487,6 @@ export default function ConfiguracoesPage() {
         </TabsContent>
       </Tabs>
 
-      {/* MODAL DE USUÁRIO */}
       <UserFormDialog
         open={showUserDialog}
         onOpenChange={(open) => {
@@ -487,7 +499,6 @@ export default function ConfiguracoesPage() {
         onSave={handleSaveUser}
       />
 
-      {/* ALERTA DE EXCLUSÃO */}
       <AlertDialog
         open={!!userToDelete}
         onOpenChange={(open) => !open && setUserToDelete(null)}
@@ -497,7 +508,8 @@ export default function ConfiguracoesPage() {
             <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
             <AlertDialogDescription>
               Essa ação removerá o usuário permanentemente e ele perderá o
-              acesso ao sistema.
+              acesso ao sistema. Para apenas bloquear o acesso, edite o usuário
+              e desative-o.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -506,7 +518,7 @@ export default function ConfiguracoesPage() {
               onClick={handleDeleteUser}
               className="bg-destructive hover:bg-destructive/90"
             >
-              Excluir Usuário
+              Excluir Definitivamente
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

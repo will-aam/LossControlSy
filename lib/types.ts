@@ -7,8 +7,10 @@ export interface User {
   nome: string;
   email: string;
   role: UserRole;
-  avatarUrl?: string; // Padronizado com o Prisma
-  // Campos opcionais para compatibilidade com componentes antigos
+  ativo: boolean; // NOVO: Status do usuário
+  ownerId?: string | null; // NOVO: ID do chefe (se for funcionário)
+  avatarUrl?: string;
+  // Campos opcionais para compatibilidade
   avatar?: string;
   createdAt?: string;
 }

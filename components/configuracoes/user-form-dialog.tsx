@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { User, UserRole } from "@/lib/types";
 import { Loader2 } from "lucide-react";
 
@@ -25,7 +26,6 @@ interface UserFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   userToEdit: User | null;
-  // Ajuste na tipagem do onSave para aceitar Partial<User> e senha
   onSave: (data: {
     id?: string;
     nome: string;
@@ -33,6 +33,7 @@ interface UserFormDialogProps {
     role: UserRole;
     password?: string;
     avatarUrl?: string;
+    ativo?: boolean; // Adicionado
   }) => void;
 }
 
@@ -46,6 +47,7 @@ export function UserFormDialog({
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<UserRole>("funcionario");
   const [password, setPassword] = useState("");
+  const [ativo, setAtivo] = useState(true); // Estado do status
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Carrega os dados quando for edição
@@ -54,12 +56,14 @@ export function UserFormDialog({
       setNome(userToEdit.nome);
       setEmail(userToEdit.email);
       setRole(userToEdit.role);
-      setPassword(""); // Limpa senha na edição (opcional alterar)
+      setAtivo(userToEdit.ativo !== undefined ? userToEdit.ativo : true);
+      setPassword("");
     } else {
       // Reseta para novo usuário
       setNome("");
       setEmail("");
       setRole("funcionario");
+      setAtivo(true);
       setPassword("");
     }
   }, [userToEdit, open]);
@@ -69,12 +73,13 @@ export function UserFormDialog({
     setIsSubmitting(true);
 
     const userData = {
-      id: userToEdit?.id, // Envia ID apenas se for edição
+      id: userToEdit?.id,
       nome,
       email,
       role,
-      password: password || undefined, // Só envia se preenchido
-      avatarUrl: userToEdit?.avatarUrl || userToEdit?.avatar, // Mantém avatar antigo
+      password: password || undefined,
+      avatarUrl: userToEdit?.avatarUrl || userToEdit?.avatar,
+      ativo, // Envia o status
     };
 
     await onSave(userData);
@@ -125,10 +130,26 @@ export function UserFormDialog({
                 <SelectItem value="funcionario">Funcionário</SelectItem>
                 <SelectItem value="fiscal">Fiscal</SelectItem>
                 <SelectItem value="gestor">Gestor</SelectItem>
-                <SelectItem value="dono">Proprietário</SelectItem>
+                {/* Apenas exibe Dono se estiver editando um Dono */}
+                {role === "dono" && (
+                  <SelectItem value="dono">Proprietário</SelectItem>
+                )}
               </SelectContent>
             </Select>
           </div>
+
+          {/* Campo de Status - Só exibe se for edição e não for o próprio dono se editando */}
+          {userToEdit && role !== "dono" && (
+            <div className="flex items-center justify-between border p-3 rounded-md">
+              <div className="space-y-0.5">
+                <Label className="text-base">Acesso Ativo</Label>
+                <p className="text-xs text-muted-foreground">
+                  Desative para bloquear o login
+                </p>
+              </div>
+              <Switch checked={ativo} onCheckedChange={setAtivo} />
+            </div>
+          )}
 
           <div className="grid gap-2">
             <Label htmlFor="password">
