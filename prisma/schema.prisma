@@ -43,6 +43,15 @@ model User {
   passwordHash String // Senha criptografada
   role         UserRole @default(funcionario)
   avatarUrl    String?
+  
+  // NOVO: Controle de Acesso
+  ativo        Boolean  @default(true) // Permite bloquear acesso sem deletar dados
+
+  // NOVO: Hierarquia (Multi-tenancy)
+  ownerId      String?  // Se for null, é um Dono independente. Se tiver ID, pertence a esse Dono.
+  owner        User?    @relation("TeamHierarchy", fields: [ownerId], references: [id])
+  team         User[]   @relation("TeamHierarchy")
+
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
