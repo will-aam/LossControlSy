@@ -12,7 +12,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  userScalable: false, // Sensação de app nativo (não dá zoom sem querer)
+  userScalable: false, // Impede zoom de pinça (sensação de app nativo)
+  interactiveWidget: "resizes-content", // Melhora o teclado virtual no Android
 };
 
 export const metadata: Metadata = {
