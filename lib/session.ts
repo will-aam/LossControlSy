@@ -2,16 +2,16 @@ import "server-only";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { UserRole } from "@prisma/client";
-import { createHash } from "crypto"; // Importação nativa do Node
+import { createHash } from "crypto";
 
-// Chave secreta para assinar o token
-const SECRET_KEY =
-  process.env.SESSION_SECRET || "minha-chave-secreta-super-segura-123";
-const key = new TextEncoder().encode(SECRET_KEY);
+// Força erro se não tiver secret em produção
+const secretKey = process.env.SESSION_SECRET;
+const encodedKey = new TextEncoder().encode(
+  secretKey || "default-dev-secret-key-change-me",
+);
 
 const COOKIE_NAME = "session_token";
 
-// Tipagem do Payload da Sessão
 export type SessionPayload = {
   id: string;
   email: string;
@@ -21,7 +21,6 @@ export type SessionPayload = {
   expiresAt: Date;
 };
 
-// 1. Criar a Sessão (Login)
 export async function createSession(user: {
   id: string;
   email: string;
@@ -29,16 +28,13 @@ export async function createSession(user: {
   nome: string;
   avatarUrl?: string | null;
 }) {
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 dias
-
-  // Cria o token JWT
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   const session = await new SignJWT({ ...user, expiresAt })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("7d")
-    .sign(key);
+    .sign(encodedKey);
 
-  // Salva no Cookie HttpOnly
   const cookieStore = await cookies();
   cookieStore.set(COOKIE_NAME, session, {
     httpOnly: true,
@@ -49,14 +45,13 @@ export async function createSession(user: {
   });
 }
 
-// 2. Ler a Sessão Atual (Verificar se está logado)
 export async function getSession() {
   const cookieStore = await cookies();
   const session = cookieStore.get(COOKIE_NAME)?.value;
   if (!session) return null;
 
   try {
-    const { payload } = await jwtVerify(session, key, {
+    const { payload } = await jwtVerify(session, encodedKey, {
       algorithms: ["HS256"],
     });
     return payload as unknown as SessionPayload;
@@ -65,20 +60,15 @@ export async function getSession() {
   }
 }
 
-// 3. Destruir a Sessão (Logout)
 export async function deleteSession() {
   const cookieStore = await cookies();
   cookieStore.delete(COOKIE_NAME);
 }
 
-// --- FUNÇÕES DE HASH DE SENHA (Adicionadas) ---
-
-// Gera um hash SHA-256 simples (para produção real, use bcrypt ou argon2)
 export async function hashPassword(password: string): Promise<string> {
   return createHash("sha256").update(password).digest("hex");
 }
 
-// Verifica se a senha bate com o hash
 export async function verifyPassword(
   password: string,
   hash: string,
