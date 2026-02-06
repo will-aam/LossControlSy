@@ -1,3 +1,4 @@
+// middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
@@ -7,7 +8,7 @@ const SECRET_KEY =
 const key = new TextEncoder().encode(SECRET_KEY);
 
 // Rotas que NÃO precisam de autenticação (Públicas)
-const publicRoutes = ["/login", "/public", "/api/upload"];
+const publicRoutes = ["/login", "/public"];
 
 // Rotas de arquivos estáticos (imagens, css, etc) que o middleware deve ignorar
 const staticAssets = ["/_next", "/favicon.ico", "/images", "/public"];
