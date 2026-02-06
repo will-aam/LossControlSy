@@ -1,3 +1,4 @@
+// lib/session.ts
 import "server-only";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
@@ -7,9 +8,8 @@ import { createHash } from "crypto";
 // Força erro se não tiver secret em produção
 const secretKey = process.env.SESSION_SECRET;
 const encodedKey = new TextEncoder().encode(
-  secretKey || "default-dev-secret-key-change-me",
+  secretKey || "default-dev-secret-key-change-me", // <--- TEM QUE SER IGUAL AO MIDDLEWARE
 );
-
 const COOKIE_NAME = "session_token";
 
 export type SessionPayload = {

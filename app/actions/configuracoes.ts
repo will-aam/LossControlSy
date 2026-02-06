@@ -1,92 +1,114 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { getSession, hashPassword } from "@/lib/session";
 import { revalidatePath } from "next/cache";
-import { getSession } from "@/lib/session";
-import { UserRole } from "@prisma/client";
-import { hashPassword } from "@/lib/session";
+import { UserRole } from "@/lib/types";
 
-// 1. Buscar Configurações (Singleton por Dono ou Global)
+// Buscar Configurações
 export async function getSettings() {
-  const session = await getSession();
-  if (!session) return { success: false };
-
   try {
-    // Busca a config vinculada ao dono (ou a primeira que achar se for sistema único)
-    // Ajuste conforme sua regra de negócio. Aqui vou pegar a primeira.
-    const config = await prisma.configuracao.findFirst();
+    // Tenta buscar a primeira configuração existente
+    let config = await prisma.configuracao.findFirst();
 
-    // Se não existir, retorna padrão
+    // Se não existir, cria uma padrão
     if (!config) {
-      return {
-        success: true,
-        data: {
-          empresaNome: "",
-          exigirFoto: false,
-          bloquearAprovados: true,
-          permitirFuncionarioGaleria: false,
-          limiteDiario: 1000,
-        },
-      };
+      const session = await getSession();
+      // Só cria se tiver alguém logado, senão retorna null
+      if (session) {
+        config = await prisma.configuracao.create({
+          data: {
+            empresaNome: "Minha Empresa",
+            donoId: session.id, // Vincula ao primeiro usuário que acessar
+            limiteDiario: 1000, // Valor padrão
+          },
+        });
+      }
     }
 
-    return {
-      success: true,
-      data: {
-        ...config,
-        limiteDiario: Number(config.limiteDiario),
-      },
-    };
+    // --- CORREÇÃO DO ERRO DE DECIMAL ---
+    // Convertemos o objeto do Prisma para um objeto simples JS
+    // O campo 'limiteDiario' (Decimal) vira number
+    const plainConfig = config
+      ? {
+          ...config,
+          limiteDiario: Number(config.limiteDiario),
+        }
+      : null;
+
+    return { success: true, data: plainConfig };
   } catch (error) {
-    return { success: false, message: "Erro ao buscar configurações." };
+    console.error("Erro ao buscar configurações:", error);
+    return { success: false, message: "Erro ao carregar configurações" };
   }
 }
 
-// 2. Salvar Configurações
-export async function saveSettings(data: any) {
+// Atualizar Configurações
+export async function saveSettings(data: {
+  empresaNome: string;
+  exigirFoto: boolean;
+  bloquearAprovados: boolean;
+  permitirFuncionarioGaleria: boolean;
+  limiteDiario?: number; // Opcional, caso adicione input para isso no futuro
+}) {
   const session = await getSession();
-  if (!session || session.role !== "dono")
+
+  // Apenas Dono e Gestor podem alterar configurações globais
+  if (!session || !["dono", "gestor"].includes(session.role)) {
     return {
       success: false,
-      message: "Apenas o dono pode alterar configurações.",
+      message: "Sem permissão para alterar configurações.",
     };
+  }
 
   try {
-    const config = await prisma.configuracao.findFirst();
+    // Busca o ID da configuração existente
+    const currentConfig = await prisma.configuracao.findFirst();
 
-    if (config) {
+    const dataToUpdate = {
+      empresaNome: data.empresaNome,
+      exigirFoto: data.exigirFoto,
+      bloquearAprovados: data.bloquearAprovados,
+      permitirFuncionarioGaleria: data.permitirFuncionarioGaleria,
+      // Se limiteDiario vier, atualiza, senão mantém
+      ...(data.limiteDiario !== undefined && {
+        limiteDiario: data.limiteDiario,
+      }),
+    };
+
+    if (currentConfig) {
       await prisma.configuracao.update({
-        where: { id: config.id },
-        data: {
-          empresaNome: data.empresaNome,
-          exigirFoto: data.exigirFoto,
-          bloquearAprovados: data.bloquearAprovados,
-          permitirFuncionarioGaleria: data.permitirFuncionarioGaleria,
-          // limiteDiario: data.limiteDiario // Se tiver no form
-        },
+        where: { id: currentConfig.id },
+        data: dataToUpdate,
       });
     } else {
+      // Caso raro: cria se não existir
       await prisma.configuracao.create({
         data: {
-          empresaNome: data.empresaNome,
-          exigirFoto: data.exigirFoto,
-          bloquearAprovados: data.bloquearAprovados,
-          permitirFuncionarioGaleria: data.permitirFuncionarioGaleria,
+          ...dataToUpdate,
           donoId: session.id,
+          limiteDiario: data.limiteDiario || 1000,
         },
       });
     }
 
     revalidatePath("/configuracoes");
+    revalidatePath("/eventos/novo");
     return { success: true };
   } catch (error) {
-    return { success: false, message: "Erro ao salvar configurações." };
+    console.error("Erro ao salvar configurações:", error);
+    return { success: false, message: "Erro interno ao salvar." };
   }
 }
 
-// --- GESTÃO DE USUÁRIOS ---
+// --- GERENCIAMENTO DE USUÁRIOS ---
 
 export async function getUsers() {
+  const session = await getSession();
+  if (!session || !["dono", "gestor"].includes(session.role)) {
+    return { success: false, message: "Sem permissão" };
+  }
+
   try {
     const users = await prisma.user.findMany({
       orderBy: { nome: "asc" },
@@ -100,26 +122,35 @@ export async function getUsers() {
     });
     return { success: true, data: users };
   } catch (error) {
-    return { success: false, data: [] };
+    return { success: false, message: "Erro ao buscar usuários" };
   }
 }
 
-export async function saveUser(data: any) {
+export async function saveUser(data: {
+  id?: string;
+  nome: string;
+  email: string;
+  role: UserRole;
+  password?: string;
+}) {
   const session = await getSession();
-  if (!session || (session.role !== "dono" && session.role !== "gestor")) {
-    return { success: false, message: "Sem permissão." };
+  if (!session || session.role !== "dono") {
+    return {
+      success: false,
+      message: "Apenas o proprietário pode gerenciar usuários.",
+    };
   }
 
   try {
-    // Se tem ID, é edição
-    if (data.id) {
+    // Se tiver ID, é atualização
+    if (data.id && data.id.length > 10) {
+      // Atualiza
       const updateData: any = {
         nome: data.nome,
         email: data.email,
-        role: data.role as UserRole,
+        role: data.role,
       };
-
-      // Só atualiza senha se for enviada
+      // Só atualiza senha se for fornecida
       if (data.password) {
         updateData.passwordHash = await hashPassword(data.password);
       }
@@ -129,22 +160,16 @@ export async function saveUser(data: any) {
         data: updateData,
       });
     } else {
-      // Criação
-      if (!data.password)
-        return { success: false, message: "Senha obrigatória." };
-
-      // Verifica email duplicado
-      const existe = await prisma.user.findUnique({
-        where: { email: data.email },
-      });
-      if (existe) return { success: false, message: "Email já cadastrado." };
+      // Cria novo
+      const passwordRaw = data.password || "1234";
+      const passwordHash = await hashPassword(passwordRaw);
 
       await prisma.user.create({
         data: {
           nome: data.nome,
           email: data.email,
-          role: data.role as UserRole,
-          passwordHash: await hashPassword(data.password),
+          role: data.role,
+          passwordHash,
         },
       });
     }
@@ -152,18 +177,23 @@ export async function saveUser(data: any) {
     revalidatePath("/configuracoes");
     return { success: true };
   } catch (error) {
-    return { success: false, message: "Erro ao salvar usuário." };
+    console.error(error);
+    return {
+      success: false,
+      message: "Erro ao salvar usuário (Email já existe?)",
+    };
   }
 }
 
 export async function deleteUser(id: string) {
   const session = await getSession();
-  if (!session || (session.role !== "dono" && session.role !== "gestor")) {
-    return { success: false, message: "Sem permissão." };
+  if (!session || session.role !== "dono") {
+    return { success: false, message: "Sem permissão" };
   }
 
-  if (id === session.id)
-    return { success: false, message: "Não pode excluir a si mesmo." };
+  if (session.id === id) {
+    return { success: false, message: "Você não pode se excluir." };
+  }
 
   try {
     await prisma.user.delete({ where: { id } });

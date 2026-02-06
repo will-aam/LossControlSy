@@ -33,7 +33,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 // Importações
 import { User, UserRole } from "@/lib/types";
 import { getRoleLabel } from "@/lib/utils";
@@ -98,7 +98,16 @@ export default function ConfiguracoesPage() {
     // Carrega Users
     const usersResult = await getUsers();
     if (usersResult.success && usersResult.data) {
-      setUsers(usersResult.data as User[]);
+      // Mapeamento correto para garantir compatibilidade com a interface User
+      const mappedUsers: User[] = (usersResult.data as any[]).map((u) => ({
+        id: u.id,
+        nome: u.nome,
+        email: u.email,
+        role: u.role as UserRole,
+        avatarUrl: u.avatarUrl,
+        avatar: u.avatarUrl, // Compatibilidade
+      }));
+      setUsers(mappedUsers);
     }
 
     // Carrega Configs
@@ -115,18 +124,28 @@ export default function ConfiguracoesPage() {
     const result = await saveSettings(settings);
     if (result.success) {
       toast.success("Configurações salvas com sucesso!");
-      // O ideal aqui seria atualizar o contexto se ele usasse configs do banco em tempo real,
-      // mas por enquanto o reload de página garante a atualização.
     } else {
       toast.error(result.message);
     }
   };
 
   // --- AÇÕES DE USUÁRIOS ---
-  const handleSaveUser = async (
-    userData: Partial<User> & { password?: string },
-  ) => {
-    const result = await saveUser(userData);
+  // Tipagem ajustada para casar com o que o Dialog envia
+  const handleSaveUser = async (userData: {
+    id?: string;
+    nome: string;
+    email: string;
+    role: UserRole;
+    password?: string;
+    avatarUrl?: string;
+  }) => {
+    // Garantimos que 'nome' e 'email' sempre existem antes de enviar
+    if (!userData.nome || !userData.email) {
+      toast.error("Nome e Email são obrigatórios");
+      return;
+    }
+
+    const result = await saveUser(userData as any);
 
     if (result.success) {
       toast.success(
@@ -178,7 +197,7 @@ export default function ConfiguracoesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20 md:pb-0">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Configurações</h1>
@@ -254,7 +273,6 @@ export default function ConfiguracoesPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Regra 1: Foto Obrigatória */}
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label>Exigir foto em eventos de perda</Label>
@@ -271,7 +289,6 @@ export default function ConfiguracoesPage() {
               </div>
               <Separator />
 
-              {/* Regra 2: Bloqueio de Edição */}
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label>Bloquear edição após aprovação</Label>
@@ -288,14 +305,10 @@ export default function ConfiguracoesPage() {
               </div>
               <Separator />
 
-              {/* Regra 3: Acesso Galeria Funcionário */}
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2">
                     <Label>Permitir funcionários na Galeria</Label>
-                    <Badge variant="outline" className="text-[10px] h-5">
-                      Novo
-                    </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">
                     Se ativo, funcionários poderão acessar a aba Galeria e
@@ -370,6 +383,12 @@ export default function ConfiguracoesPage() {
                         <TableCell>
                           <div className="flex items-center gap-3">
                             <Avatar className="h-8 w-8">
+                              {user.avatarUrl ? (
+                                <AvatarImage
+                                  src={user.avatarUrl}
+                                  alt={user.nome}
+                                />
+                              ) : null}
                               <AvatarFallback className={roleColors[user.role]}>
                                 {initials}
                               </AvatarFallback>
@@ -418,7 +437,7 @@ export default function ConfiguracoesPage() {
           </Card>
         </TabsContent>
 
-        {/* --- NOTIFICAÇÕES TAB (Visual apenas por enquanto) --- */}
+        {/* --- NOTIFICAÇÕES TAB --- */}
         <TabsContent value="notificacoes" className="space-y-6">
           <Card>
             <CardHeader>

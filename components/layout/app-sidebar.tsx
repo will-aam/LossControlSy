@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -18,8 +18,6 @@ import {
   ShieldCheck,
   Sparkles,
   MessageSquareWarning,
-  UserPlus,
-  RefreshCcw, // Ícone de troca
 } from "lucide-react";
 import {
   Sidebar,
@@ -41,7 +39,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuGroup,
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/lib/auth-context";
@@ -68,21 +65,11 @@ const roleColors: Record<UserRole, string> = {
   dono: "bg-emerald-600 text-white",
 };
 
-// Interface para contas salvas no navegador
-interface SavedAccount {
-  id: string;
-  nome: string;
-  email: string;
-  role: UserRole;
-  avatarUrl?: string;
-}
-
 export function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, navItems, setUser, logout } = useAuth();
+  const { user, navItems, logout } = useAuth();
   const { isMobile } = useSidebar();
-  const [savedAccounts, setSavedAccounts] = useState<SavedAccount[]>([]);
 
   if (!user) return null;
 
@@ -93,52 +80,10 @@ export function AppSidebar() {
     .toUpperCase()
     .slice(0, 2);
 
-  // --- LÓGICA DE CONTAS SALVAS ---
-  useEffect(() => {
-    // 1. Carregar contas do localStorage
-    const stored = localStorage.getItem("losscontrol_saved_accounts");
-    let accounts: SavedAccount[] = stored ? JSON.parse(stored) : [];
-
-    // 2. Adicionar/Atualizar o usuário atual na lista
-    const currentUserData: SavedAccount = {
-      id: user.id,
-      nome: user.nome,
-      email: user.email,
-      role: user.role,
-      avatarUrl: user.avatarUrl,
-    };
-
-    // Remove a versão antiga do usuário atual se existir e adiciona a nova no topo
-    accounts = accounts.filter((acc) => acc.email !== user.email);
-    accounts.unshift(currentUserData);
-
-    // Salva de volta (mantendo no máximo 5 contas recentes)
-    const limitedAccounts = accounts.slice(0, 5);
-    localStorage.setItem(
-      "losscontrol_saved_accounts",
-      JSON.stringify(limitedAccounts),
-    );
-    setSavedAccounts(limitedAccounts);
-  }, [user]);
-
   const handleLogout = async () => {
-    await logout(); // Usa a função do contexto que limpa o cookie
-    router.push("/login");
-  };
-
-  const handleSwitchAccount = async (email: string) => {
-    await logout();
-    // Redireciona para login já com o email preenchido na URL
-    router.push(`/login?email=${encodeURIComponent(email)}`);
-  };
-
-  const handleAddAccount = async () => {
     await logout();
     router.push("/login");
   };
-
-  // Filtra a lista para não mostrar o usuário logado atualmente nas opções de troca
-  const otherAccounts = savedAccounts.filter((acc) => acc.email !== user.email);
 
   return (
     <Sidebar collapsible="icon">
@@ -264,53 +209,6 @@ export function AppSidebar() {
                     </div>
                   </div>
                 </DropdownMenuLabel>
-
-                <DropdownMenuSeparator />
-
-                {/* --- SEÇÃO DE TROCA DE CONTAS --- */}
-                {otherAccounts.length > 0 && (
-                  <>
-                    <DropdownMenuGroup>
-                      <DropdownMenuLabel className="text-xs text-muted-foreground font-normal">
-                        Alternar conta
-                      </DropdownMenuLabel>
-                      {otherAccounts.map((acc) => (
-                        <DropdownMenuItem
-                          key={acc.email}
-                          onClick={() => handleSwitchAccount(acc.email)}
-                          className="cursor-pointer"
-                        >
-                          <div className="flex items-center gap-2">
-                            <Avatar className="h-6 w-6 rounded-md border">
-                              <AvatarFallback
-                                className={`text-[10px] ${roleColors[acc.role]}`}
-                              >
-                                {acc.nome.charAt(0).toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex flex-col">
-                              <span className="font-medium text-xs">
-                                {acc.nome}
-                              </span>
-                              <span className="text-[10px] text-muted-foreground truncate max-w-30">
-                                {acc.email}
-                              </span>
-                            </div>
-                          </div>
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuGroup>
-                    <DropdownMenuSeparator />
-                  </>
-                )}
-
-                <DropdownMenuItem
-                  onClick={handleAddAccount}
-                  className="cursor-pointer"
-                >
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  Adicionar outra conta
-                </DropdownMenuItem>
 
                 <DropdownMenuSeparator />
 

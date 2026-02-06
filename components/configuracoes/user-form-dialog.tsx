@@ -18,14 +18,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-// Importações corrigidas
 import { User, UserRole } from "@/lib/types";
+import { Loader2 } from "lucide-react";
 
 interface UserFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   userToEdit: User | null;
-  onSave: (user: User) => void;
+  // Ajuste na tipagem do onSave para aceitar Partial<User> e senha
+  onSave: (data: {
+    id?: string;
+    nome: string;
+    email: string;
+    role: UserRole;
+    password?: string;
+    avatarUrl?: string;
+  }) => void;
 }
 
 export function UserFormDialog({
@@ -37,6 +45,8 @@ export function UserFormDialog({
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<UserRole>("funcionario");
+  const [password, setPassword] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Carrega os dados quando for edição
   useEffect(() => {
@@ -44,27 +54,31 @@ export function UserFormDialog({
       setNome(userToEdit.nome);
       setEmail(userToEdit.email);
       setRole(userToEdit.role);
+      setPassword(""); // Limpa senha na edição (opcional alterar)
     } else {
       // Reseta para novo usuário
       setNome("");
       setEmail("");
       setRole("funcionario");
+      setPassword("");
     }
   }, [userToEdit, open]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSubmitting(true);
 
-    // Mantém o ID se for edição, ou cria novo se for criação
-    const newUser: User = {
-      id: userToEdit ? userToEdit.id : Math.random().toString(36).substr(2, 9),
+    const userData = {
+      id: userToEdit?.id, // Envia ID apenas se for edição
       nome,
       email,
       role,
-      avatar: userToEdit?.avatar || "",
+      password: password || undefined, // Só envia se preenchido
+      avatarUrl: userToEdit?.avatarUrl || userToEdit?.avatar, // Mantém avatar antigo
     };
 
-    onSave(newUser);
+    await onSave(userData);
+    setIsSubmitting(false);
     onOpenChange(false);
   };
 
@@ -115,15 +129,40 @@ export function UserFormDialog({
               </SelectContent>
             </Select>
           </div>
+
+          <div className="grid gap-2">
+            <Label htmlFor="password">
+              {userToEdit ? "Nova Senha (Opcional)" : "Senha Inicial"}
+            </Label>
+            <Input
+              id="password"
+              type="text"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={userToEdit ? "Manter atual" : "Padrão: 1234"}
+            />
+            {!userToEdit && !password && (
+              <p className="text-[10px] text-muted-foreground">
+                Se vazio, será "1234".
+              </p>
+            )}
+          </div>
+
           <DialogFooter>
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
+              disabled={isSubmitting}
             >
               Cancelar
             </Button>
-            <Button type="submit">Salvar</Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : null}
+              Salvar
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>

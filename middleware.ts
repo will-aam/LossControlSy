@@ -1,10 +1,10 @@
-// middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 
+// --- IMPORTANTE: A chave deve ser IGUAL à usada no lib/session.ts ---
 const SECRET_KEY =
-  process.env.SESSION_SECRET || "minha-chave-secreta-super-segura-123";
+  process.env.SESSION_SECRET || "default-dev-secret-key-change-me";
 const key = new TextEncoder().encode(SECRET_KEY);
 
 // Rotas que NÃO precisam de autenticação (Públicas)
@@ -31,18 +31,20 @@ export async function middleware(req: NextRequest) {
 
   // 4. Validar Sessão
   let isAuthenticated = false;
+
   if (session) {
     try {
       await jwtVerify(session, key, { algorithms: ["HS256"] });
       isAuthenticated = true;
     } catch (error) {
       // Token inválido ou expirado
-      console.log("Token inválido");
+      // Em produção, isso força o logout se a chave secreta mudar
     }
   }
 
   // CENÁRIO A: Usuário NÃO logado tentando acessar rota protegida
   if (!isPublicRoute && !isAuthenticated) {
+    // Redireciona para login
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
@@ -54,16 +56,6 @@ export async function middleware(req: NextRequest) {
   return NextResponse.next();
 }
 
-// Configuração: Em quais rotas o middleware deve rodar?
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    "/((?!api|_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };

@@ -7,9 +7,10 @@ export interface User {
   nome: string;
   email: string;
   role: UserRole;
-  avatarUrl?: string; // Atualizado de 'avatar' para 'avatarUrl'
+  avatarUrl?: string; // Padronizado com o Prisma
+  // Campos opcionais para compatibilidade com componentes antigos
+  avatar?: string;
   createdAt?: string;
-  // Outros campos opcionais que podem vir do banco
 }
 
 export interface NavItem {
@@ -25,7 +26,7 @@ export interface Item {
   nome: string;
   categoria: string;
   subcategoria?: string;
-  unidade: "UN" | "KG" | "CX" | "L"; // Adicionei mais unidades comuns
+  unidade: "UN" | "KG" | "CX" | "L";
   custo: number;
   precoVenda: number;
   imagemUrl?: string;
@@ -77,9 +78,9 @@ export interface NotaFiscal {
   uploadedBy: User;
 
   // Arquivos
-  pdfUrl?: string; // URL do PDF no R2
-  xmlUrl?: string; // NOVO: URL do XML no R2
-  xmlContent?: string; // Conteúdo texto do XML (para leitura/backup)
+  pdfUrl?: string;
+  xmlUrl?: string;
+  xmlContent?: string;
 
   // Metadados
   numero?: string;
