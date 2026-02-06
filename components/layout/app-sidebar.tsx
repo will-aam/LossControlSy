@@ -13,7 +13,6 @@ import {
   BarChart3,
   Settings,
   Tags,
-  ChevronsUpDown,
   LogOut,
   ShieldCheck,
   Sparkles,
@@ -30,17 +29,9 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  useSidebar,
 } from "@/components/ui/sidebar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button"; // Importando Button para o logout
 import { useAuth } from "@/lib/auth-context";
 import { getRoleLabel } from "@/lib/utils";
 import { UserRole } from "@/lib/types";
@@ -69,7 +60,6 @@ export function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, navItems, logout } = useAuth();
-  const { isMobile } = useSidebar();
 
   if (!user) return null;
 
@@ -156,73 +146,40 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuButton
-                  size="lg"
-                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-                >
-                  <Avatar className="h-8 w-8 rounded-lg">
-                    {user.avatarUrl ? (
-                      <AvatarImage src={user.avatarUrl} alt={user.nome} />
-                    ) : null}
-                    <AvatarFallback
-                      className={`rounded-lg ${roleColors[user.role]}`}
-                    >
-                      {initials}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-semibold">{user.nome}</span>
-                    <span className="truncate text-xs text-muted-foreground capitalize">
-                      {getRoleLabel(user.role)}
-                    </span>
-                  </div>
-                  <ChevronsUpDown className="ml-auto size-4" />
-                </SidebarMenuButton>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                className="w-[--radix-dropdown-menu-trigger-width] min-w-56 rounded-lg"
-                side={isMobile ? "bottom" : "right"}
-                align="end"
-                sideOffset={4}
-              >
-                <DropdownMenuLabel className="p-0 font-normal">
-                  <div className="flex items-center gap-2 px-1 py-1.5 text-left text-sm">
-                    <Avatar className="h-8 w-8 rounded-lg">
-                      <AvatarFallback
-                        className={`rounded-lg ${roleColors[user.role]}`}
-                      >
-                        {initials}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="grid flex-1 text-left text-sm leading-tight">
-                      <span className="truncate font-semibold">
-                        {user.nome}
-                      </span>
-                      <span className="truncate text-xs text-muted-foreground">
-                        {user.email}
-                      </span>
-                    </div>
-                  </div>
-                </DropdownMenuLabel>
+      <SidebarFooter className="p-2 border-t">
+        <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-sidebar-accent/50 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:bg-transparent group-data-[collapsible=icon]:justify-center">
+          {/* Informações do Usuário */}
+          <div className="flex items-center gap-3 overflow-hidden group-data-[collapsible=icon]:hidden">
+            <Avatar className="h-9 w-9 rounded-lg border">
+              {user.avatarUrl ? (
+                <AvatarImage src={user.avatarUrl} alt={user.nome} />
+              ) : null}
+              <AvatarFallback className={`rounded-lg ${roleColors[user.role]}`}>
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            <div className="grid flex-1 text-left text-sm leading-tight">
+              <span className="truncate font-semibold text-foreground">
+                {user.nome}
+              </span>
+              <span className="truncate text-xs text-muted-foreground capitalize">
+                {getRoleLabel(user.role)}
+              </span>
+            </div>
+          </div>
 
-                <DropdownMenuSeparator />
-
-                <DropdownMenuItem
-                  onClick={handleLogout}
-                  className="text-destructive focus:text-destructive cursor-pointer"
-                >
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Sair
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </SidebarMenuItem>
-        </SidebarMenu>
+          {/* Botão de Logout */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleLogout}
+            className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-9 w-9 shrink-0 group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:mt-2"
+            title="Sair do sistema"
+          >
+            <LogOut className="h-5 w-5" />
+            <span className="sr-only">Sair</span>
+          </Button>
+        </div>
       </SidebarFooter>
     </Sidebar>
   );
