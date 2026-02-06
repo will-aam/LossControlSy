@@ -1,225 +1,121 @@
 "use client";
 
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useMemo,
-} from "react";
-import { User, NavItem } from "@/lib/types";
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { User, NavItem, UserRole } from "@/lib/types";
+import { getPermissions, hasPermission } from "@/lib/permissions";
+import {
+  LayoutDashboard,
+  Package,
+  List,
+  ClipboardCheck,
+  Images,
+  BarChart3,
+  Settings,
+  Tags,
+  MessageSquareWarning,
+} from "lucide-react";
 import {
   loginAction,
   logoutAction,
   getClientSession,
 } from "@/app/actions/auth";
-import { getSettings } from "@/app/actions/configuracoes"; // Importa a action
-import { useRouter } from "next/navigation";
-import {
-  LayoutDashboard,
-  ClipboardCheck,
-  Package,
-  Images,
-  BarChart3,
-  Settings,
-  Tags,
-  PlusCircle,
-  FileText,
-  MessageSquareWarning,
-} from "lucide-react";
+import { getSettings } from "@/app/actions/configuracoes";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
-// --- DEFINIÇÃO DE PERMISSÕES ---
-type Permission =
-  | "dashboard:ver"
-  | "eventos:ver_todos"
-  | "eventos:criar"
-  | "eventos:editar"
-  | "eventos:excluir"
-  | "eventos:aprovar"
-  | "eventos:exportar"
-  | "catalogo:ver"
-  | "catalogo:criar"
-  | "catalogo:importar"
-  | "catalogo:editar"
-  | "catalogo:status"
-  | "catalogo:excluir"
-  | "categorias:ver"
-  | "categorias:criar"
-  | "categorias:editar"
-  | "categorias:excluir"
-  | "motivos:ver"
-  | "motivos:criar"
-  | "motivos:editar"
-  | "motivos:excluir"
-  | "galeria:ver"
-  | "galeria:upload"
-  | "galeria:excluir"
-  | "notas:ver"
-  | "notas:upload"
-  | "notas:excluir"
-  | "relatorios:ver"
-  | "configuracoes:ver";
-
-const ROLE_PERMISSIONS: Record<string, Permission[]> = {
-  dono: [
-    "dashboard:ver",
-    "eventos:ver_todos",
-    "eventos:criar",
-    "eventos:editar",
-    "eventos:excluir",
-    "eventos:aprovar",
-    "eventos:exportar",
-    "catalogo:ver",
-    "catalogo:criar",
-    "catalogo:importar",
-    "catalogo:editar",
-    "catalogo:status",
-    "catalogo:excluir",
-    "categorias:ver",
-    "categorias:criar",
-    "categorias:editar",
-    "categorias:excluir",
-    "motivos:ver",
-    "motivos:criar",
-    "motivos:editar",
-    "motivos:excluir",
-    "galeria:ver",
-    "galeria:upload",
-    "galeria:excluir",
-    "notas:ver",
-    "notas:upload",
-    "notas:excluir",
-    "relatorios:ver",
-    "configuracoes:ver",
-  ],
-  gestor: [
-    "dashboard:ver",
-    "eventos:ver_todos",
-    "eventos:criar",
-    "eventos:editar",
-    "eventos:excluir",
-    "eventos:aprovar",
-    "eventos:exportar",
-    "catalogo:ver",
-    "catalogo:criar",
-    "catalogo:importar",
-    "catalogo:editar",
-    "catalogo:status",
-    "catalogo:excluir",
-    "categorias:ver",
-    "categorias:criar",
-    "categorias:editar",
-    "categorias:excluir",
-    "motivos:ver",
-    "motivos:criar",
-    "motivos:editar",
-    "motivos:excluir",
-    "galeria:ver",
-    "galeria:upload",
-    "galeria:excluir",
-    "notas:ver",
-    "notas:upload",
-    "notas:excluir",
-    "relatorios:ver",
-  ],
-  fiscal: [
-    "dashboard:ver",
-    "eventos:ver_todos",
-    "eventos:exportar",
-    "catalogo:ver",
-    "catalogo:criar",
-    "catalogo:importar",
-    "catalogo:editar",
-    "catalogo:status",
-    "catalogo:excluir",
-    "categorias:ver",
-    "categorias:criar",
-    "categorias:editar",
-    "categorias:excluir",
-    "motivos:ver",
-    "galeria:ver",
-    "galeria:upload",
-    "notas:ver",
-    "notas:upload",
-    "relatorios:ver",
-  ],
-  funcionario: [
-    "eventos:criar",
-    "catalogo:ver",
-    "catalogo:criar",
-    "catalogo:status",
-    "categorias:ver",
-    "categorias:criar",
-    "categorias:editar",
-  ],
-};
-
-// Tipo para as configurações globais
-interface AppSettings {
-  empresaNome: string;
-  exigirFoto: boolean;
-  bloquearAprovados: boolean;
-  permitirFuncionarioGaleria: boolean;
-}
+// --- Definição dos Menus (Sidebar) ---
+const ALL_NAV_ITEMS: NavItem[] = [
+  { title: "Visão Geral", href: "/dashboard", icon: "LayoutDashboard" },
+  { title: "Catálogo", href: "/catalogo", icon: "Package" },
+  { title: "Categorias", href: "/categorias", icon: "List" },
+  { title: "Eventos / Perdas", href: "/eventos", icon: "ClipboardCheck" },
+  { title: "Galeria", href: "/galeria", icon: "Images" },
+  { title: "Notas Fiscais", href: "/notas", icon: "Tags" },
+  { title: "Motivos", href: "/motivos", icon: "MessageSquareWarning" },
+  { title: "Relatórios", href: "/relatorios", icon: "BarChart3" },
+  { title: "Configurações", href: "/configuracoes", icon: "Settings" },
+];
 
 interface AuthContextType {
   user: User | null;
-  settings: AppSettings; // Agora exportamos as settings
   isLoading: boolean;
-  login: (email: string, password?: string) => Promise<void>;
-  logout: () => void;
-  hasPermission: (permission: Permission) => boolean;
   navItems: NavItem[];
-  setUser: (user: User | null) => void;
+  settings: any;
+  login: (email: string, password?: string) => Promise<void>;
+  logout: () => Promise<void>;
+  hasPermission: (permission: string) => boolean;
 }
 
-const AuthContext = createContext<AuthContextType>({} as AuthContextType);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-
-  // Estado padrão das configurações
-  const [settings, setSettings] = useState<AppSettings>({
-    empresaNome: "Minha Empresa",
-    exigirFoto: false,
-    bloquearAprovados: true,
-    permitirFuncionarioGaleria: false,
-  });
-
+  const [navItems, setNavItems] = useState<NavItem[]>([]);
+  const [settings, setSettings] = useState<any>(null);
   const router = useRouter();
 
-  // Carrega Usuário e Configurações do Banco
+  const loadSettings = async () => {
+    try {
+      const result = await getSettings();
+      if (result.success && result.data) {
+        setSettings(result.data);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar configurações no contexto");
+    }
+  };
+
+  // --- 1. Carregar Sessão ao Iniciar ---
   useEffect(() => {
-    const init = async () => {
+    const initAuth = async () => {
       try {
-        // 1. Carrega Sessão
         const sessionUser = await getClientSession();
         if (sessionUser) {
-          setUser(sessionUser);
-        }
-
-        // 2. Carrega Configurações
-        const configResult = await getSettings();
-        if (configResult.success && configResult.data) {
-          setSettings({
-            empresaNome: configResult.data.empresaNome,
-            exigirFoto: configResult.data.exigirFoto,
-            bloquearAprovados: configResult.data.bloquearAprovados,
-            permitirFuncionarioGaleria:
-              configResult.data.permitirFuncionarioGaleria,
-          });
+          const safeUser: User = {
+            ...sessionUser,
+            ativo: sessionUser.ativo ?? true,
+            ownerId: sessionUser.ownerId ?? null,
+            avatarUrl: sessionUser.avatarUrl ?? undefined,
+          };
+          setUser(safeUser);
+          await loadSettings();
         }
       } catch (error) {
-        console.error("Erro na inicialização:", error);
+        console.error("Erro ao restaurar sessão:", error);
       } finally {
         setIsLoading(false);
       }
     };
-    init();
-  }, []); // Executa apenas uma vez no mount
+    initAuth();
+  }, []);
 
+  // --- 2. Atualizar Menu quando Usuário/Settings mudar ---
+  useEffect(() => {
+    if (user) {
+      const userPermissions = getPermissions(user.role);
+
+      const filteredNav = ALL_NAV_ITEMS.filter((item) => {
+        if (item.href === "/galeria" && user.role === "funcionario") {
+          return settings?.permitirFuncionarioGaleria === true;
+        }
+
+        const resource = item.href.replace("/", "");
+        const permissionKey = `${resource}:ver`;
+
+        if (resource === "dashboard") return true;
+
+        const perms = userPermissions as string[];
+        return perms.includes(permissionKey) || perms.includes("*");
+      });
+
+      setNavItems(filteredNav);
+    } else {
+      setNavItems([]);
+    }
+  }, [user, settings]);
+
+  // --- Ações de Auth ---
   const login = async (email: string, password?: string) => {
     setIsLoading(true);
     try {
@@ -230,25 +126,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           id: result.user.id,
           nome: result.user.nome,
           email: result.user.email,
-          role: result.user.role as any,
-          avatarUrl: result.user.avatarUrl || undefined,
+          role: result.user.role as UserRole,
+          avatarUrl: result.user.avatarUrl ?? undefined,
+          ativo: result.user.ativo,
+          ownerId: result.user.ownerId,
         };
 
         setUser(userData);
-
-        // Recarrega configs ao logar
-        const configResult = await getSettings();
-        if (configResult.success && configResult.data) {
-          setSettings(configResult.data as any);
-        }
-
+        await loadSettings();
         toast.success(`Bem-vindo, ${userData.nome.split(" ")[0]}!`);
         router.push("/dashboard");
       } else {
-        toast.error(result.message || "Credenciais inválidas");
+        toast.error(result.message || "Falha ao entrar.");
       }
     } catch (error) {
-      toast.error("Erro de conexão ao tentar entrar.");
+      toast.error("Erro de conexão.");
     } finally {
       setIsLoading(false);
     }
@@ -257,103 +149,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     await logoutAction();
     setUser(null);
+    setSettings(null);
+    router.push("/login");
   };
 
-  const hasPermission = (permission: Permission): boolean => {
+  const checkPermission = (permission: string) => {
     if (!user) return false;
-
-    if (
-      user.role === "funcionario" &&
-      (permission === "galeria:ver" || permission === "galeria:upload")
-    ) {
-      return settings.permitirFuncionarioGaleria;
-    }
-
-    const permissions = ROLE_PERMISSIONS[user.role] || [];
-    return permissions.includes(permission);
+    // --- CORREÇÃO AQUI ---
+    // Passamos 'user.role' em vez de 'user'
+    return hasPermission(user.role, permission as any);
   };
-
-  const navItems = useMemo(() => {
-    const items: NavItem[] = [];
-
-    if (hasPermission("dashboard:ver")) {
-      items.push({
-        title: "Dashboard",
-        href: "/dashboard",
-        icon: "LayoutDashboard",
-      });
-    }
-
-    if (user?.role === "funcionario") {
-      items.push({
-        title: "Registrar Perda",
-        href: "/eventos/novo",
-        icon: "PlusCircle",
-      });
-    } else {
-      if (hasPermission("eventos:ver_todos")) {
-        items.push({
-          title: "Eventos",
-          href: "/eventos",
-          icon: "ClipboardCheck",
-        });
-      }
-    }
-
-    if (hasPermission("catalogo:ver")) {
-      items.push({ title: "Catálogo", href: "/catalogo", icon: "Package" });
-    }
-
-    if (hasPermission("categorias:ver")) {
-      items.push({ title: "Categorias", href: "/categorias", icon: "Tags" });
-    }
-
-    if (hasPermission("motivos:ver")) {
-      items.push({
-        title: "Motivos de Perda",
-        href: "/motivos",
-        icon: "MessageSquareWarning",
-      });
-    }
-
-    if (hasPermission("galeria:ver")) {
-      items.push({ title: "Galeria", href: "/galeria", icon: "Images" });
-    }
-
-    if (hasPermission("notas:ver")) {
-      items.push({ title: "Notas Fiscais", href: "/notas", icon: "FileText" });
-    }
-
-    if (hasPermission("relatorios:ver")) {
-      items.push({
-        title: "Relatórios",
-        href: "/relatorios",
-        icon: "BarChart3",
-      });
-    }
-
-    if (hasPermission("configuracoes:ver")) {
-      items.push({
-        title: "Configurações",
-        href: "/configuracoes",
-        icon: "Settings",
-      });
-    }
-
-    return items;
-  }, [user, settings]);
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        settings, // Exportando settings para quem precisar
         isLoading,
+        navItems,
+        settings,
         login,
         logout,
-        hasPermission,
-        navItems,
-        setUser,
+        hasPermission: checkPermission,
       }}
     >
       {children}
@@ -361,4 +177,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useAuth deve ser usado dentro de um AuthProvider");
+  }
+  return context;
+};
