@@ -1,24 +1,33 @@
-import React from "react";
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
-import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
-// 1. Importe o AuthProvider
+import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "@/components/ui/sonner";
 import { AuthProvider } from "@/lib/auth-context";
-import { Toaster } from "@/components/ui/sonner"; // Importante para os toasts funcionarem globalmente
 
 const inter = Inter({ subsets: ["latin"] });
 
-export const metadata: Metadata = {
-  title: "Sistema de Controle de Perdas",
-  description: "Controle operacional e gerencial de quebras e descartes",
-  generator: "v0.app",
-};
-
 export const viewport: Viewport = {
-  themeColor: "#0a0a0a",
+  themeColor: "#ffffff",
   width: "device-width",
   initialScale: 1,
+  maximumScale: 1,
+  userScalable: false, // Sensação de app nativo (não dá zoom sem querer)
+};
+
+export const metadata: Metadata = {
+  title: "Loss Control",
+  description: "Sistema de Controle de Perdas",
+  manifest: "/manifest.json", // Link para o PWA
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Loss Control",
+  },
+  icons: {
+    icon: "/icon.svg",
+    apple: "/apple-icon.png",
+  },
 };
 
 export default function RootLayout({
@@ -27,14 +36,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="pt-BR">
-      <body className={`${inter.className} antialiased`}>
-        {/* 2. Envolva toda a aplicação com o AuthProvider */}
-        <AuthProvider>
-          {children}
-          <Analytics />
-          <Toaster /> {/* Toast global */}
-        </AuthProvider>
+    <html lang="pt-BR" suppressHydrationWarning>
+      <body className={inter.className}>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <AuthProvider>
+            {children}
+            <Toaster />
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
