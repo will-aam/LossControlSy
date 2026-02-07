@@ -1,3 +1,4 @@
+// components/layout/app-sidebar.tsx
 "use client";
 
 import React from "react";
@@ -31,7 +32,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button"; // Importando Button para o logout
+import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
 import { getRoleLabel } from "@/lib/utils";
 import { UserRole } from "@/lib/types";

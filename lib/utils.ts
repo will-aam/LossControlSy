@@ -2,12 +2,9 @@ import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { EventoStatus, UserRole } from "./types";
 
-// Função padrão do Shadcn UI
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
-
-// --- Funções Migradas do mock-data.ts ---
 
 export function formatCurrency(value: number): string {
   return new Intl.NumberFormat("pt-BR", {

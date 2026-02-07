@@ -2,18 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, NavItem, UserRole } from "@/lib/types";
-import { getPermissions, hasPermission } from "@/lib/permissions";
-import {
-  LayoutDashboard,
-  Package,
-  List,
-  ClipboardCheck,
-  Images,
-  BarChart3,
-  Settings,
-  Tags,
-  MessageSquareWarning,
-} from "lucide-react";
+import { hasPermission, Permission } from "@/lib/permissions";
 import {
   loginAction,
   logoutAction,
@@ -23,17 +12,72 @@ import { getSettings } from "@/app/actions/configuracoes";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
-// --- Definição dos Menus (Sidebar) ---
-const ALL_NAV_ITEMS: NavItem[] = [
-  { title: "Visão Geral", href: "/dashboard", icon: "LayoutDashboard" },
-  { title: "Catálogo", href: "/catalogo", icon: "Package" },
-  { title: "Categorias", href: "/categorias", icon: "List" },
-  { title: "Eventos / Perdas", href: "/eventos", icon: "ClipboardCheck" },
-  { title: "Galeria", href: "/galeria", icon: "Images" },
-  { title: "Notas Fiscais", href: "/notas", icon: "Tags" },
-  { title: "Motivos", href: "/motivos", icon: "MessageSquareWarning" },
-  { title: "Relatórios", href: "/relatorios", icon: "BarChart3" },
-  { title: "Configurações", href: "/configuracoes", icon: "Settings" },
+// --- Definição dos Menus (Sidebar) com Permissões Explicitas ---
+interface NavItemWithPermission extends NavItem {
+  permission: Permission; // Define qual permissão exata é necessária
+}
+
+const ALL_NAV_ITEMS: NavItemWithPermission[] = [
+  {
+    title: "Visão Geral",
+    href: "/dashboard",
+    icon: "LayoutDashboard",
+    permission: "dashboard:ver",
+  },
+  {
+    title: "Registrar Perda",
+    href: "/eventos/novo",
+    icon: "PlusCircle",
+    permission: "eventos:criar",
+  },
+  {
+    title: "Eventos / Perdas",
+    href: "/eventos",
+    icon: "ClipboardCheck",
+    permission: "eventos:menu",
+  },
+  {
+    title: "Catálogo",
+    href: "/catalogo",
+    icon: "Package",
+    permission: "catalogo:ver",
+  },
+  {
+    title: "Categorias",
+    href: "/categorias",
+    icon: "List",
+    permission: "categorias:ver",
+  },
+  {
+    title: "Galeria",
+    href: "/galeria",
+    icon: "Images",
+    permission: "galeria:ver",
+  },
+  {
+    title: "Notas Fiscais",
+    href: "/notas",
+    icon: "Tags",
+    permission: "notas:ver",
+  },
+  {
+    title: "Motivos",
+    href: "/motivos",
+    icon: "MessageSquareWarning",
+    permission: "motivos:ver",
+  },
+  {
+    title: "Relatórios",
+    href: "/relatorios",
+    icon: "BarChart3",
+    permission: "relatorios:ver",
+  },
+  {
+    title: "Configurações",
+    href: "/configuracoes",
+    icon: "Settings",
+    permission: "configuracoes:ver",
+  },
 ];
 
 interface AuthContextType {
@@ -93,20 +137,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // --- 2. Atualizar Menu quando Usuário/Settings mudar ---
   useEffect(() => {
     if (user) {
-      const userPermissions = getPermissions(user.role);
-
       const filteredNav = ALL_NAV_ITEMS.filter((item) => {
+        // Regra especial para Galeria (Funcionario depende de Config)
         if (item.href === "/galeria" && user.role === "funcionario") {
-          return settings?.permitirFuncionarioGaleria === true;
+          // Verifica se tem a permissão base E a configuração ativa
+          const temPermissaoBase = hasPermission(user.role, item.permission);
+          return (
+            temPermissaoBase && settings?.permitirFuncionarioGaleria === true
+          );
         }
 
-        const resource = item.href.replace("/", "");
-        const permissionKey = `${resource}:ver`;
-
-        if (resource === "dashboard") return true;
-
-        const perms = userPermissions as string[];
-        return perms.includes(permissionKey) || perms.includes("*");
+        // Regra padrão: Verifica se o usuário tem a permissão exigida pelo item
+        // Como o funcionario NÃO TEM "dashboard:ver", o item "Visão Geral" será removido aqui
+        return hasPermission(user.role, item.permission);
       });
 
       setNavItems(filteredNav);
@@ -135,7 +178,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(userData);
         await loadSettings();
         toast.success(`Bem-vindo, ${userData.nome.split(" ")[0]}!`);
-        router.push("/dashboard");
+
+        // --- REDIRECIONAMENTO BASEADO NO CARGO ---
+        // Se for funcionário, manda para "Registrar Perda"
+        // Se for gestor/dono/fiscal, manda para "Dashboard"
+        if (userData.role === "funcionario") {
+          router.push("/eventos/novo");
+        } else {
+          router.push("/dashboard");
+        }
       } else {
         toast.error(result.message || "Falha ao entrar.");
       }
@@ -155,8 +206,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const checkPermission = (permission: string) => {
     if (!user) return false;
-    // --- CORREÇÃO AQUI ---
-    // Passamos 'user.role' em vez de 'user'
     return hasPermission(user.role, permission as any);
   };
 

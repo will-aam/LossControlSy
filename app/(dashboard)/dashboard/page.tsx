@@ -1,3 +1,4 @@
+// app/(dashboard)/dashboard/page.tsx
 "use client";
 
 import { useEffect, useState, useMemo } from "react";

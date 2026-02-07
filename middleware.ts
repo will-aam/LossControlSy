@@ -12,7 +12,6 @@ export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
 
   // 1. Verificação extra para arquivos estáticos na raiz (caso o matcher deixe passar algo)
-  // Isso garante que android-chrome-192x192.png, etc, não sejam bloqueados
   if (
     path.endsWith(".png") ||
     path.endsWith(".jpg") ||
@@ -31,15 +30,20 @@ export async function middleware(req: NextRequest) {
   // 3. Ler o Cookie de Sessão
   const session = req.cookies.get("session_token")?.value;
 
-  // 4. Validar Sessão
+  // 4. Validar Sessão e obter o CARGO do usuário
   let isAuthenticated = false;
+  let userRole = "";
 
   if (session) {
     try {
-      await jwtVerify(session, key, { algorithms: ["HS256"] });
+      // Extraímos o 'payload' para ler os dados salvos no token (como o role)
+      const { payload } = await jwtVerify(session, key, {
+        algorithms: ["HS256"],
+      });
       isAuthenticated = true;
+      userRole = payload.role as string;
     } catch (error) {
-      // Token inválido
+      // Token inválido ou expirado
     }
   }
 
@@ -50,6 +54,12 @@ export async function middleware(req: NextRequest) {
 
   // CENÁRIO B: Usuário JÁ logado tentando acessar Login
   if (path === "/login" && isAuthenticated) {
+    // SE FOR FUNCIONÁRIO: Manda para Registrar Perda (pois não tem acesso ao dashboard)
+    if (userRole === "funcionario") {
+      return NextResponse.redirect(new URL("/eventos/novo", req.url));
+    }
+
+    // OUTROS (Gestor, Dono, Fiscal): Mandam para o Dashboard
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
@@ -57,7 +67,7 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // Atualizei o matcher para excluir explicitamente sw.js, manifest.json e arquivos .png/.svg
+  // Mantive o matcher otimizado que definimos antes
   matcher: [
     "/((?!api|_next/static|_next/image|favicon.ico|sw.js|sw.js.map|manifest.json|.*\\.png$|.*\\.svg$).*)",
   ],

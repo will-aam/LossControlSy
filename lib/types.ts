@@ -1,3 +1,4 @@
+// lib/types.ts
 // Definições de Tipos do Sistema (Sem dados falsos)
 
 export type UserRole = "dono" | "gestor" | "fiscal" | "funcionario";
@@ -7,10 +8,9 @@ export interface User {
   nome: string;
   email: string;
   role: UserRole;
-  ativo: boolean; // NOVO: Status do usuário
-  ownerId?: string | null; // NOVO: ID do chefe (se for funcionário)
+  ativo: boolean;
+  ownerId?: string | null;
   avatarUrl?: string;
-  // Campos opcionais para compatibilidade
   avatar?: string;
   createdAt?: string;
 }

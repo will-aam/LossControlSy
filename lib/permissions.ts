@@ -1,3 +1,4 @@
+// lib/permissions.ts
 // RBAC - Role Based Access Control
 import { UserRole } from "./types";
 
@@ -9,6 +10,9 @@ export type Permission =
   | "eventos:editar"
   | "eventos:exportar"
   | "eventos:excluir"
+  | "eventos:menu"
+
+  // Motivos
   | "motivos:ver"
   | "motivos:criar"
   | "motivos:editar"
@@ -33,7 +37,7 @@ export type Permission =
   | "galeria:upload"
   | "galeria:excluir"
 
-  // Notas Fiscais (NOVO)
+  // Notas Fiscais
   | "notas:ver"
   | "notas:upload"
   | "notas:excluir"
@@ -46,6 +50,8 @@ export type Permission =
 
 const rolePermissions: Record<UserRole, Permission[]> = {
   funcionario: [
+    // REMOVIDO: "dashboard:ver",
+    "eventos:menu",
     "eventos:criar",
     "catalogo:ver",
     "catalogo:status",
@@ -55,6 +61,7 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     "categorias:editar",
   ],
   gestor: [
+    "eventos:menu",
     "eventos:criar",
     "eventos:ver_todos",
     "eventos:aprovar",
@@ -74,9 +81,9 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     "galeria:ver",
     "galeria:upload",
     "galeria:excluir",
-    "notas:ver", // NOVO
-    "notas:upload", // NOVO
-    "notas:excluir", // NOVO
+    "notas:ver",
+    "notas:upload",
+    "notas:excluir",
     "relatorios:ver",
     "dashboard:ver",
     "motivos:ver",
@@ -98,13 +105,14 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     "categorias:editar",
     "categorias:excluir",
     "galeria:ver",
-    "galeria:upload", // Fiscal pode subir foto
-    "notas:ver", // NOVO
-    "notas:upload", // NOVO
+    "galeria:upload",
+    "notas:ver",
+    "notas:upload",
     "relatorios:ver",
     "dashboard:ver",
   ],
   dono: [
+    "eventos:menu",
     "eventos:criar",
     "eventos:ver_todos",
     "eventos:aprovar",
@@ -124,9 +132,9 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     "galeria:ver",
     "galeria:upload",
     "galeria:excluir",
-    "notas:ver", // NOVO
-    "notas:upload", // NOVO
-    "notas:excluir", // NOVO
+    "notas:ver",
+    "notas:upload",
+    "notas:excluir",
     "relatorios:ver",
     "dashboard:ver",
     "configuracoes:ver",
@@ -144,76 +152,4 @@ export function hasPermission(role: UserRole, permission: Permission): boolean {
 
 export function getPermissions(role: UserRole): Permission[] {
   return rolePermissions[role] ?? [];
-}
-
-// Navigation items based on role
-export interface NavItem {
-  title: string;
-  href: string;
-  icon: string;
-  permission?: Permission;
-}
-
-export const navItems: NavItem[] = [
-  {
-    title: "Dashboard",
-    href: "/dashboard",
-    icon: "LayoutDashboard",
-    permission: "dashboard:ver",
-  },
-  {
-    title: "Registrar Perda",
-    href: "/eventos/novo",
-    icon: "PlusCircle",
-    permission: "eventos:criar",
-  },
-  {
-    title: "Eventos",
-    href: "/eventos",
-    icon: "ClipboardCheck",
-    permission: "eventos:ver_todos",
-  },
-  {
-    title: "Catálogo",
-    href: "/catalogo",
-    icon: "Package",
-    permission: "catalogo:ver",
-  },
-  {
-    title: "Categorias",
-    href: "/categorias",
-    icon: "Tags",
-    permission: "categorias:ver",
-  },
-  {
-    title: "Galeria",
-    href: "/galeria",
-    icon: "Images",
-    permission: "galeria:ver",
-  },
-  {
-    title: "Notas Fiscais", // NOVO ITEM
-    href: "/notas",
-    icon: "FileText",
-    permission: "notas:ver",
-  },
-  {
-    title: "Relatórios",
-    href: "/relatorios",
-    icon: "BarChart3",
-    permission: "relatorios:ver",
-  },
-  {
-    title: "Configurações",
-    href: "/configuracoes",
-    icon: "Settings",
-    permission: "configuracoes:ver",
-  },
-];
-
-export function getNavItemsForRole(role: UserRole): NavItem[] {
-  return navItems.filter((item) => {
-    if (!item.permission) return true;
-    return hasPermission(role, item.permission);
-  });
 }

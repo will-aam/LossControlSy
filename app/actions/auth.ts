@@ -1,3 +1,4 @@
+// app/actions/auth.ts
 "use server";
 
 import { prisma } from "@/lib/prisma";
@@ -9,7 +10,7 @@ import {
   hashPassword,
 } from "@/lib/session";
 import { redirect } from "next/navigation";
-import { User, UserRole } from "@/lib/types";
+import { User } from "@/lib/types";
 import { revalidatePath } from "next/cache";
 
 // 1. Função de Login
