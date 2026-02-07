@@ -18,7 +18,6 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
 };
-
 export const metadata: Metadata = {
   title: "LossControlSy - Controle de Perdas",
   description: "Sistema web para controle de perda de estoque.",
@@ -32,8 +31,8 @@ export const metadata: Metadata = {
     telephone: false,
   },
   icons: {
-    icon: "/icon.png",
-    apple: "/apple-touch-icon.png",
+    icon: "/icon.png", // Favicon padrão
+    apple: "/apple-touch-icon.png", // <--- O NOME CORRETO É ESSE
   },
 };
 
