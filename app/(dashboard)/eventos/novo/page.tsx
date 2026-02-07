@@ -1,4 +1,3 @@
-// app/(dashboard)/eventos/novo/page.tsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -26,6 +25,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar"; // <--- IMPORTADO
 import { ItemSearch } from "@/components/forms/item-search";
 import { Item } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
@@ -44,6 +44,7 @@ import {
   Loader2,
   ChevronsUpDown,
   Check,
+  Calendar as CalendarIcon, // <--- ÍCONE DE CALENDÁRIO
 } from "lucide-react";
 import {
   Dialog,
@@ -73,7 +74,7 @@ interface ItemLancamento {
 
 export default function NovoEventoPage() {
   const router = useRouter();
-  const { user, hasPermission, settings } = useAuth(); // Pegando settings do AuthContext
+  const { user, hasPermission, settings } = useAuth();
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [activeItemIdForPhoto, setActiveItemIdForPhoto] = useState<
@@ -82,6 +83,9 @@ export default function NovoEventoPage() {
 
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [quantidade, setQuantidade] = useState("");
+
+  // ESTADO DA DATA (Padrão: Hoje)
+  const [date, setDate] = useState<Date | undefined>(new Date());
 
   // Controle de Motivos
   const [motivos, setMotivos] = useState<{ id: string; nome: string }[]>([]);
@@ -93,9 +97,7 @@ export default function NovoEventoPage() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [exigirFoto, setExigirFoto] = useState(false);
 
-  // Carrega Motivos e Configs
   useEffect(() => {
-    // Sincroniza configs do contexto
     if (settings) {
       setExigirFoto(settings.exigirFoto);
     }
@@ -118,16 +120,13 @@ export default function NovoEventoPage() {
       return;
     }
 
-    // Define motivo padrão se vazio
     const motivoFinal = selectedMotivo.trim() || "Perda Operacional";
 
-    // Se o motivo não existe na lista, cria ele no banco automaticamente
     const motivoExistente = motivos.find(
       (m) => m.nome.toLowerCase() === motivoFinal.toLowerCase(),
     );
 
     if (!motivoExistente && motivoFinal !== "Perda Operacional") {
-      // Dispara criação assíncrona sem travar a UI
       createMotivo(motivoFinal).then(() => loadMotivos());
     }
 
@@ -142,7 +141,6 @@ export default function NovoEventoPage() {
 
     setItemsList([novoLancamento, ...itemsList]);
 
-    // Reset
     setSelectedItem(null);
     setQuantidade("");
     setSelectedMotivo("");
@@ -154,7 +152,6 @@ export default function NovoEventoPage() {
     setItemsList(itemsList.filter((i) => i.tempId !== tempId));
   };
 
-  // --- FOTO ---
   const triggerPhotoInput = (tempId: string) => {
     setActiveItemIdForPhoto(tempId);
     setTimeout(() => {
@@ -165,7 +162,6 @@ export default function NovoEventoPage() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && activeItemIdForPhoto) {
-      // Limite de 5MB
       if (file.size > 5 * 1024 * 1024) {
         toast.error("A imagem é muito grande (Máx 5MB).");
         return;
@@ -189,7 +185,6 @@ export default function NovoEventoPage() {
     }
   };
 
-  // --- SUBMIT ---
   const handleSubmit = async () => {
     if (itemsList.length === 0 || !user) return;
 
@@ -210,6 +205,7 @@ export default function NovoEventoPage() {
           quantidade: entry.quantidade,
           motivo: entry.motivo,
           fotos: entry.fotoUrl ? [entry.fotoUrl] : [],
+          dataPersonalizada: date, // <--- ENVIA A DATA SELECIONADA
         };
         return createEvento(payload);
       });
@@ -233,7 +229,9 @@ export default function NovoEventoPage() {
   const handleSuccessClose = () => {
     setShowSuccess(false);
     setItemsList([]);
-    router.push("/eventos");
+    // Não redirecionamos automaticamente se o usuário estiver fazendo lançamentos em massa de datas passadas
+    // Mas se quiser redirecionar: router.push("/eventos");
+    toast.success("Pronto! Pode lançar os próximos.");
   };
 
   if (!hasPermission("eventos:criar")) {
@@ -259,9 +257,35 @@ export default function NovoEventoPage() {
       <div className="flex items-center justify-between shrink-0 px-1">
         <div>
           <h1 className="text-xl font-bold tracking-tight">Registrar Perda</h1>
-          <p className="text-muted-foreground text-sm">
-            {new Date().toLocaleDateString()}
-          </p>
+
+          {/* SELETOR DE DATA */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={"outline"}
+                size="sm"
+                className={cn(
+                  "mt-1 justify-start text-left font-normal h-8",
+                  !date && "text-muted-foreground",
+                )}
+              >
+                <CalendarIcon className="mr-2 h-3.5 w-3.5" />
+                {date ? (
+                  date.toLocaleDateString("pt-BR")
+                ) : (
+                  <span>Selecione a data</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar
+                mode="single"
+                selected={date}
+                onSelect={setDate}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
         </div>
         <div className="text-right">
           <span className="text-xs text-muted-foreground block">
@@ -294,7 +318,7 @@ export default function NovoEventoPage() {
           </div>
         </div>
 
-        {/* Motivo (Com Busca e Criação) */}
+        {/* Motivo */}
         <div className="w-full xl:w-64">
           <label className="text-xs font-medium text-muted-foreground mb-1.5 ml-1 block">
             Motivo
@@ -316,7 +340,6 @@ export default function NovoEventoPage() {
                 <CommandInput
                   placeholder="Buscar ou criar motivo..."
                   onValueChange={(val) => {
-                    // Atualiza o estado local com o que foi digitado
                     setSelectedMotivo(val);
                   }}
                 />
@@ -332,8 +355,6 @@ export default function NovoEventoPage() {
                         key={motivo.id}
                         value={motivo.nome}
                         onSelect={(currentValue) => {
-                          // Define o motivo selecionado
-                          // Nota: O valor do CommandItem é normalizado (lowercase), então pegamos o nome original do array
                           const originalName =
                             motivos.find(
                               (m) =>
@@ -522,7 +543,7 @@ export default function NovoEventoPage() {
             </div>
             <DialogTitle className="text-center">Sucesso!</DialogTitle>
             <DialogDescription className="text-center text-xs">
-              Registros salvos com sucesso.
+              Registros salvos para {date?.toLocaleDateString("pt-BR")}.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="sm:justify-center">

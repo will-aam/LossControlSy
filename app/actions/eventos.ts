@@ -10,32 +10,31 @@ export type CreateEventoData = {
   itemId: string;
   quantidade: number;
   motivo: string;
-  fotos?: string[]; // Array de strings (Base64 ou URLs)
+  fotos?: string[];
+  dataPersonalizada?: Date; // <--- NOVO CAMPO
 };
 
 // 1. Listar Eventos (Dashboard e Lista)
 export async function getEventos() {
   try {
     const eventos = await prisma.evento.findMany({
-      orderBy: { dataHora: "desc" }, // Mais recentes primeiro
+      orderBy: { dataHora: "desc" },
       include: {
         item: {
-          include: { categoria: true }, // Traz dados do item e categoria
+          include: { categoria: true },
         },
         criadoPor: {
-          select: { nome: true, email: true, role: true }, // Dados do autor
+          select: { nome: true, email: true, role: true },
         },
-        evidencias: true, // Fotos anexadas
+        evidencias: true,
       },
     });
 
-    // Formata os números decimais para o Frontend
     const formattedEventos = eventos.map((ev) => ({
       ...ev,
       quantidade: Number(ev.quantidade),
       custoSnapshot: Number(ev.custoSnapshot),
       precoVendaSnapshot: Number(ev.precoVendaSnapshot),
-      // Campos calculados para facilitar exibição
       valorTotal: Number(ev.precoVendaSnapshot) * Number(ev.quantidade),
       item: ev.item
         ? {
@@ -55,19 +54,16 @@ export async function getEventos() {
 
 // 2. Criar Evento (Registrar Perda)
 export async function createEvento(data: CreateEventoData) {
-  // 1. Identificar Usuário Logado
   const session = await getSession();
   if (!session || !session.id) {
     return { success: false, message: "Usuário não autenticado." };
   }
 
-  // 2. Validar Dados
   if (!data.itemId || !data.quantidade || data.quantidade <= 0) {
     return { success: false, message: "Item e Quantidade são obrigatórios." };
   }
 
   try {
-    // 3. Buscar Item para pegar Preço Atual (Snapshot)
     const item = await prisma.item.findUnique({
       where: { id: data.itemId },
     });
@@ -76,23 +72,20 @@ export async function createEvento(data: CreateEventoData) {
       return { success: false, message: "Item não encontrado." };
     }
 
-    // 4. Criar o Evento + Evidências numa única transação
+    // LÓGICA DE DATA: Usa a personalizada ou a atual
+    const dataDoEvento = data.dataPersonalizada || new Date();
+
     await prisma.evento.create({
       data: {
-        dataHora: new Date(),
+        dataHora: dataDoEvento, // <--- APLICA A DATA AQUI
         motivo: data.motivo,
-        status: "rascunho", // Começa como rascunho ou enviado (depende da sua regra, pus rascunho por segurança)
+        status: "rascunho",
         quantidade: data.quantidade,
-        unidade: item.unidade, // Copia a unidade do item
-
-        // SNAPSHOTS: Salva o preço do momento da perda
+        unidade: item.unidade,
         custoSnapshot: item.custo,
         precoVendaSnapshot: item.precoVenda,
-
         itemId: item.id,
-        criadoPorId: session.id, // Link com usuário logado
-
-        // Cria as fotos na tabela de Evidências automaticamente
+        criadoPorId: session.id,
         evidencias: {
           create: data.fotos?.map((fotoUrl) => ({
             url: fotoUrl,
@@ -112,7 +105,7 @@ export async function createEvento(data: CreateEventoData) {
   }
 }
 
-// 3. Aprovar/Rejeitar Evento (Para Gestores)
+// 3. Aprovar/Rejeitar Evento
 export async function updateEventoStatus(id: string, novoStatus: EventoStatus) {
   const session = await getSession();
   if (!session) return { success: false, message: "Não autorizado" };
