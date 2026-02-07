@@ -1,4 +1,3 @@
-// components/catalogo/item-form-dialog.tsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -22,22 +21,14 @@ import {
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Item } from "@/lib/types";
-// REMOVIDO: import { StorageService } from "@/lib/storage";
-import { getCategorias } from "@/app/actions/categorias"; // Importa a action do banco
-import {
-  Upload,
-  Link as LinkIcon,
-  Image as ImageIcon,
-  X,
-  Barcode,
-  Loader2, // Adicionado ícone de loading
-} from "lucide-react";
+import { getCategorias } from "@/app/actions/categorias";
+import { Upload, Image as ImageIcon, X, Barcode, Loader2 } from "lucide-react";
 
 interface ItemFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   item: Item | null;
-  onSave: (itemData: Partial<Item>) => Promise<void> | void; // Suporta async agora
+  onSave: (itemData: Partial<Item>) => Promise<void> | void;
 }
 
 export function ItemFormDialog({
@@ -55,7 +46,7 @@ export function ItemFormDialog({
   // Estados de Salvamento
   const [isSaving, setIsSaving] = useState(false);
 
-  // Estado para Categorias (carregar dinamicamente)
+  // Estado para Categorias
   const [categorias, setCategorias] = useState<string[]>([]);
   const [loadingCategorias, setLoadingCategorias] = useState(false);
 
@@ -63,7 +54,7 @@ export function ItemFormDialog({
   const [imageTab, setImageTab] = useState<"url" | "upload">("upload");
   const [previewUrl, setPreviewUrl] = useState<string>("");
 
-  // Carregar categorias ao montar (do Banco de Dados)
+  // Carregar categorias ao montar
   useEffect(() => {
     if (open) {
       loadCategorias();
@@ -75,8 +66,12 @@ export function ItemFormDialog({
     try {
       const result = await getCategorias();
       if (result.success && result.data) {
-        // Mapeia para pegar apenas o nome, mantendo compatibilidade com o form atual
-        setCategorias(result.data.map((c: any) => c.nome));
+        // Mapeia para pegar apenas o nome
+        // O tipo vem do Prisma, garantimos que tem 'nome'
+        const nomesCategorias = result.data.map(
+          (c: { nome: string }) => c.nome,
+        );
+        setCategorias(nomesCategorias);
       }
     } catch (error) {
       console.error("Erro ao carregar categorias", error);
@@ -103,7 +98,7 @@ export function ItemFormDialog({
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  // Manipular Upload de Arquivo Local (Apenas Preview Visual por enquanto)
+  // Manipular Upload de Arquivo Local
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -124,13 +119,14 @@ export function ItemFormDialog({
   const handleSave = async () => {
     // Validação básica
     if (!formData.nome || !formData.categoria || !formData.precoVenda) {
-      // Poderia adicionar um toast de erro aqui se quisesse ser mais explícito
       return;
     }
 
     setIsSaving(true);
     try {
       await onSave(formData);
+      // Não fechamos aqui, o pai fecha após sucesso, ou fechamos se o pai retornar void
+      // Mas para garantir fluidez na UI:
       onOpenChange(false);
     } catch (error) {
       console.error("Erro ao salvar", error);
@@ -327,8 +323,6 @@ export function ItemFormDialog({
                 onChange={(e) =>
                   handleInputChange("custo", parseFloat(e.target.value))
                 }
-                // Desabilitado pois o schema atual não tem custo,
-                // mas mantemos visualmente
               />
             </div>
             <div className="space-y-2">
