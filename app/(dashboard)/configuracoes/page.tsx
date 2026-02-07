@@ -296,9 +296,6 @@ export default function ConfiguracoesPage() {
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-2">
                     <Label>Permitir funcionários na Galeria</Label>
-                    <Badge variant="outline" className="text-[10px] h-5">
-                      Novo
-                    </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">
                     Se ativo, funcionários poderão acessar a aba Galeria e
@@ -388,9 +385,7 @@ export default function ConfiguracoesPage() {
                               </AvatarFallback>
                             </Avatar>
                             <div className="flex flex-col">
-                              <span className="font-medium">
-                                {user.nome} {isSelf && "(Você)"}
-                              </span>
+                              <span className="font-medium">{user.nome}</span>
                               {!user.ativo && (
                                 <span className="text-[10px] text-destructive font-semibold">
                                   ACESSO BLOQUEADO
