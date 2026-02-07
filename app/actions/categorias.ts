@@ -1,3 +1,4 @@
+// app/actions/categorias.ts
 "use server";
 
 import { prisma } from "@/lib/prisma";

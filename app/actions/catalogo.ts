@@ -3,23 +3,25 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { ItemUnidade } from "@prisma/client";
+import { Item } from "@/lib/types"; // Importamos o tipo Item
 
 // Tipo para criação de item
 export type CreateItemData = {
   nome: string;
   codigoBarras?: string;
-  codigoInterno?: string; // Agora é opcional no envio, mas pode ser passado
+  codigoInterno?: string;
   unidade: string;
   preco?: number;
-  custo?: number; // Adicionando custo se quiser enviar
+  custo?: number;
   categoriaId: string;
   fotoUrl?: string;
 };
 
 // Helper de Unidade
 function parseUnidade(unidade: string): ItemUnidade {
-  if (Object.values(ItemUnidade).includes(unidade as ItemUnidade)) {
-    return unidade as ItemUnidade;
+  const u = unidade.toUpperCase();
+  if (Object.values(ItemUnidade).includes(u as ItemUnidade)) {
+    return u as ItemUnidade;
   }
   return "UN";
 }
@@ -41,13 +43,10 @@ export async function getItens() {
       },
     });
 
-    // CORREÇÃO DO ERRO "Decimal objects are not supported":
-    // Convertemos os campos Decimal para Number (float) antes de enviar para o React
     const formattedItens = itens.map((item) => ({
       ...item,
       custo: Number(item.custo),
       precoVenda: Number(item.precoVenda),
-      // Campos extras para compatibilidade com a interface antiga se precisar
       preco: Number(item.precoVenda),
     }));
 
@@ -65,7 +64,6 @@ export async function createItem(data: CreateItemData) {
   }
 
   try {
-    // Validação de Código de Barras (Se existir)
     if (data.codigoBarras) {
       const existeCodigo = await prisma.item.findFirst({
         where: { codigoBarras: data.codigoBarras },
@@ -78,11 +76,9 @@ export async function createItem(data: CreateItemData) {
       }
     }
 
-    // Validação de Código Interno (Se foi passado manualmente)
     let finalCodigoInterno = data.codigoInterno;
 
     if (finalCodigoInterno) {
-      // Se o usuário mandou um código, verifica se já existe
       const existeInterno = await prisma.item.findUnique({
         where: { codigoInterno: finalCodigoInterno },
       });
@@ -93,7 +89,6 @@ export async function createItem(data: CreateItemData) {
         };
       }
     } else {
-      // Se não mandou, gera automático
       finalCodigoInterno = generateInternalCode();
     }
 
@@ -101,7 +96,7 @@ export async function createItem(data: CreateItemData) {
       data: {
         nome: data.nome,
         codigoBarras: data.codigoBarras || null,
-        codigoInterno: finalCodigoInterno, // Usa o manual ou o gerado
+        codigoInterno: finalCodigoInterno,
         unidade: parseUnidade(data.unidade),
         precoVenda: data.preco || 0,
         custo: data.custo || 0,
@@ -141,7 +136,7 @@ export async function updateItem(id: string, data: Partial<CreateItemData>) {
       where: { id },
       data: {
         nome: data.nome,
-        codigoInterno: data.codigoInterno, // Permite atualizar o código interno se necessário
+        codigoInterno: data.codigoInterno,
         codigoBarras: data.codigoBarras,
         unidade: data.unidade ? parseUnidade(data.unidade) : undefined,
         precoVenda: data.preco !== undefined ? data.preco : undefined,
@@ -191,5 +186,75 @@ export async function deleteItem(id: string) {
   } catch (error) {
     console.error("Erro ao deletar item:", error);
     return { success: false, message: "Erro ao excluir item." };
+  }
+}
+
+// 6. IMPORTAÇÃO EM MASSA (NOVA FUNÇÃO)
+export async function importarItens(itensImportados: Item[]) {
+  try {
+    let count = 0;
+
+    // Cache simples de categorias para não consultar o banco a cada linha
+    const categoriaCache = new Map<string, string>();
+
+    for (const item of itensImportados) {
+      if (!item.nome) continue; // Pula linhas inválidas
+
+      // 1. Resolver Categoria (Find or Create)
+      // O CSV traz o nome da categoria. Precisamos do ID.
+      const nomeCategoria = item.categoria || "Geral";
+      let categoriaId = categoriaCache.get(nomeCategoria);
+
+      if (!categoriaId) {
+        // Tenta achar no banco
+        const catExistente = await prisma.categoria.findFirst({
+          where: { nome: { equals: nomeCategoria, mode: "insensitive" } },
+        });
+
+        if (catExistente) {
+          categoriaId = catExistente.id;
+        } else {
+          // Cria nova categoria se não existir
+          const novaCat = await prisma.categoria.create({
+            data: { nome: nomeCategoria, status: "ativa" },
+          });
+          categoriaId = novaCat.id;
+        }
+        // Salva no cache
+        categoriaCache.set(nomeCategoria, categoriaId);
+      }
+
+      // 2. Salvar ou Atualizar Item (Upsert)
+      // Usamos o codigoInterno como chave única para saber se atualizamos ou criamos
+      await prisma.item.upsert({
+        where: { codigoInterno: item.codigoInterno },
+        update: {
+          nome: item.nome,
+          precoVenda: item.precoVenda,
+          custo: item.custo,
+          unidade: parseUnidade(item.unidade),
+          categoriaId: categoriaId,
+          // Não atualizamos codigoBarras ou Imagem para não sobrescrever dados manuais
+        },
+        create: {
+          codigoInterno: item.codigoInterno,
+          nome: item.nome,
+          codigoBarras: item.codigoBarras || null,
+          precoVenda: item.precoVenda || 0,
+          custo: item.custo || 0,
+          unidade: parseUnidade(item.unidade),
+          categoriaId: categoriaId,
+          status: "ativo",
+        },
+      });
+
+      count++;
+    }
+
+    revalidatePath("/catalogo");
+    return { success: true, count };
+  } catch (error) {
+    console.error("Erro na importação:", error);
+    return { success: false, message: "Falha ao processar importação." };
   }
 }

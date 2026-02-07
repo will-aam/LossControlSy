@@ -1,3 +1,4 @@
+// lib/csv-parser.ts
 import { Item } from "@/lib/types"; // Importação corrigida
 
 export async function parseItemsCSV(file: File): Promise<Item[]> {

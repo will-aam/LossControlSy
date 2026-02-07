@@ -40,6 +40,7 @@ import {
 import { Item } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
+import { parseItemsCSV } from "@/lib/csv-parser"; // <--- Importei o parser
 
 // Novos Actions e Componentes
 import {
@@ -48,6 +49,7 @@ import {
   toggleItemStatus,
   createItem,
   updateItem,
+  importarItens, // <--- Importei a nova action (criaremos no próximo passo)
   CreateItemData,
 } from "@/app/actions/catalogo";
 import { getCategorias } from "@/app/actions/categorias";
@@ -101,7 +103,7 @@ export default function CatalogoPage() {
   // Paginação
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Importação (Desativada temporariamente)
+  // Importação
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -122,20 +124,17 @@ export default function CatalogoPage() {
     // 2. Busca Itens
     const itemResult = await getItens();
     if (itemResult.success) {
-      // Mapeia os dados do Prisma para o tipo Item da interface
       const mappedItems: Item[] = (itemResult.data as any[]).map((i) => ({
         id: i.id,
         nome: i.nome,
         codigoBarras: i.codigoBarras || "",
-        // CORREÇÃO AQUI: Usar o código interno real vindo do banco
-        // Se por algum motivo vier vazio do banco (legado), usa string vazia, mas NÃO gera fake do ID
         codigoInterno: i.codigoInterno || "",
         categoria: i.categoria?.nome || "Sem Categoria",
         unidade: i.unidade,
-        custo: Number(i.custo) || 0, // Garante que venha o custo se existir
-        precoVenda: Number(i.precoVenda), // Usa o campo correto mapeado na action
+        custo: Number(i.custo) || 0,
+        precoVenda: Number(i.precoVenda),
         status: i.status as "ativo" | "inativo",
-        imagemUrl: i.imagemUrl, // O campo no banco se chama imagemUrl, não fotoUrl
+        imagemUrl: i.imagemUrl,
       }));
       setItems(mappedItems);
     } else {
@@ -185,18 +184,51 @@ export default function CatalogoPage() {
     [items],
   );
 
+  // --- FUNÇÃO DE IMPORTAÇÃO ATUALIZADA ---
   const handleFileUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
-    // Importação via CSV será reimplementada no backend posteriormente
-    toast.info(
-      "Importação via CSV em manutenção para migração ao Banco de Dados.",
-    );
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    toast.info("Lendo arquivo CSV...");
+
+    try {
+      // 1. Processa o CSV no Front-end (usando seu parser)
+      const parsedItems = await parseItemsCSV(file);
+
+      if (parsedItems.length === 0) {
+        toast.warning("O arquivo parece estar vazio ou inválido.");
+        setIsImporting(false);
+        return;
+      }
+
+      toast.loading(`Importando ${parsedItems.length} itens para o banco...`);
+
+      // 2. Envia para o Back-end (Server Action)
+      const result = await importarItens(parsedItems);
+
+      if (result.success) {
+        toast.dismiss(); // Remove o loading
+        toast.success(
+          `${result.count} itens importados/atualizados com sucesso!`,
+        );
+        loadData(); // Recarrega a tabela
+      } else {
+        toast.dismiss();
+        toast.error(result.message || "Erro ao importar itens.");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao processar o arquivo.");
+    } finally {
+      setIsImporting(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const handleSaveItem = async (itemData: Partial<Item>) => {
-    // Busca ID da categoria pelo nome
     const catResult = await getCategorias();
     const categoriaEncontrada = catResult.data?.find(
       (c: any) => c.nome === itemData.categoria,
@@ -210,7 +242,6 @@ export default function CatalogoPage() {
     const payload: CreateItemData = {
       nome: itemData.nome || "",
       codigoBarras: itemData.codigoBarras,
-      // Importante: Passar o código interno digitado
       codigoInterno: itemData.codigoInterno,
       unidade: itemData.unidade || "UN",
       preco: itemData.precoVenda || 0,
@@ -220,7 +251,6 @@ export default function CatalogoPage() {
     };
 
     if (editingItem) {
-      // Editar
       const result = await updateItem(editingItem.id, payload);
       if (result.success) {
         toast.success("Item atualizado!");
@@ -229,7 +259,6 @@ export default function CatalogoPage() {
         toast.error(result.message);
       }
     } else {
-      // Criar
       const result = await createItem(payload);
       if (result.success) {
         toast.success("Item criado com sucesso!");
@@ -306,7 +335,11 @@ export default function CatalogoPage() {
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isImporting}
               >
-                <Upload className="mr-2 h-4 w-4" />{" "}
+                {isImporting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="mr-2 h-4 w-4" />
+                )}
                 {isImporting ? "Importando..." : "Importar CSV"}
               </Button>
             </>
@@ -423,7 +456,6 @@ export default function CatalogoPage() {
                 <TableHead className="bg-card">Código</TableHead>
                 <TableHead className="bg-card">Categoria</TableHead>
                 <TableHead className="bg-card">Unidade</TableHead>
-                {/* <TableHead className="text-right bg-card">Custo</TableHead> */}
                 <TableHead className="text-right bg-card">Preço</TableHead>
                 <TableHead className="w-25 text-center bg-card">
                   Status
@@ -473,7 +505,6 @@ export default function CatalogoPage() {
                         </div>
                       </div>
                     </TableCell>
-                    {/* Exibe o código interno real */}
                     <TableCell className="py-2 font-mono text-xs">
                       {item.codigoInterno}
                     </TableCell>
@@ -483,9 +514,6 @@ export default function CatalogoPage() {
                     <TableCell className="py-2 text-xs">
                       {item.unidade}
                     </TableCell>
-                    {/* <TableCell className="py-2 text-right text-xs text-muted-foreground">
-                      {formatCurrency(item.custo)}
-                    </TableCell> */}
                     <TableCell className="py-2 text-right text-sm font-medium">
                       {formatCurrency(item.precoVenda)}
                     </TableCell>
