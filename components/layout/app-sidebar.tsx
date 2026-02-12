@@ -1,4 +1,3 @@
-// components/layout/app-sidebar.tsx
 "use client";
 
 import React from "react";
@@ -18,6 +17,8 @@ import {
   ShieldCheck,
   Sparkles,
   MessageSquareWarning,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import {
   Sidebar,
@@ -30,6 +31,8 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
+  SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -61,6 +64,8 @@ export function AppSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, navItems, logout } = useAuth();
+  // Hook para controlar o estado do sidebar (aberto/fechado)
+  const { state } = useSidebar();
 
   if (!user) return null;
 
@@ -79,24 +84,20 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
-            >
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <ShieldCheck className="size-4" />
-              </div>
-              <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">Loss Control</span>
-                <span className="truncate text-xs text-muted-foreground">
-                  Controle de Perdas
-                </span>
-              </div>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <div className="flex items-center justify-between px-2 py-2">
+          {/* Logo e Título (Só aparecem se aberto) */}
+          <div className="flex items-center gap-2 group-data-[collapsible=icon]:hidden overflow-hidden transition-all">
+            <div className="grid flex-1 text-left text-sm leading-tight">
+              <span className="truncate font-semibold">Loss Control</span>
+              <span className="truncate text-xs text-muted-foreground">
+                Controle de Perdas
+              </span>
+            </div>
+          </div>
+
+          {/* Botão de Colapso (Trigger) - Agora dentro do Sidebar */}
+          <SidebarTrigger className="h-8 w-8 text-muted-foreground hover:bg-muted group-data-[collapsible=icon]:mx-auto" />
+        </div>
       </SidebarHeader>
 
       <SidebarContent>
