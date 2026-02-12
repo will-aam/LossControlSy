@@ -14,6 +14,16 @@ export function formatCurrency(value: number | undefined | null) {
   }).format(value);
 }
 
+// --- NOVA FUNÇÃO ADICIONADA ---
+export function formatQuantity(value: number | undefined | null) {
+  if (value === undefined || value === null) return "0";
+  return new Intl.NumberFormat("pt-BR", {
+    minimumFractionDigits: 0, // Não força zeros (ex: 1 mostra 1, não 1,000)
+    maximumFractionDigits: 3, // Limita a 3 casas (ex: 1.3333 -> 1,333)
+  }).format(value);
+}
+// ------------------------------
+
 export function formatDate(dateString: string): string {
   if (!dateString) return "-";
   try {
@@ -74,7 +84,7 @@ export function getRoleLabel(role: UserRole): string {
   return labels[role] || role;
 }
 
-// --- NOVA FUNÇÃO DE COMPRESSÃO ---
+// Mantive sua função de compressão existente
 export async function compressImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -84,11 +94,8 @@ export async function compressImage(file: File): Promise<string> {
       img.src = event.target?.result as string;
       img.onload = () => {
         const canvas = document.createElement("canvas");
-        // Define um tamanho máximo (ex: 1280px de largura)
         const maxWidth = 1280;
         const scale = maxWidth / img.width;
-
-        // Se a imagem for menor que o limite, não redimensiona
         const finalScale = scale < 1 ? scale : 1;
 
         canvas.width = img.width * finalScale;
@@ -97,8 +104,6 @@ export async function compressImage(file: File): Promise<string> {
         const ctx = canvas.getContext("2d");
         ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-        // Converte para JPEG com 70% de qualidade
-        // Isso reduz uma foto de 5MB para ~300KB
         const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
         resolve(compressedBase64);
       };
