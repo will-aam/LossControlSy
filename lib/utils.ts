@@ -6,7 +6,8 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(value: number): string {
+export function formatCurrency(value: number | undefined | null) {
+  if (value === undefined || value === null) return "R$ 0,00";
   return new Intl.NumberFormat("pt-BR", {
     style: "currency",
     currency: "BRL",
@@ -71,4 +72,38 @@ export function getRoleLabel(role: UserRole): string {
     dono: "Proprietário",
   };
   return labels[role] || role;
+}
+
+// --- NOVA FUNÇÃO DE COMPRESSÃO ---
+export async function compressImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        // Define um tamanho máximo (ex: 1280px de largura)
+        const maxWidth = 1280;
+        const scale = maxWidth / img.width;
+
+        // Se a imagem for menor que o limite, não redimensiona
+        const finalScale = scale < 1 ? scale : 1;
+
+        canvas.width = img.width * finalScale;
+        canvas.height = img.height * finalScale;
+
+        const ctx = canvas.getContext("2d");
+        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        // Converte para JPEG com 70% de qualidade
+        // Isso reduz uma foto de 5MB para ~300KB
+        const compressedBase64 = canvas.toDataURL("image/jpeg", 0.7);
+        resolve(compressedBase64);
+      };
+      img.onerror = (error) => reject(error);
+    };
+    reader.onerror = (error) => reject(error);
+  });
 }

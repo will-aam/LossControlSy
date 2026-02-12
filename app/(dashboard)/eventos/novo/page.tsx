@@ -25,10 +25,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar"; // <--- IMPORTADO
+import { Calendar } from "@/components/ui/calendar";
 import { ItemSearch } from "@/components/forms/item-search";
 import { Item } from "@/lib/types";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, compressImage } from "@/lib/utils"; // <--- Importei compressImage
 import { useAuth } from "@/lib/auth-context";
 import { createEvento, CreateEventoData } from "@/app/actions/eventos";
 import { getMotivos, createMotivo } from "@/app/actions/motivos";
@@ -44,7 +44,7 @@ import {
   Loader2,
   ChevronsUpDown,
   Check,
-  Calendar as CalendarIcon, // <--- ÍCONE DE CALENDÁRIO
+  Calendar as CalendarIcon,
 } from "lucide-react";
 import {
   Dialog,
@@ -159,29 +159,34 @@ export default function NovoEventoPage() {
     }, 50);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && activeItemIdForPhoto) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error("A imagem é muito grande (Máx 5MB).");
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
+      // Feedback visual imediato
+      toast.loading("Processando imagem...", { id: "compress-toast" });
+
+      try {
+        // --- AQUI A MÁGICA: Comprime antes de salvar ---
+        const compressedBase64 = await compressImage(file);
+
         setItemsList((prev) =>
           prev.map((item) => {
             if (item.tempId === activeItemIdForPhoto) {
-              return { ...item, fotoUrl: base64String };
+              return { ...item, fotoUrl: compressedBase64 };
             }
             return item;
           }),
         );
-        toast.success("Evidência anexada!");
+        toast.dismiss("compress-toast");
+        toast.success("Foto anexada!");
+      } catch (error) {
+        toast.dismiss("compress-toast");
+        toast.error("Erro ao processar a foto. Tente novamente.");
+        console.error(error);
+      } finally {
         if (fileInputRef.current) fileInputRef.current.value = "";
         setActiveItemIdForPhoto(null);
-      };
-      reader.readAsDataURL(file);
+      }
     }
   };
 
@@ -197,6 +202,7 @@ export default function NovoEventoPage() {
     }
 
     setIsSubmitting(true);
+    toast.loading("Enviando dados...", { id: "submit-toast" });
 
     try {
       const promises = itemsList.map(async (entry) => {
@@ -205,7 +211,7 @@ export default function NovoEventoPage() {
           quantidade: entry.quantidade,
           motivo: entry.motivo,
           fotos: entry.fotoUrl ? [entry.fotoUrl] : [],
-          dataPersonalizada: date, // <--- ENVIA A DATA SELECIONADA
+          dataPersonalizada: date,
         };
         return createEvento(payload);
       });
@@ -213,14 +219,20 @@ export default function NovoEventoPage() {
       const results = await Promise.all(promises);
       const errors = results.filter((r) => !r.success);
 
+      toast.dismiss("submit-toast");
+
       if (errors.length > 0) {
-        toast.error(`Erro ao salvar ${errors.length} itens.`);
+        // MOSTRA O ERRO REAL QUE VEIO DO SERVIDOR
+        toast.error(`Erro: ${errors[0].message}`);
+        console.error("Erros no envio:", errors);
       } else {
         setShowSuccess(true);
       }
-    } catch (error) {
+    } catch (error: any) {
+      toast.dismiss("submit-toast");
       console.error(error);
-      toast.error("Erro ao salvar eventos.");
+      // Tratamento de erro genérico
+      toast.error(`Erro crítico: ${error.message || "Falha na conexão"}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -229,8 +241,6 @@ export default function NovoEventoPage() {
   const handleSuccessClose = () => {
     setShowSuccess(false);
     setItemsList([]);
-    // Não redirecionamos automaticamente se o usuário estiver fazendo lançamentos em massa de datas passadas
-    // Mas se quiser redirecionar: router.push("/eventos");
     toast.success("Pronto! Pode lançar os próximos.");
   };
 
@@ -245,6 +255,11 @@ export default function NovoEventoPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 max-w-6xl mx-auto w-full overflow-hidden">
+      {/* INPUT DE ARQUIVO AJUSTADO 
+          accept="image/*" -> Padrão universal para "Quero uma imagem". 
+          No Android/iOS isso abre o menu "Câmera ou Galeria".
+          Removemos 'capture' para dar a escolha ao usuário.
+      */}
       <input
         type="file"
         accept="image/*"
@@ -258,7 +273,6 @@ export default function NovoEventoPage() {
         <div>
           <h1 className="text-xl font-bold tracking-tight">Registrar Perda</h1>
 
-          {/* SELETOR DE DATA */}
           <Popover>
             <PopoverTrigger asChild>
               <Button

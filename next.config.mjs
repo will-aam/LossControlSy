@@ -13,7 +13,22 @@ const withSerwist = withSerwistInit({
 const nextConfig = {
   // Suas configurações existentes
   reactStrictMode: true,
-  // Se tiver outras configs, mantenha aqui
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "10mb",
+    },
+  },
+  // Permite imagens externas (se já não estiver configurado)
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "**",
+      },
+    ],
+  },
+
+  reactStrictMode: true,
 };
 
-export default withSerwist(nextConfig);
+export default nextConfig;
