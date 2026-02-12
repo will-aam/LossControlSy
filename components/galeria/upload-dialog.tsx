@@ -36,7 +36,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Evidencia } from "@/lib/types";
-import { cn } from "@/lib/utils";
+import { cn, compressImage } from "@/lib/utils"; // <--- Importe o compressImage aqui
 import { buscarEventosParaVinculo } from "@/app/actions/galeria";
 
 interface UploadDialogProps {
@@ -85,9 +85,9 @@ export function UploadDialog({
     if (e.target.files) {
       const newFiles = Array.from(e.target.files);
       const validFiles = newFiles.filter((file) => {
-        // Aumentei o limite para 15MB já que vamos usar R2 e redimensionamento no futuro
-        if (file.size > 15 * 1024 * 1024) {
-          toast.error(`Arquivo ${file.name} muito grande (max 15MB)`);
+        // Validação inicial simples (a compressão resolve o tamanho real depois)
+        if (file.size > 20 * 1024 * 1024) {
+          toast.error(`Arquivo ${file.name} muito grande (max 20MB)`);
           return false;
         }
         return true;
@@ -108,21 +108,18 @@ export function UploadDialog({
     if (files.length === 0) return;
 
     setIsUploading(true);
-    toast.info("Enviando evidências...");
+    toast.info("Processando e enviando...");
 
     try {
       for (const file of files) {
-        const base64String = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
+        // --- MUDANÇA PRINCIPAL: USA COMPRESSÃO ---
+        // Em vez de FileReader direto, usamos compressImage
+        // Isso reduz uma foto de 5MB para ~300KB, evitando erro no 4G
+        const base64String = await compressImage(file);
 
         await onSave({
-          url: base64String, // O backend vai jogar pro R2
+          url: base64String,
           motivo: motivo || "Galeria Detalhada",
-          // Passamos os novos campos
           dataPersonalizada: date,
           eventoId: selectedEventoId || undefined,
         });
@@ -134,9 +131,11 @@ export function UploadDialog({
       setMotivo("");
       setSelectedEventoId("");
       setDate(new Date());
+      // O pai (GaleriaPage) deve fechar o modal ou você pode fechar aqui se preferir:
+      // onOpenChange(false);
     } catch (error) {
       console.error("Erro no upload:", error);
-      toast.error("Erro ao processar fotos.");
+      toast.error("Erro ao processar fotos. Tente novamente.");
     } finally {
       setIsUploading(false);
     }
@@ -202,9 +201,9 @@ export function UploadDialog({
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-(--radix-popover-trigger-width) p-0">
+              <PopoverContent className="w-[300px] p-0">
                 <Command>
-                  <CommandInput placeholder="Busque por produto ou data..." />
+                  <CommandInput placeholder="Busque por produto..." />
                   <CommandList>
                     <CommandEmpty>
                       Nenhum evento recente encontrado.

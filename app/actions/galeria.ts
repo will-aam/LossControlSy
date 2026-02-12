@@ -7,28 +7,39 @@ import { r2 } from "@/lib/r2";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { randomUUID } from "crypto";
 
-// Função helper de upload para o R2
+// Função helper de upload para o R2 (Igual ao eventos.ts)
 async function uploadToR2(base64Image: string): Promise<string | null> {
   try {
     // Limpa o prefixo do base64 se houver
     const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
+
     const fileName = `galeria/${randomUUID()}.jpg`;
+    const bucketName = process.env.R2_BUCKET_NAME;
+
+    if (!bucketName) {
+      console.error("ERRO: R2_BUCKET_NAME não definido.");
+      return null;
+    }
 
     await r2.send(
       new PutObjectCommand({
-        Bucket: process.env.R2_BUCKET_NAME,
+        Bucket: bucketName,
         Key: fileName,
         Body: buffer,
         ContentType: "image/jpeg",
-        ACL: "public-read",
       }),
     );
 
-    // Retorna a URL pública
-    return process.env.R2_PUBLIC_DOMAIN
-      ? `${process.env.R2_PUBLIC_DOMAIN}/${fileName}`
-      : fileName;
+    // Retorna a URL pública correta
+    const publicDomain = process.env.R2_PUBLIC_DOMAIN;
+    if (publicDomain) {
+      const domain = publicDomain.replace(/\/$/, "");
+      return `${domain}/${fileName}`;
+    }
+
+    console.warn("ATENÇÃO: R2_PUBLIC_DOMAIN ausente.");
+    return fileName;
   } catch (error) {
     console.error("Erro R2:", error);
     return null;
@@ -139,7 +150,7 @@ export async function buscarEventosParaVinculo() {
       data: eventos.map((e) => ({
         id: e.id,
         label: `${new Date(e.dataHora).toLocaleDateString("pt-BR")} - ${e.item?.nome} (${Number(e.quantidade)} ${e.unidade})`,
-        dataOriginal: e.dataHora, // Útil se quisermos sugerir a data do evento na foto
+        dataOriginal: e.dataHora,
       })),
     };
   } catch (error) {
