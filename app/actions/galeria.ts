@@ -7,9 +7,10 @@ import { r2 } from "@/lib/r2";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { randomUUID } from "crypto";
 
-// Função helper de upload (mesma do eventos.ts)
+// Função helper de upload para o R2
 async function uploadToR2(base64Image: string): Promise<string | null> {
   try {
+    // Limpa o prefixo do base64 se houver
     const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
     const fileName = `galeria/${randomUUID()}.jpg`;
@@ -24,6 +25,7 @@ async function uploadToR2(base64Image: string): Promise<string | null> {
       }),
     );
 
+    // Retorna a URL pública
     return process.env.R2_PUBLIC_DOMAIN
       ? `${process.env.R2_PUBLIC_DOMAIN}/${fileName}`
       : fileName;
@@ -33,7 +35,7 @@ async function uploadToR2(base64Image: string): Promise<string | null> {
   }
 }
 
-// 1. Listar
+// 1. Listar Evidências
 export async function getEvidencias() {
   try {
     const evidencias = await prisma.evidencia.findMany({
@@ -67,42 +69,48 @@ export async function getEvidencias() {
   }
 }
 
-// 2. Criar Evidência (Atualizado para R2 e Vinculação)
+// 2. Criar Evidência (AGORA COM DATA E VÍNCULO)
 export async function createEvidenciaAvulsa(data: {
   url: string;
   motivo?: string;
-  eventoId?: string; // NOVO: Permite vincular a um evento existente
+  eventoId?: string; // Vínculo com evento
+  dataPersonalizada?: Date | string; // Data retroativa
 }) {
   const session = await getSession();
   if (!session) return { success: false, message: "Não autorizado" };
 
   try {
-    // Faz o upload real
+    // Upload para R2
     const r2Url = await uploadToR2(data.url);
     if (!r2Url)
       return { success: false, message: "Falha no upload da imagem." };
 
+    // Define a data: ou a escolhida ou agora
+    const dataFinal = data.dataPersonalizada
+      ? new Date(data.dataPersonalizada)
+      : new Date();
+
     await prisma.evidencia.create({
       data: {
-        url: r2Url, // Salva a URL curta do R2
+        url: r2Url,
         motivo: data.motivo || "Upload Galeria",
-        dataUpload: new Date(),
+        dataUpload: dataFinal,
         userId: session.id,
-        eventoId: data.eventoId || null, // Vincula se tiver ID
+        eventoId: data.eventoId || null,
       },
     });
 
     revalidatePath("/galeria");
     return { success: true };
   } catch (error) {
+    console.error("Erro ao criar evidencia:", error);
     return { success: false, message: "Erro ao salvar foto." };
   }
 }
 
-// 3. Excluir
+// 3. Excluir Evidência
 export async function deleteEvidencia(id: string) {
   try {
-    // Opcional: Aqui você poderia também deletar do R2 se quisesse limpar espaço
     await prisma.evidencia.delete({ where: { id } });
     revalidatePath("/galeria");
     return { success: true };
@@ -111,22 +119,27 @@ export async function deleteEvidencia(id: string) {
   }
 }
 
-// 4. Listar Eventos Recentes (Para o Select do Dialog)
-export async function getEventosRecentes() {
+// 4. Buscar Eventos para Vínculo (NOVA)
+export async function buscarEventosParaVinculo() {
   try {
+    // Busca os últimos 50 eventos para vincular fotos
     const eventos = await prisma.evento.findMany({
-      take: 20, // Pega os últimos 20
+      take: 50,
       orderBy: { dataHora: "desc" },
       include: {
-        item: { select: { nome: true } },
+        item: {
+          select: { nome: true, codigoInterno: true, unidade: true },
+        },
       },
     });
 
+    // Formata para o combobox
     return {
       success: true,
       data: eventos.map((e) => ({
         id: e.id,
-        label: `${new Date(e.dataHora).toLocaleDateString()} - ${e.item?.nome || "Item desconhecido"} (${Number(e.quantidade)} ${e.unidade})`,
+        label: `${new Date(e.dataHora).toLocaleDateString("pt-BR")} - ${e.item?.nome} (${Number(e.quantidade)} ${e.unidade})`,
+        dataOriginal: e.dataHora, // Útil se quisermos sugerir a data do evento na foto
       })),
     };
   } catch (error) {
