@@ -7,20 +7,20 @@ import { r2 } from "@/lib/r2";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { randomUUID } from "crypto";
 
-// Função helper de upload para o R2 (Igual ao eventos.ts)
+// URL de Fallback (Use a mesma que colocamos no eventos.ts ou a do seu painel Cloudflare)
+const R2_DOMAIN_FALLBACK =
+  "https://pub-4209581585804561a086053351239c05.r2.dev";
+
+// Função helper de upload para o R2
 async function uploadToR2(base64Image: string): Promise<string | null> {
   try {
     // Limpa o prefixo do base64 se houver
     const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
-
     const fileName = `galeria/${randomUUID()}.jpg`;
-    const bucketName = process.env.R2_BUCKET_NAME;
 
-    if (!bucketName) {
-      console.error("ERRO: R2_BUCKET_NAME não definido.");
-      return null;
-    }
+    // Nome do bucket (Fallback se o .env falhar)
+    const bucketName = process.env.R2_BUCKET_NAME || "losscontrolsy";
 
     await r2.send(
       new PutObjectCommand({
@@ -31,15 +31,13 @@ async function uploadToR2(base64Image: string): Promise<string | null> {
       }),
     );
 
-    // Retorna a URL pública correta
-    const publicDomain = process.env.R2_PUBLIC_DOMAIN;
-    if (publicDomain) {
-      const domain = publicDomain.replace(/\/$/, "");
-      return `${domain}/${fileName}`;
-    }
+    // MONTAGEM DO LINK COMPLETO
+    // Tenta pegar do .env, se falhar, usa o fallback hardcoded
+    const publicDomain = process.env.R2_PUBLIC_DOMAIN || R2_DOMAIN_FALLBACK;
+    const domain = publicDomain.replace(/\/$/, ""); // Remove barra final se houver
 
-    console.warn("ATENÇÃO: R2_PUBLIC_DOMAIN ausente.");
-    return fileName;
+    // Retorna: https://.../galeria/uuid.jpg
+    return `${domain}/${fileName}`;
   } catch (error) {
     console.error("Erro R2:", error);
     return null;
@@ -80,7 +78,7 @@ export async function getEvidencias() {
   }
 }
 
-// 2. Criar Evidência (AGORA COM DATA E VÍNCULO)
+// 2. Criar Evidência (COM DATA RETROATIVA E VÍNCULO)
 export async function createEvidenciaAvulsa(data: {
   url: string;
   motivo?: string;
@@ -91,7 +89,7 @@ export async function createEvidenciaAvulsa(data: {
   if (!session) return { success: false, message: "Não autorizado" };
 
   try {
-    // Upload para R2
+    // Upload para R2 (Agora retorna o link completo com https)
     const r2Url = await uploadToR2(data.url);
     if (!r2Url)
       return { success: false, message: "Falha no upload da imagem." };
@@ -150,7 +148,7 @@ export async function buscarEventosParaVinculo() {
       data: eventos.map((e) => ({
         id: e.id,
         label: `${new Date(e.dataHora).toLocaleDateString("pt-BR")} - ${e.item?.nome} (${Number(e.quantidade)} ${e.unidade})`,
-        dataOriginal: e.dataHora,
+        dataOriginal: e.dataHora, // Útil se quisermos sugerir a data do evento na foto
       })),
     };
   } catch (error) {

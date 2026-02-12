@@ -36,12 +36,13 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { Evidencia } from "@/lib/types";
-import { cn, compressImage } from "@/lib/utils"; // Importado corretamente
+import { cn, compressImage } from "@/lib/utils"; // <--- Importe o compressImage aqui
 import { buscarEventosParaVinculo } from "@/app/actions/galeria";
 
 interface UploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  // Atualizamos a tipagem para aceitar os novos campos
   onSave: (
     data: Partial<Evidencia> & { eventoId?: string; dataPersonalizada?: Date },
   ) => Promise<void>;
@@ -57,6 +58,7 @@ export function UploadDialog({
   const [previews, setPreviews] = useState<string[]>([]);
   const [motivo, setMotivo] = useState("");
 
+  // Novos Estados
   const [date, setDate] = useState<Date | undefined>(new Date());
   const [openEventos, setOpenEventos] = useState(false);
   const [selectedEventoId, setSelectedEventoId] = useState("");
@@ -66,6 +68,7 @@ export function UploadDialog({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Carrega lista de eventos ao abrir
   useEffect(() => {
     if (open) {
       buscarEventosParaVinculo().then((res) => {
@@ -73,6 +76,7 @@ export function UploadDialog({
           setEventosList(res.data);
         }
       });
+      // Reseta data para hoje ao abrir
       setDate(new Date());
     }
   }, [open]);
@@ -108,8 +112,9 @@ export function UploadDialog({
 
     try {
       for (const file of files) {
-        // --- AQUI ESTÁ A CORREÇÃO PRINCIPAL ---
-        // Usamos compressImage em vez de FileReader manual
+        // --- MUDANÇA PRINCIPAL: USA COMPRESSÃO ---
+        // Em vez de FileReader direto, usamos compressImage
+        // Isso reduz uma foto de 5MB para ~300KB, evitando erro no 4G
         const base64String = await compressImage(file);
 
         await onSave({
@@ -120,13 +125,13 @@ export function UploadDialog({
         });
       }
 
+      // Limpa formulário
       setFiles([]);
       setPreviews([]);
       setMotivo("");
       setSelectedEventoId("");
       setDate(new Date());
-
-      // Opcional: fechar o modal automaticamente após sucesso
+      // O pai (GaleriaPage) deve fechar o modal ou você pode fechar aqui se preferir:
       // onOpenChange(false);
     } catch (error) {
       console.error("Erro no upload:", error);
@@ -196,7 +201,7 @@ export function UploadDialog({
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-[300px] p-0">
+              <PopoverContent className="w-75 p-0">
                 <Command>
                   <CommandInput placeholder="Busque por produto..." />
                   <CommandList>
@@ -224,7 +229,7 @@ export function UploadDialog({
                       {eventosList.map((ev) => (
                         <CommandItem
                           key={ev.id}
-                          value={ev.label}
+                          value={ev.label} // O value é usado para busca textual
                           onSelect={() => {
                             setSelectedEventoId(ev.id);
                             setOpenEventos(false);

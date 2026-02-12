@@ -16,20 +16,17 @@ export type CreateEventoData = {
   dataPersonalizada?: Date;
 };
 
-// Função auxiliar para subir Base64 para o R2
+// URL Pública do seu R2 (Fallback de segurança)
+const R2_DOMAIN_FALLBACK =
+  "https://pub-4209581585804561a086053351239c05.r2.dev";
+
 async function uploadToR2(base64Image: string): Promise<string | null> {
   try {
-    // Remove o cabeçalho "data:image/jpeg;base64," se existir
     const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
 
     const fileName = `eventos/${randomUUID()}.jpg`;
-    const bucketName = process.env.R2_BUCKET_NAME;
-
-    if (!bucketName) {
-      console.error("ERRO: R2_BUCKET_NAME não definido no .env");
-      return null;
-    }
+    const bucketName = process.env.R2_BUCKET_NAME || "losscontrolsy";
 
     await r2.send(
       new PutObjectCommand({
@@ -37,28 +34,15 @@ async function uploadToR2(base64Image: string): Promise<string | null> {
         Key: fileName,
         Body: buffer,
         ContentType: "image/jpeg",
-        // ACL: "public-read", // Removido pois R2 geralmente não usa ACL dessa forma
       }),
     );
 
-    // Constrói a URL Pública
-    const publicDomain = process.env.R2_PUBLIC_DOMAIN;
+    // Tenta pegar do .env, se falhar, usa o fallback hardcoded
+    const publicDomain = process.env.R2_PUBLIC_DOMAIN || R2_DOMAIN_FALLBACK;
+    const domain = publicDomain.replace(/\/$/, ""); // Remove barra final se houver
 
-    // Log para Debug (aparecerá no seu terminal onde roda o 'npm run dev')
-    console.log("Upload R2 - Domain:", publicDomain);
-    console.log("Upload R2 - File:", fileName);
-
-    if (publicDomain) {
-      // Remove barra final se houver e monta a URL
-      const domain = publicDomain.replace(/\/$/, "");
-      return `${domain}/${fileName}`;
-    }
-
-    // Fallback de emergência (mas o ideal é ter o R2_PUBLIC_DOMAIN)
-    console.warn(
-      "ATENÇÃO: R2_PUBLIC_DOMAIN ausente. Salvando apenas o caminho relativo.",
-    );
-    return fileName;
+    // Retorna: https://.../eventos/uuid.jpg
+    return `${domain}/${fileName}`;
   } catch (error) {
     console.error("Erro CRÍTICO no upload R2:", error);
     return null;
@@ -117,7 +101,6 @@ export async function createEvento(data: CreateEventoData) {
     const uploadedUrls: string[] = [];
     if (data.fotos && data.fotos.length > 0) {
       for (const fotoBase64 of data.fotos) {
-        // Verifica se é uma URL já existente ou um novo base64
         if (fotoBase64.startsWith("http")) {
           uploadedUrls.push(fotoBase64);
         } else {

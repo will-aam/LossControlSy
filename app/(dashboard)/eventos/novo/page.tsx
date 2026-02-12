@@ -1,3 +1,4 @@
+// app/(dashboard)/eventos/novo/page.tsx
 "use client";
 
 import { useState, useEffect, useRef } from "react";
