@@ -4,28 +4,61 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/session";
 import { EventoStatus } from "@prisma/client";
+import { r2 } from "@/lib/r2"; // Importa seu cliente R2
+import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { randomUUID } from "crypto";
 
-// Tipo de entrada de dados para criar evento
 export type CreateEventoData = {
   itemId: string;
   quantidade: number;
   motivo: string;
   fotos?: string[];
-  dataPersonalizada?: Date; // <--- NOVO CAMPO
+  dataPersonalizada?: Date;
 };
 
-// 1. Listar Eventos (Dashboard e Lista)
+// Função auxiliar para subir Base64 para o R2
+async function uploadToR2(base64Image: string): Promise<string | null> {
+  try {
+    // Remove o cabeçalho "data:image/jpeg;base64," se existir
+    const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
+    const buffer = Buffer.from(base64Data, "base64");
+
+    const fileName = `eventos/${randomUUID()}.jpg`;
+
+    await r2.send(
+      new PutObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME, // Certifique-se de ter essa var no .env
+        Key: fileName,
+        Body: buffer,
+        ContentType: "image/jpeg",
+        ACL: "public-read", // Opcional, depende da config do seu bucket
+      }),
+    );
+
+    // Retorna a URL pública (ajuste conforme seu domínio público do R2)
+    // Se você não tiver domínio personalizado, use o endpoint do R2 ou configure no .env
+    const publicUrl = process.env.R2_PUBLIC_URL
+      ? `${process.env.R2_PUBLIC_URL}/${fileName}`
+      : `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${process.env.R2_BUCKET_NAME}/${fileName}`; // Fallback (geralmente não é público direto)
+
+    // DICA: O ideal é ter uma variável R2_PUBLIC_DOMAIN no .env
+    return process.env.R2_PUBLIC_DOMAIN
+      ? `${process.env.R2_PUBLIC_DOMAIN}/${fileName}`
+      : fileName;
+  } catch (error) {
+    console.error("Erro no upload R2:", error);
+    return null;
+  }
+}
+
+// 1. Listar Eventos
 export async function getEventos() {
   try {
     const eventos = await prisma.evento.findMany({
       orderBy: { dataHora: "desc" },
       include: {
-        item: {
-          include: { categoria: true },
-        },
-        criadoPor: {
-          select: { nome: true, email: true, role: true },
-        },
+        item: { include: { categoria: true } },
+        criadoPor: { select: { nome: true, email: true, role: true } },
         evidencias: true,
       },
     });
@@ -52,32 +85,33 @@ export async function getEventos() {
   }
 }
 
-// 2. Criar Evento (Registrar Perda)
+// 2. Criar Evento (COM UPLOAD R2)
 export async function createEvento(data: CreateEventoData) {
   const session = await getSession();
-  if (!session || !session.id) {
-    return { success: false, message: "Usuário não autenticado." };
-  }
-
+  if (!session || !session.id)
+    return { success: false, message: "Não autorizado." };
   if (!data.itemId || !data.quantidade || data.quantidade <= 0) {
-    return { success: false, message: "Item e Quantidade são obrigatórios." };
+    return { success: false, message: "Dados inválidos." };
   }
 
   try {
-    const item = await prisma.item.findUnique({
-      where: { id: data.itemId },
-    });
+    const item = await prisma.item.findUnique({ where: { id: data.itemId } });
+    if (!item) return { success: false, message: "Item não encontrado." };
 
-    if (!item) {
-      return { success: false, message: "Item não encontrado." };
+    // PROCESSAR FOTOS (Upload para R2)
+    const uploadedUrls: string[] = [];
+    if (data.fotos && data.fotos.length > 0) {
+      for (const fotoBase64 of data.fotos) {
+        const url = await uploadToR2(fotoBase64);
+        if (url) uploadedUrls.push(url);
+      }
     }
 
-    // LÓGICA DE DATA: Usa a personalizada ou a atual
     const dataDoEvento = data.dataPersonalizada || new Date();
 
     await prisma.evento.create({
       data: {
-        dataHora: dataDoEvento, // <--- APLICA A DATA AQUI
+        dataHora: dataDoEvento,
         motivo: data.motivo,
         status: "rascunho",
         quantidade: data.quantidade,
@@ -86,9 +120,10 @@ export async function createEvento(data: CreateEventoData) {
         precoVendaSnapshot: item.precoVenda,
         itemId: item.id,
         criadoPorId: session.id,
+        // Cria as evidências com as URLs do R2 (não mais o Base64)
         evidencias: {
-          create: data.fotos?.map((fotoUrl) => ({
-            url: fotoUrl,
+          create: uploadedUrls.map((url) => ({
+            url: url,
             userId: session.id,
             motivo: data.motivo,
           })),
@@ -105,23 +140,20 @@ export async function createEvento(data: CreateEventoData) {
   }
 }
 
-// 3. Aprovar/Rejeitar Evento
+// 3. Status
 export async function updateEventoStatus(id: string, novoStatus: EventoStatus) {
   const session = await getSession();
   if (!session) return { success: false, message: "Não autorizado" };
-
   try {
     await prisma.evento.update({
       where: { id },
       data: {
         status: novoStatus,
-        aprovadoPorId:
-          novoStatus === "aprovado" || novoStatus === "rejeitado"
-            ? session.id
-            : undefined,
+        aprovadoPorId: ["aprovado", "rejeitado"].includes(novoStatus)
+          ? session.id
+          : undefined,
       },
     });
-
     revalidatePath("/eventos");
     return { success: true };
   } catch (error) {
@@ -129,7 +161,7 @@ export async function updateEventoStatus(id: string, novoStatus: EventoStatus) {
   }
 }
 
-// 4. Excluir Evento
+// 4. Delete
 export async function deleteEvento(id: string) {
   try {
     await prisma.evento.delete({ where: { id } });
