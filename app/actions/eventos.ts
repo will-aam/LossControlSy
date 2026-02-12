@@ -16,18 +16,27 @@ export type CreateEventoData = {
   dataPersonalizada?: Date;
 };
 
-// URL Pública do seu R2 (Fallback de segurança)
-const R2_DOMAIN_FALLBACK =
-  "https://pub-4209581585804561a086053351239c05.r2.dev";
-
 async function uploadToR2(base64Image: string): Promise<string | null> {
   try {
+    // Remove o cabeçalho "data:image/..." para pegar só os dados
     const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
 
     const fileName = `eventos/${randomUUID()}.jpg`;
-    const bucketName = process.env.R2_BUCKET_NAME || "losscontrolsy";
 
+    // Pega as configurações do .env
+    const bucketName = process.env.R2_BUCKET_NAME;
+    const publicDomain = process.env.R2_PUBLIC_DOMAIN;
+
+    if (!bucketName || !publicDomain) {
+      console.error(
+        "ERRO DE CONFIGURAÇÃO: Verifique R2_BUCKET_NAME e R2_PUBLIC_DOMAIN no arquivo .env",
+      );
+      // Se não tiver configurado, retorna null para evitar salvar link quebrado
+      return null;
+    }
+
+    // Faz o upload do arquivo
     await r2.send(
       new PutObjectCommand({
         Bucket: bucketName,
@@ -37,14 +46,12 @@ async function uploadToR2(base64Image: string): Promise<string | null> {
       }),
     );
 
-    // Tenta pegar do .env, se falhar, usa o fallback hardcoded
-    const publicDomain = process.env.R2_PUBLIC_DOMAIN || R2_DOMAIN_FALLBACK;
-    const domain = publicDomain.replace(/\/$/, ""); // Remove barra final se houver
-
-    // Retorna: https://.../eventos/uuid.jpg
+    // Remove barra final do domínio se houver e monta a URL completa
+    // Ex: https://pub-xyz.r2.dev/eventos/arquivo.jpg
+    const domain = publicDomain.replace(/\/$/, "");
     return `${domain}/${fileName}`;
   } catch (error) {
-    console.error("Erro CRÍTICO no upload R2:", error);
+    console.error("Erro no upload R2:", error);
     return null;
   }
 }
@@ -101,6 +108,7 @@ export async function createEvento(data: CreateEventoData) {
     const uploadedUrls: string[] = [];
     if (data.fotos && data.fotos.length > 0) {
       for (const fotoBase64 of data.fotos) {
+        // Se já for link (http) ou base64 (data), processa
         if (fotoBase64.startsWith("http")) {
           uploadedUrls.push(fotoBase64);
         } else {

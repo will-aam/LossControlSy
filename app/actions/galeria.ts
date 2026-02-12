@@ -7,20 +7,24 @@ import { r2 } from "@/lib/r2";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { randomUUID } from "crypto";
 
-// URL de Fallback (Use a mesma que colocamos no eventos.ts ou a do seu painel Cloudflare)
-const R2_DOMAIN_FALLBACK =
-  "https://pub-4209581585804561a086053351239c05.r2.dev";
-
 // Função helper de upload para o R2
 async function uploadToR2(base64Image: string): Promise<string | null> {
   try {
-    // Limpa o prefixo do base64 se houver
     const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
+
     const fileName = `galeria/${randomUUID()}.jpg`;
 
-    // Nome do bucket (Fallback se o .env falhar)
-    const bucketName = process.env.R2_BUCKET_NAME || "losscontrolsy";
+    // Pega as variáveis do .env
+    const bucketName = process.env.R2_BUCKET_NAME;
+    const publicDomain = process.env.R2_PUBLIC_DOMAIN;
+
+    if (!bucketName || !publicDomain) {
+      console.error(
+        "ERRO DE CONFIGURAÇÃO: Verifique R2_BUCKET_NAME e R2_PUBLIC_DOMAIN no .env",
+      );
+      return null;
+    }
 
     await r2.send(
       new PutObjectCommand({
@@ -31,13 +35,12 @@ async function uploadToR2(base64Image: string): Promise<string | null> {
       }),
     );
 
-    // MONTAGEM DO LINK COMPLETO
-    // Tenta pegar do .env, se falhar, usa o fallback hardcoded
-    const publicDomain = process.env.R2_PUBLIC_DOMAIN || R2_DOMAIN_FALLBACK;
-    const domain = publicDomain.replace(/\/$/, ""); // Remove barra final se houver
+    // Remove barra final se houver e monta a URL completa
+    const domain = publicDomain.replace(/\/$/, "");
 
-    // Retorna: https://.../galeria/uuid.jpg
-    return `${domain}/${fileName}`;
+    // Retorna: https://pub-....r2.dev/galeria/uuid.jpg
+    const fullUrl = `${domain}/${fileName}`;
+    return fullUrl;
   } catch (error) {
     console.error("Erro R2:", error);
     return null;
@@ -61,6 +64,11 @@ export async function getEvidencias() {
 
     const formattedData = evidencias.map((ev) => ({
       ...ev,
+      // O banco agora deve ter o link completo. Se não tiver (legado), tenta usar o domínio atual
+      url:
+        ev.url.startsWith("http") || ev.url.startsWith("data:")
+          ? ev.url
+          : `${process.env.R2_PUBLIC_DOMAIN?.replace(/\/$/, "")}/${ev.url}`,
       evento: ev.evento
         ? {
             ...ev.evento,
@@ -78,30 +86,29 @@ export async function getEvidencias() {
   }
 }
 
-// 2. Criar Evidência (COM DATA RETROATIVA E VÍNCULO)
+// 2. Criar Evidência
 export async function createEvidenciaAvulsa(data: {
   url: string;
   motivo?: string;
-  eventoId?: string; // Vínculo com evento
-  dataPersonalizada?: Date | string; // Data retroativa
+  eventoId?: string;
+  dataPersonalizada?: Date | string;
 }) {
   const session = await getSession();
   if (!session) return { success: false, message: "Não autorizado" };
 
   try {
-    // Upload para R2 (Agora retorna o link completo com https)
+    // Faz o upload e recebe o link completo
     const r2Url = await uploadToR2(data.url);
     if (!r2Url)
       return { success: false, message: "Falha no upload da imagem." };
 
-    // Define a data: ou a escolhida ou agora
     const dataFinal = data.dataPersonalizada
       ? new Date(data.dataPersonalizada)
       : new Date();
 
     await prisma.evidencia.create({
       data: {
-        url: r2Url,
+        url: r2Url, // Salva https://... no banco
         motivo: data.motivo || "Upload Galeria",
         dataUpload: dataFinal,
         userId: session.id,
@@ -128,10 +135,9 @@ export async function deleteEvidencia(id: string) {
   }
 }
 
-// 4. Buscar Eventos para Vínculo (NOVA)
+// 4. Buscar Eventos para Vínculo
 export async function buscarEventosParaVinculo() {
   try {
-    // Busca os últimos 50 eventos para vincular fotos
     const eventos = await prisma.evento.findMany({
       take: 50,
       orderBy: { dataHora: "desc" },
@@ -142,13 +148,12 @@ export async function buscarEventosParaVinculo() {
       },
     });
 
-    // Formata para o combobox
     return {
       success: true,
       data: eventos.map((e) => ({
         id: e.id,
         label: `${new Date(e.dataHora).toLocaleDateString("pt-BR")} - ${e.item?.nome} (${Number(e.quantidade)} ${e.unidade})`,
-        dataOriginal: e.dataHora, // Útil se quisermos sugerir a data do evento na foto
+        dataOriginal: e.dataHora,
       })),
     };
   } catch (error) {
