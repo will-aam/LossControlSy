@@ -1,3 +1,4 @@
+// app/(dashboard)/galeria/page.tsx
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
@@ -30,6 +31,7 @@ import {
   formatDateTime,
   getStatusLabel,
   getStatusColor,
+  compressImage,
 } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
 import { UploadDialog } from "@/components/galeria/upload-dialog";
@@ -37,6 +39,7 @@ import {
   getEvidencias,
   createEvidenciaAvulsa,
   deleteEvidencia,
+  updateEvidencia,
 } from "@/app/actions/galeria";
 
 import {
@@ -52,6 +55,7 @@ import {
   Camera,
   MoreVertical,
   Loader2,
+  Edit,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -61,8 +65,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 
-// Interface ajustada para aceitar dados parciais do banco sem reclamar
-interface EvidenciaDisplay {
+// Interface ajustada para aceitar dados parciais do banco
+export interface EvidenciaDisplay {
   id: string;
   url: string;
   dataUpload: string;
@@ -76,6 +80,7 @@ interface EvidenciaDisplay {
     unidade: string;
     motivo?: string;
     item?: {
+      id: string;
       nome: string;
       codigoInterno: string;
     };
@@ -98,11 +103,14 @@ export default function GaleriaPage() {
     null,
   );
   const [isViewerOpen, setIsViewerOpen] = useState(false);
-
   const [photoIndex, setPhotoIndex] = useState(0);
 
   // Modais e Upload
   const [showUploadDialog, setShowUploadDialog] = useState(false);
+
+  // Estado para EDIÇÃO (vincular foto avulsa) - Usaremos o mesmo dialog de upload, mas em modo edição
+  const [photoToEdit, setPhotoToEdit] = useState<EvidenciaDisplay | null>(null);
+
   const [photoToDelete, setPhotoToDelete] = useState<EvidenciaDisplay | null>(
     null,
   );
@@ -118,7 +126,6 @@ export default function GaleriaPage() {
     const result = await getEvidencias();
 
     if (result.success && result.data) {
-      // Mapeamento com tipagem flexível para evitar erro de Evento incompleto
       const mappedData: EvidenciaDisplay[] = (result.data as any[]).map(
         (ev) => ({
           id: ev.id,
@@ -136,6 +143,7 @@ export default function GaleriaPage() {
                 motivo: ev.evento.motivo,
                 item: ev.evento.item
                   ? {
+                      id: ev.evento.item.id,
                       nome: ev.evento.item.nome,
                       codigoInterno: ev.evento.item.codigoInterno,
                     }
@@ -156,41 +164,64 @@ export default function GaleriaPage() {
   const handleQuickUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64String = reader.result as string;
+      toast.loading("Processando...", { id: "quick-upload" });
 
+      compressImage(file).then(async (base64String) => {
         const result = await createEvidenciaAvulsa({
           url: base64String,
           motivo: "Upload Rápido",
         });
 
+        toast.dismiss("quick-upload");
         if (result.success) {
           toast.success("Foto adicionada à galeria");
           loadData();
         } else {
           toast.error("Erro ao salvar foto.");
         }
-      };
-      reader.readAsDataURL(file);
+      });
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleDetailedSave = async (data: Partial<Evidencia>) => {
+  const handleDetailedSave = async (
+    data: Partial<Evidencia> & { eventoId?: string; dataPersonalizada?: Date },
+  ) => {
+    // MODO EDIÇÃO
+    if (photoToEdit) {
+      const result = await updateEvidencia(photoToEdit.id, {
+        motivo: data.motivo,
+        eventoId: data.eventoId,
+        dataPersonalizada: data.dataPersonalizada,
+      });
+
+      if (result.success) {
+        toast.success("Foto atualizada com sucesso!");
+        loadData();
+        setShowUploadDialog(false);
+        setPhotoToEdit(null);
+      } else {
+        toast.error(result.message || "Erro ao atualizar.");
+      }
+      return;
+    }
+
+    // MODO CRIAÇÃO (Novo Upload)
     if (!data.url) return;
 
     const result = await createEvidenciaAvulsa({
       url: data.url,
       motivo: data.motivo,
+      eventoId: data.eventoId,
+      dataPersonalizada: data.dataPersonalizada,
     });
 
     if (result.success) {
-      toast.success("Foto registrada com detalhes!");
+      toast.success("Foto registrada com sucesso!");
       loadData();
       setShowUploadDialog(false);
     } else {
-      toast.error("Erro ao salvar.");
+      toast.error(result.message || "Erro ao salvar.");
     }
   };
 
@@ -198,25 +229,22 @@ export default function GaleriaPage() {
   const confirmDelete = async () => {
     if (!photoToDelete) return;
 
-    if (photoToDelete.evento) {
-      toast.error(
-        "Não é possível excluir fotos vinculadas a eventos auditados aqui.",
-      );
-    } else {
-      const result = await deleteEvidencia(photoToDelete.id);
+    // Removemos a restrição de não poder excluir fotos de eventos,
+    // pois o usuário pode ter errado a foto.
 
-      if (result.success) {
-        toast.success("Foto removida.");
-        loadData();
-        // Se apagou a foto que estava aberta no viewer, fecha o viewer
-        if (selectedPhoto?.id === photoToDelete.id) {
-          setIsViewerOpen(false);
-          setSelectedPhoto(null);
-        }
-      } else {
-        toast.error(result.message);
+    const result = await deleteEvidencia(photoToDelete.id);
+
+    if (result.success) {
+      toast.success("Foto removida.");
+      loadData();
+      if (selectedPhoto?.id === photoToDelete.id) {
+        setIsViewerOpen(false);
+        setSelectedPhoto(null);
       }
+    } else {
+      toast.error(result.message);
     }
+
     setPhotoToDelete(null);
   };
 
@@ -279,6 +307,13 @@ export default function GaleriaPage() {
     setPhotoIndex(newIndex);
   };
 
+  const openEditDialog = (photo: EvidenciaDisplay) => {
+    setPhotoToEdit(photo);
+    setShowUploadDialog(true);
+    // Fecha o viewer se estiver aberto para editar
+    setIsViewerOpen(false);
+  };
+
   if (!hasPermission("galeria:ver")) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
@@ -299,7 +334,7 @@ export default function GaleriaPage() {
           </p>
         </div>
 
-        {/* BOTÕES DE UPLOAD (Protegidos por permissão) */}
+        {/* BOTÕES DE UPLOAD */}
         {hasPermission("galeria:upload") && (
           <div className="flex gap-2">
             <input
@@ -318,7 +353,12 @@ export default function GaleriaPage() {
               Foto Rápida
             </Button>
 
-            <Button onClick={() => setShowUploadDialog(true)}>
+            <Button
+              onClick={() => {
+                setPhotoToEdit(null); // Garante que é modo criação
+                setShowUploadDialog(true);
+              }}
+            >
               <Plus className="mr-2 h-4 w-4" />
               Adicionar Detalhado
             </Button>
@@ -353,80 +393,34 @@ export default function GaleriaPage() {
         </Select>
       </div>
 
-      {/* Grid de Fotos */}
+      {/* Grid de Fotos - AJUSTADO PARA QUADRADOS PEQUENOS */}
       {isLoading ? (
         <div className="flex justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       ) : filteredEvidencias.length > 0 ? (
-        <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 pb-10">
+        <div className="grid gap-2 grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 pb-10">
           {filteredEvidencias.map((evidencia, index) => (
-            <Card
+            <button
               key={evidencia.id}
-              className="group relative overflow-hidden border-0 shadow-sm ring-1 ring-border/50"
+              type="button"
+              onClick={() => handlePhotoClick(evidencia, index)}
+              className="group relative aspect-square w-full overflow-hidden rounded-md ring-1 ring-border/50 shadow-sm"
             >
-              <CardContent
-                className="p-0 aspect-square relative cursor-pointer"
-                onClick={() => handlePhotoClick(evidencia, index)}
-              >
-                <img
-                  src={evidencia.url || "/placeholder.svg"}
-                  alt={`Evidência ${index + 1}`}
-                  className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                />
+              <img
+                src={evidencia.url || "/placeholder.svg"}
+                alt={`Evidência ${index + 1}`}
+                className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+              />
 
-                {/* Overlay Gradiente */}
-                <div className="absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-3">
-                  <p className="text-white text-xs font-medium truncate">
-                    {evidencia.evento?.item?.nome || "Foto Avulsa"}
-                  </p>
-                  <p className="text-white/70 text-[10px]">
-                    {formatDate(evidencia.dataUpload)}
-                  </p>
-                </div>
+              <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100 flex items-center justify-center">
+                <ZoomIn className="h-6 w-6 text-white" />
+              </div>
 
-                {/* Ícone de Zoom */}
-                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                  <div className="h-6 w-6 rounded-full bg-transparent p-1.5 text-white">
-                    <ZoomIn className="h-3 w-3" />
-                  </div>
-                </div>
-              </CardContent>
-
-              {/* Botão de Menu/Excluir (ABSOLUTAMENTE ACIMA DE TUDO) */}
-              {/* Só mostra se NÃO for evento e tiver permissão */}
-              {!evidencia.evento && hasPermission("galeria:excluir") && (
-                <div
-                  className="absolute top-2 right-2 z-20"
-                  onClick={(e) => {
-                    e.stopPropagation(); // Impede abrir o viewer ao clicar no menu
-                  }}
-                >
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 rounded-full bg-black/40 hover:bg-black/60 text-white"
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        className="text-destructive focus:text-destructive text-xs"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPhotoToDelete(evidencia);
-                        }}
-                      >
-                        <Trash2 className="mr-2 h-3 w-3" /> Excluir Foto
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              )}
-            </Card>
+              <span
+                className={`absolute bottom-1 right-1 h-2 w-2 rounded-full ${evidencia.evento ? "bg-green-500" : "bg-yellow-500"}`}
+              />
+            </button>
           ))}
         </div>
       ) : (
@@ -435,27 +429,20 @@ export default function GaleriaPage() {
             <Search className="h-8 w-8 text-muted-foreground" />
           </div>
           <h3 className="text-lg font-medium">Nenhuma foto encontrada</h3>
-          <p className="text-muted-foreground text-sm mt-1 max-w-xs">
-            Tente ajustar os filtros ou adicione novas fotos usando os botões
-            acima.
-          </p>
         </div>
       )}
 
       {/* Modal Visualizador */}
       <Dialog open={isViewerOpen} onOpenChange={setIsViewerOpen}>
         <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden bg-black/95 border-none [&>button]:hidden">
-          <DialogTitle className="sr-only">
-            Visualizar Evidência:{" "}
-            {selectedPhoto?.evento?.item?.nome || "Foto Avulsa"}
-          </DialogTitle>
+          <DialogTitle className="sr-only">Visualizar Evidência</DialogTitle>
 
           <div className="relative w-full h-full flex flex-col">
             {/* Header Flutuante */}
             <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-start z-50 bg-linear-to-b from-black/80 to-transparent">
               <div>
                 <h2 className="text-white font-medium text-sm">
-                  {selectedPhoto?.evento?.item?.nome || "Registro de Galeria"}
+                  {selectedPhoto?.evento?.item?.nome || "Foto Avulsa"}
                 </h2>
                 <p className="text-white/70 text-xs">
                   {selectedPhoto && formatDateTime(selectedPhoto.dataUpload)}
@@ -510,76 +497,92 @@ export default function GaleriaPage() {
               )}
             </div>
 
-            {/* Footer com Detalhes */}
-            <div className="bg-background p-4 border-t">
-              <div className="flex items-start gap-4">
-                {selectedPhoto?.evento ? (
-                  // Se for vinculado a evento
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Badge variant="outline">
-                        {selectedPhoto.evento.item?.codigoInterno}
-                      </Badge>
-                      <Badge
-                        className={getStatusColor(
-                          selectedPhoto.evento.status as any,
-                        )}
-                      >
-                        {getStatusLabel(selectedPhoto.evento.status as any)}
-                      </Badge>
-                    </div>
-                    <p className="text-sm">
-                      Quantidade:{" "}
-                      <strong>
-                        {selectedPhoto.evento.quantidade}{" "}
-                        {selectedPhoto.evento.unidade}
-                      </strong>
-                    </p>
-                    {selectedPhoto.evento.motivo && (
-                      <p className="text-sm text-muted-foreground mt-1">
+            {/* Footer com Detalhes e Ações */}
+            <div className="bg-background p-4 border-t flex flex-col gap-3">
+              <div className="flex items-start justify-between">
+                {/* Informações */}
+                <div className="flex-1">
+                  {selectedPhoto?.evento ? (
+                    <>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Badge variant="outline">
+                          {selectedPhoto.evento.item?.codigoInterno}
+                        </Badge>
+                        <Badge
+                          className={getStatusColor(
+                            selectedPhoto.evento.status as any,
+                          )}
+                        >
+                          {getStatusLabel(selectedPhoto.evento.status as any)}
+                        </Badge>
+                      </div>
+                      <p className="text-sm">
+                        Qtd:{" "}
+                        <strong>
+                          {selectedPhoto.evento.quantidade}{" "}
+                          {selectedPhoto.evento.unidade}
+                        </strong>
+                      </p>
+                      <p className="text-sm text-muted-foreground">
                         Motivo: {selectedPhoto.evento.motivo}
                       </p>
-                    )}
-                  </div>
-                ) : (
-                  // Se for foto avulsa
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Badge variant="secondary">Avulso</Badge>
+                    </>
+                  ) : (
+                    <div>
+                      <Badge variant="secondary" className="mb-1">
+                        Avulso
+                      </Badge>
+                      <p className="text-sm">
+                        Motivo: {selectedPhoto?.motivo || "-"}
+                      </p>
                     </div>
-                    <p className="text-sm text-foreground">
-                      {selectedPhoto?.motivo || "Sem observações registradas."}
-                    </p>
-                  </div>
-                )}
+                  )}
+                </div>
 
-                {/* Botão de Excluir no Viewer */}
-                {!selectedPhoto?.evento && hasPermission("galeria:excluir") && (
+                {/* Ações: Editar e Excluir */}
+                <div className="flex gap-2">
+                  {/* Botão EDITAR (Só se tiver permissão e for avulsa ou quiser editar detalhes) */}
                   <Button
-                    variant="destructive"
+                    variant="secondary"
                     size="sm"
-                    onClick={() => {
-                      setPhotoToDelete(selectedPhoto);
-                      // Não fecha o viewer agora, espera confirmação
-                    }}
+                    onClick={() =>
+                      selectedPhoto && openEditDialog(selectedPhoto)
+                    }
                   >
-                    <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                    <Edit className="mr-2 h-4 w-4" />{" "}
+                    {selectedPhoto?.evento
+                      ? "Ver Detalhes"
+                      : "Completar Cadastro"}
                   </Button>
-                )}
+
+                  {hasPermission("galeria:excluir") && (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => {
+                        setPhotoToDelete(selectedPhoto);
+                      }}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Modal de Upload Detalhado */}
+      {/* Modal de Upload/Edição Detalhado */}
       <UploadDialog
         open={showUploadDialog}
         onOpenChange={setShowUploadDialog}
         onSave={handleDetailedSave}
+        // Passaremos a foto para edição se houver
+        editMode={!!photoToEdit}
+        initialData={photoToEdit}
       />
 
-      {/* Alerta de Exclusão */}
       <AlertDialog
         open={!!photoToDelete}
         onOpenChange={(open) => !open && setPhotoToDelete(null)}

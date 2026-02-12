@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Command,
   CommandEmpty,
@@ -33,109 +32,182 @@ import {
   Calendar as CalendarIcon,
   Check,
   ChevronsUpDown,
+  Image as ImageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Evidencia } from "@/lib/types";
-import { cn, compressImage } from "@/lib/utils"; // <--- Importe o compressImage aqui
+import { cn, compressImage, formatDateTime } from "@/lib/utils";
 import { buscarEventosParaVinculo } from "@/app/actions/galeria";
+import { getMotivos, createMotivo } from "@/app/actions/motivos";
+import { EvidenciaDisplay } from "@/app/(dashboard)/galeria/page";
 
 interface UploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  // Atualizamos a tipagem para aceitar os novos campos
   onSave: (
     data: Partial<Evidencia> & { eventoId?: string; dataPersonalizada?: Date },
   ) => Promise<void>;
+  editMode?: boolean;
+  initialData?: EvidenciaDisplay | null;
 }
 
 export function UploadDialog({
   open,
   onOpenChange,
   onSave,
+  editMode = false,
+  initialData,
 }: UploadDialogProps) {
   const [isUploading, setIsUploading] = useState(false);
-  const [files, setFiles] = useState<File[]>([]);
-  const [previews, setPreviews] = useState<string[]>([]);
-  const [motivo, setMotivo] = useState("");
 
-  // Novos Estados
+  // No modo detalhado/edição, é apenas 1 arquivo
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string>("");
+
+  // Estados do Formulário
   const [date, setDate] = useState<Date | undefined>(new Date());
-  const [openEventos, setOpenEventos] = useState(false);
-  const [selectedEventoId, setSelectedEventoId] = useState("");
+
+  // Vínculo com Evento
+  const [selectedEventoId, setSelectedEventoId] = useState("none");
   const [eventosList, setEventosList] = useState<
-    { id: string; label: string }[]
+    { id: string; label: string; dataOriginal: Date; itemNome: string }[]
   >([]);
+  const [openEventos, setOpenEventos] = useState(false);
+
+  // Motivos (Select/Combobox)
+  const [motivos, setMotivos] = useState<{ id: string; nome: string }[]>([]);
+  const [selectedMotivo, setSelectedMotivo] = useState("");
+  const [openMotivo, setOpenMotivo] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Carrega lista de eventos ao abrir
+  // Carrega dados iniciais
   useEffect(() => {
     if (open) {
+      // 1. Carregar Eventos
       buscarEventosParaVinculo().then((res) => {
         if (res.success && res.data) {
-          setEventosList(res.data);
+          // Mapeia para incluir o nome do item e data original para facilitar
+          const mapped = res.data.map((e) => ({
+            ...e,
+            // O label já vem formatado do server action
+            // Garantimos que a data venha como objeto Date
+            dataOriginal: new Date(e.dataOriginal),
+            itemNome: e.label.split(" - ")[1]?.split(" (")[0] || "Item",
+          }));
+          setEventosList(mapped);
         }
       });
-      // Reseta data para hoje ao abrir
-      setDate(new Date());
+
+      // 2. Carregar Motivos
+      loadMotivos();
+
+      // 3. Preencher se for Edição
+      if (editMode && initialData) {
+        setPreview(initialData.url);
+        // Se já tem evento, seleciona
+        if (initialData.evento) {
+          setSelectedEventoId(initialData.evento.id);
+          // A data será atualizada pelo useEffect do selectedEventoId
+        } else {
+          setSelectedEventoId("none");
+          setDate(new Date(initialData.dataUpload));
+        }
+        setSelectedMotivo(initialData.motivo || "");
+      } else {
+        // Reset para criação
+        setFile(null);
+        setPreview("");
+        setSelectedEventoId("none");
+        setDate(new Date());
+        setSelectedMotivo("");
+      }
     }
-  }, [open]);
+  }, [open, editMode, initialData]);
+
+  const loadMotivos = async () => {
+    const result = await getMotivos();
+    if (result.success && result.data) {
+      setMotivos(result.data);
+    }
+  };
+
+  // Efeito: Ao selecionar um evento, preencher a data e travar
+  useEffect(() => {
+    if (selectedEventoId && selectedEventoId !== "none") {
+      const evento = eventosList.find((e) => e.id === selectedEventoId);
+      if (evento) {
+        setDate(evento.dataOriginal);
+        // Se não tiver motivo selecionado, tenta sugerir algo ou deixa vazio
+        if (!selectedMotivo) setSelectedMotivo("Registro vinculado");
+      }
+    }
+  }, [selectedEventoId, eventosList]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const newFiles = Array.from(e.target.files);
-      const validFiles = newFiles.filter((file) => {
-        // Validação inicial (a compressão resolve o tamanho real depois)
-        if (file.size > 20 * 1024 * 1024) {
-          toast.error(`Arquivo ${file.name} muito grande (max 20MB)`);
-          return false;
-        }
-        return true;
-      });
-
-      setFiles((prev) => [...prev, ...validFiles]);
-      const newPreviews = validFiles.map((file) => URL.createObjectURL(file));
-      setPreviews((prev) => [...prev, ...newPreviews]);
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      if (selectedFile.size > 20 * 1024 * 1024) {
+        toast.error("Arquivo muito grande (max 20MB)");
+        return;
+      }
+      setFile(selectedFile);
+      setPreview(URL.createObjectURL(selectedFile));
     }
   };
 
-  const removeFile = (index: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
-    setPreviews((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleUpload = async () => {
-    if (files.length === 0) return;
+  const handleSaveAction = async () => {
+    // Validação
+    if (!editMode && !file) {
+      toast.error("Selecione uma foto.");
+      return;
+    }
+    if (selectedEventoId === "none" && !editMode) {
+      // No modo criação detalhada, evento é obrigatório segundo sua regra
+      toast.error("Selecione um evento para vincular.");
+      return;
+    }
 
     setIsUploading(true);
-    toast.info("Processando e enviando...");
+    toast.info(editMode ? "Atualizando..." : "Enviando...");
 
     try {
-      for (const file of files) {
-        // --- MUDANÇA PRINCIPAL: USA COMPRESSÃO ---
-        // Em vez de FileReader direto, usamos compressImage
-        // Isso reduz uma foto de 5MB para ~300KB, evitando erro no 4G
-        const base64String = await compressImage(file);
-
-        await onSave({
-          url: base64String,
-          motivo: motivo || "Galeria Detalhada",
-          dataPersonalizada: date,
-          eventoId: selectedEventoId || undefined,
-        });
+      // 1. Processar Motivo (Criar se não existir)
+      let motivoFinal = selectedMotivo.trim();
+      if (motivoFinal) {
+        const existe = motivos.find(
+          (m) => m.nome.toLowerCase() === motivoFinal.toLowerCase(),
+        );
+        if (!existe) {
+          await createMotivo(motivoFinal);
+          loadMotivos();
+        }
       }
 
-      // Limpa formulário
-      setFiles([]);
-      setPreviews([]);
-      setMotivo("");
-      setSelectedEventoId("");
-      setDate(new Date());
-      // O pai (GaleriaPage) deve fechar o modal ou você pode fechar aqui se preferir:
-      // onOpenChange(false);
+      // 2. Preparar Imagem (apenas se for novo upload)
+      let base64String = "";
+      if (file) {
+        base64String = await compressImage(file);
+      }
+
+      // 3. Salvar
+      await onSave({
+        url: base64String, // Se vazio (edição sem troca de foto), o pai trata
+        motivo: motivoFinal,
+        dataPersonalizada: date,
+        eventoId: selectedEventoId === "none" ? undefined : selectedEventoId,
+      });
+
+      // Limpeza (se não for fechar automático pelo pai)
+      if (!editMode) {
+        setFile(null);
+        setPreview("");
+        setSelectedMotivo("");
+        setSelectedEventoId("none");
+      }
     } catch (error) {
-      console.error("Erro no upload:", error);
-      toast.error("Erro ao processar fotos. Tente novamente.");
+      console.error("Erro:", error);
+      toast.error("Erro ao processar.");
     } finally {
       setIsUploading(false);
     }
@@ -145,47 +217,22 @@ export function UploadDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md max-h-[95vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Adicionar Evidência Detalhada</DialogTitle>
+          <DialogTitle>
+            {editMode ? "Completar Cadastro" : "Adicionar Evidência Detalhada"}
+          </DialogTitle>
           <DialogDescription>
-            Registre fotos retroativas ou vincule a perdas já lançadas.
+            {editMode
+              ? "Adicione informações à foto avulsa."
+              : "Vincule uma nova foto a um evento existente."}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          {/* 1. SELETOR DE DATA */}
+          {/* 1. SELEÇÃO DE EVENTO (Obrigatório na criação, Opcional na edição) */}
           <div className="flex flex-col space-y-2">
-            <Label>Data da Ocorrência</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant={"outline"}
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !date && "text-muted-foreground",
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date ? (
-                    date.toLocaleDateString("pt-BR")
-                  ) : (
-                    <span>Selecione a data</span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={date}
-                  onSelect={setDate}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          {/* 2. SELETOR DE EVENTO (BUSCA) */}
-          <div className="flex flex-col space-y-2">
-            <Label>Vincular a Evento (Opcional)</Label>
+            <Label>
+              Evento / Perda <span className="text-red-500">*</span>
+            </Label>
             <Popover open={openEventos} onOpenChange={setOpenEventos}>
               <PopoverTrigger asChild>
                 <Button
@@ -194,42 +241,44 @@ export function UploadDialog({
                   aria-expanded={openEventos}
                   className="w-full justify-between overflow-hidden"
                 >
-                  {selectedEventoId
+                  {selectedEventoId && selectedEventoId !== "none"
                     ? eventosList.find((ev) => ev.id === selectedEventoId)
                         ?.label
-                    : "Procurar evento..."}
+                    : "Selecione o evento..."}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-75 p-0">
                 <Command>
-                  <CommandInput placeholder="Busque por produto..." />
+                  <CommandInput placeholder="Buscar por item ou data..." />
                   <CommandList>
-                    <CommandEmpty>
-                      Nenhum evento recente encontrado.
-                    </CommandEmpty>
-                    <CommandGroup heading="Últimos lançamentos">
+                    <CommandEmpty>Nenhum evento encontrado.</CommandEmpty>
+                    <CommandGroup>
+                      {/* Opção de "Sem Vínculo" apenas na edição ou se permitido */}
                       <CommandItem
                         value="none"
                         onSelect={() => {
-                          setSelectedEventoId("");
+                          setSelectedEventoId("none");
                           setOpenEventos(false);
+                          // Destrava a data para hoje
+                          setDate(new Date());
                         }}
                       >
                         <Check
                           className={cn(
                             "mr-2 h-4 w-4",
-                            selectedEventoId === ""
+                            selectedEventoId === "none"
                               ? "opacity-100"
                               : "opacity-0",
                           )}
                         />
                         -- Sem Vínculo (Avulso) --
                       </CommandItem>
+
                       {eventosList.map((ev) => (
                         <CommandItem
                           key={ev.id}
-                          value={ev.label} // O value é usado para busca textual
+                          value={ev.label}
                           onSelect={() => {
                             setSelectedEventoId(ev.id);
                             setOpenEventos(false);
@@ -251,70 +300,162 @@ export function UploadDialog({
                 </Command>
               </PopoverContent>
             </Popover>
-            <p className="text-[10px] text-muted-foreground">
-              *Ao vincular, a foto será associada automaticamente ao item do
-              evento.
-            </p>
           </div>
 
-          {/* 3. ÁREA DE UPLOAD */}
-          <div
-            className="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors"
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <input
-              type="file"
-              multiple
-              accept="image/*"
-              className="hidden"
-              ref={fileInputRef}
-              onChange={handleFileSelect}
-            />
-            <div className="bg-primary/10 p-3 rounded-full mb-2">
-              <Upload className="h-6 w-6 text-primary" />
-            </div>
-            <p className="text-sm font-medium">Toque para adicionar fotos</p>
-            <p className="text-xs text-muted-foreground">
-              Suporta JPG, PNG, WEBP
-            </p>
-          </div>
-
-          {/* PREVIEWS */}
-          {previews.length > 0 && (
-            <div className="grid grid-cols-3 gap-2 max-h-32 overflow-y-auto">
-              {previews.map((src, index) => (
-                <div
-                  key={index}
-                  className="relative group aspect-square rounded-md overflow-hidden border"
+          {/* 2. DATA (Automática do evento ou manual se avulso) */}
+          <div className="flex flex-col space-y-2">
+            <Label>Data da Ocorrência</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  disabled={selectedEventoId !== "none"} // Trava se tiver evento
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !date && "text-muted-foreground",
+                    selectedEventoId !== "none" && "opacity-80 bg-muted",
+                  )}
                 >
-                  <img
-                    src={src}
-                    alt="Preview"
-                    className="w-full h-full object-cover"
-                  />
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      removeFile(index);
-                    }}
-                    className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {date ? (
+                    date.toLocaleDateString("pt-BR")
+                  ) : (
+                    <span>Selecione a data</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0">
+                <Calendar
+                  mode="single"
+                  selected={date}
+                  onSelect={setDate}
+                  initialFocus
+                  disabled={selectedEventoId !== "none"}
+                />
+              </PopoverContent>
+            </Popover>
+            {selectedEventoId !== "none" && (
+              <p className="text-[10px] text-muted-foreground">
+                *Data vinculada ao evento selecionado.
+              </p>
+            )}
+          </div>
 
-          {/* 4. MOTIVO */}
-          <div className="space-y-2">
-            <Label htmlFor="motivo">Observação</Label>
-            <Textarea
-              id="motivo"
-              placeholder="Ex: Foto tirada dias depois..."
-              value={motivo}
-              onChange={(e) => setMotivo(e.target.value)}
-            />
+          {/* 3. FOTO (Preview ou Upload) */}
+          <div className="flex flex-col space-y-2">
+            <Label>Evidência Fotográfica</Label>
+
+            {/* Área de Preview/Upload */}
+            <div
+              className={cn(
+                "border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer transition-colors relative overflow-hidden h-48",
+                !file && !preview ? "hover:bg-muted/50" : "border-primary/50",
+              )}
+              onClick={() => !editMode && fileInputRef.current?.click()} // Só clica se não for edição (você disse "não trocar a foto")
+            >
+              {preview ? (
+                <div className="relative w-full h-full flex items-center justify-center group">
+                  <img
+                    src={preview}
+                    alt="Preview"
+                    className="max-h-full max-w-full object-contain"
+                  />
+                  {!editMode && (
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white font-medium">
+                      Trocar Foto
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="bg-primary/10 p-3 rounded-full mb-2">
+                    <Upload className="h-6 w-6 text-primary" />
+                  </div>
+                  <p className="text-sm font-medium">Toque para adicionar</p>
+                  <p className="text-xs text-muted-foreground">
+                    1 Foto por vez
+                  </p>
+                </>
+              )}
+
+              {/* Input escondido - desativado em modo edição */}
+              {!editMode && (
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  ref={fileInputRef}
+                  onChange={handleFileSelect}
+                />
+              )}
+            </div>
+            {editMode && (
+              <p className="text-[10px] text-amber-600">
+                *A foto não pode ser alterada na edição, apenas os dados.
+              </p>
+            )}
+          </div>
+
+          {/* 4. MOTIVO (SELECT/COMBOBOX) */}
+          <div className="flex flex-col space-y-2">
+            <Label>Motivo / Observação</Label>
+            <Popover open={openMotivo} onOpenChange={setOpenMotivo}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={openMotivo}
+                  className="w-full justify-between"
+                >
+                  {selectedMotivo || "Selecione ou digite..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-75 p-0">
+                <Command>
+                  <CommandInput
+                    placeholder="Buscar ou criar motivo..."
+                    onValueChange={(val) => setSelectedMotivo(val)}
+                  />
+                  <CommandList>
+                    <CommandEmpty>
+                      <span className="text-muted-foreground text-xs">
+                        "{selectedMotivo}" será criado ao salvar.
+                      </span>
+                    </CommandEmpty>
+                    <CommandGroup heading="Sugestões">
+                      {motivos.map((motivo) => (
+                        <CommandItem
+                          key={motivo.id}
+                          value={motivo.nome}
+                          onSelect={(currentValue) => {
+                            // Garante que pega o nome original com case correto
+                            const original =
+                              motivos.find(
+                                (m) =>
+                                  m.nome.toLowerCase() ===
+                                  currentValue.toLowerCase(),
+                              )?.nome || currentValue;
+                            setSelectedMotivo(original);
+                            setOpenMotivo(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              selectedMotivo === motivo.nome
+                                ? "opacity-100"
+                                : "opacity-0",
+                            )}
+                          />
+                          {motivo.nome}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 
@@ -327,15 +468,17 @@ export function UploadDialog({
             Cancelar
           </Button>
           <Button
-            onClick={handleUpload}
-            disabled={files.length === 0 || isUploading}
+            onClick={handleSaveAction}
+            disabled={(!file && !editMode) || isUploading}
           >
             {isUploading ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Salvando...
               </>
+            ) : editMode ? (
+              "Atualizar Dados"
             ) : (
-              "Salvar e Vincular"
+              "Salvar Foto"
             )}
           </Button>
         </DialogFooter>

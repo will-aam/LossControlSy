@@ -15,7 +15,6 @@ async function uploadToR2(base64Image: string): Promise<string | null> {
 
     const fileName = `galeria/${randomUUID()}.jpg`;
 
-    // Pega as variáveis do .env
     const bucketName = process.env.R2_BUCKET_NAME;
     const publicDomain = process.env.R2_PUBLIC_DOMAIN;
 
@@ -35,10 +34,7 @@ async function uploadToR2(base64Image: string): Promise<string | null> {
       }),
     );
 
-    // Remove barra final se houver e monta a URL completa
     const domain = publicDomain.replace(/\/$/, "");
-
-    // Retorna: https://pub-....r2.dev/galeria/uuid.jpg
     const fullUrl = `${domain}/${fileName}`;
     return fullUrl;
   } catch (error) {
@@ -64,7 +60,7 @@ export async function getEvidencias() {
 
     const formattedData = evidencias.map((ev) => ({
       ...ev,
-      // O banco agora deve ter o link completo. Se não tiver (legado), tenta usar o domínio atual
+      // Se não tiver http, tenta corrigir (legado)
       url:
         ev.url.startsWith("http") || ev.url.startsWith("data:")
           ? ev.url
@@ -97,7 +93,6 @@ export async function createEvidenciaAvulsa(data: {
   if (!session) return { success: false, message: "Não autorizado" };
 
   try {
-    // Faz o upload e recebe o link completo
     const r2Url = await uploadToR2(data.url);
     if (!r2Url)
       return { success: false, message: "Falha no upload da imagem." };
@@ -108,7 +103,7 @@ export async function createEvidenciaAvulsa(data: {
 
     await prisma.evidencia.create({
       data: {
-        url: r2Url, // Salva https://... no banco
+        url: r2Url,
         motivo: data.motivo || "Upload Galeria",
         dataUpload: dataFinal,
         userId: session.id,
@@ -158,5 +153,39 @@ export async function buscarEventosParaVinculo() {
     };
   } catch (error) {
     return { success: false, data: [] };
+  }
+}
+
+// 5. Atualizar Evidência (Edição) - AGORA FORA DA OUTRA FUNÇÃO
+export async function updateEvidencia(
+  id: string,
+  data: {
+    motivo?: string;
+    eventoId?: string;
+    dataPersonalizada?: Date | string;
+  },
+) {
+  const session = await getSession();
+  if (!session) return { success: false, message: "Não autorizado" };
+
+  try {
+    const dataFinal = data.dataPersonalizada
+      ? new Date(data.dataPersonalizada)
+      : undefined;
+
+    await prisma.evidencia.update({
+      where: { id },
+      data: {
+        motivo: data.motivo,
+        eventoId: data.eventoId === "none" ? null : data.eventoId,
+        dataUpload: dataFinal,
+      },
+    });
+
+    revalidatePath("/galeria");
+    return { success: true };
+  } catch (error) {
+    console.error("Erro ao atualizar evidencia:", error);
+    return { success: false, message: "Erro ao atualizar foto." };
   }
 }
