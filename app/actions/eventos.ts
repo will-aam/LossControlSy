@@ -18,12 +18,17 @@ export type CreateEventoData = {
 };
 
 // Função helper para extrair a KEY (nome do arquivo) da URL completa
+// Função helper para extrair a KEY (nome do arquivo) da URL completa
 function getKeyFromUrl(url: string): string | null {
   try {
     if (!url.startsWith("http")) return null; // Se não for URL, ignora
     const urlObj = new URL(url);
-    // Remove a barra inicial do pathname (ex: /eventos/foto.jpg -> eventos/foto.jpg)
-    return urlObj.pathname.substring(1);
+
+    // 1. Pega o caminho (ex: /eventos/Minha%20Foto.jpg)
+    // 2. Remove a barra inicial (.substring(1))
+    // 3. DECODIFICA para remover %20 e outros símbolos (decodeURIComponent)
+    const rawPath = urlObj.pathname.substring(1);
+    return decodeURIComponent(rawPath);
   } catch (e) {
     return null;
   }
