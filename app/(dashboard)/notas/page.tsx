@@ -6,7 +6,12 @@ import { NotaFiscal } from "@/lib/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
 // Actions
 import { getPresignedUploadUrl } from "@/app/actions/storage";
-import { getNotas, createNota, deleteNota } from "@/app/actions/notas";
+import {
+  getNotas,
+  createNota,
+  deleteNota,
+  getDownloadLink,
+} from "@/app/actions/notas";
 import { getEventos } from "@/app/actions/eventos";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -161,6 +166,7 @@ export default function NotasFiscaisPage() {
     const { uploadUrl, publicUrl } = await getPresignedUploadUrl(
       file.name,
       file.type,
+      "notas",
     );
     await fetch(uploadUrl, {
       method: "PUT",
@@ -324,13 +330,34 @@ export default function NotasFiscaisPage() {
     }
   };
 
-  const downloadFile = (urlOrContent: string | undefined, filename: string) => {
+  const downloadFile = async (
+    urlOrContent: string | undefined,
+    filename: string,
+  ) => {
     if (!urlOrContent) return;
+
     let href = urlOrContent;
-    if (!urlOrContent.startsWith("http")) {
+
+    // Se for URL http (R2), precisamos assinar
+    if (urlOrContent.startsWith("http")) {
+      toast.loading("Gerando link seguro...");
+      const signedUrl = await getDownloadLink(urlOrContent);
+      toast.dismiss();
+
+      if (signedUrl) {
+        href = signedUrl;
+      } else {
+        toast.error(
+          "Erro ao gerar link de download. O arquivo pode não existir.",
+        );
+        return; // Aborta se falhar
+      }
+    } else {
+      // Se for conteúdo XML texto (base64 ou raw), cria blob
       const blob = new Blob([urlOrContent], { type: "text/xml" });
       href = URL.createObjectURL(blob);
     }
+
     const link = document.createElement("a");
     link.href = href;
     link.download = filename;
