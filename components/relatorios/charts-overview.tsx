@@ -28,9 +28,11 @@ import {
   CartesianGrid,
   XAxis,
   YAxis,
+  ResponsiveContainer,
 } from "recharts";
 import { formatCurrency, formatQuantity } from "@/lib/utils";
 
+// CORREÇÃO: Removido o 'hsl()' que estava causando a cor preta
 const chartConfig = {
   custo: { label: "Custo", color: "var(--chart-1)" },
   precoVenda: { label: "Preço Venda", color: "var(--chart-2)" },
@@ -58,48 +60,51 @@ export function ChartsOverview({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer
-              config={chartConfig}
-              className="h-64 md:h-80 w-full"
-            >
-              <LineChart
-                data={monthlyData}
-                margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  className="stroke-border"
-                  vertical={false}
-                />
-                <XAxis
-                  dataKey="mes"
-                  className="text-xs"
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  className="text-xs"
-                  tickFormatter={(v) => `R$${v}`}
-                  width={40}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Line
-                  type="monotone"
-                  dataKey="custo"
-                  stroke="var(--chart-1)"
-                  strokeWidth={2}
-                  dot={{ fill: "var(--chart-1)" }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="venda"
-                  stroke="var(--chart-2)"
-                  strokeWidth={2}
-                  dot={{ fill: "var(--chart-2)" }}
-                />
-              </LineChart>
+            {/* ChartContainer DEVE envolver o gráfico e ter altura fixa */}
+            <ChartContainer config={chartConfig} className="h-80 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={monthlyData}
+                  margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    className="stroke-border"
+                    vertical={false}
+                  />
+                  <XAxis
+                    dataKey="mes"
+                    className="text-xs"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                  />
+                  <YAxis
+                    className="text-xs"
+                    tickFormatter={(v) => `R$${v}`}
+                    width={40}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Line
+                    type="monotone"
+                    dataKey="custo"
+                    stroke="var(--color-custo)"
+                    strokeWidth={2}
+                    dot={{ fill: "var(--color-custo)", r: 4 }}
+                    activeDot={{ r: 6 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="venda"
+                    stroke="var(--color-precoVenda)"
+                    strokeWidth={2}
+                    dot={{ fill: "var(--color-precoVenda)", r: 4 }}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
             </ChartContainer>
           </CardContent>
         </Card>
@@ -113,29 +118,39 @@ export function ChartsOverview({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer
-              config={chartConfig}
-              className="h-64 md:h-80 w-full"
-            >
-              <BarChart
-                data={perdasPorDiaSemana}
-                margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  className="stroke-border"
-                  vertical={false}
-                />
-                <XAxis
-                  dataKey="dia"
-                  className="text-xs"
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis className="text-xs" tickLine={false} axisLine={false} />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="quantidade" fill="var(--chart-3)" radius={4} />
-              </BarChart>
+            <ChartContainer config={chartConfig} className="h-80 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={perdasPorDiaSemana}
+                  margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    className="stroke-border"
+                    vertical={false}
+                  />
+                  <XAxis
+                    dataKey="dia"
+                    className="text-xs"
+                    tickLine={false}
+                    axisLine={false}
+                    tickMargin={8}
+                  />
+                  <YAxis
+                    className="text-xs"
+                    tickLine={false}
+                    axisLine={false}
+                    width={30}
+                  />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar
+                    dataKey="quantidade"
+                    fill="var(--color-quantidade)"
+                    radius={[4, 4, 0, 0]}
+                    barSize={40}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
             </ChartContainer>
           </CardContent>
         </Card>
