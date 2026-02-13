@@ -14,16 +14,15 @@ export function formatCurrency(value: number | undefined | null) {
   }).format(value);
 }
 
-// --- NOVA FUNÇÃO ADICIONADA ---
 export function formatQuantity(value: number | undefined | null) {
   if (value === undefined || value === null) return "0";
   return new Intl.NumberFormat("pt-BR", {
-    minimumFractionDigits: 0, // Não força zeros (ex: 1 mostra 1, não 1,000)
-    maximumFractionDigits: 3, // Limita a 3 casas (ex: 1.3333 -> 1,333)
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 3,
   }).format(value);
 }
-// ------------------------------
 
+// --- CORREÇÃO APLICADA AQUI ---
 export function formatDate(dateString: string): string {
   if (!dateString) return "-";
   try {
@@ -31,12 +30,15 @@ export function formatDate(dateString: string): string {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
+      timeZone: "UTC", // <--- ISSO É ESSENCIAL PARA CORRIGIR O ERRO DE DATAS
     }).format(new Date(dateString));
   } catch (e) {
     return dateString;
   }
 }
 
+// Para DATA E HORA, geralmente queremos ver no horário local do usuário,
+// então mantemos sem o 'timeZone: UTC' (ou adicionamos se você quiser hora UTC também).
 export function formatDateTime(dateString: string): string {
   if (!dateString) return "-";
   try {
@@ -46,12 +48,14 @@ export function formatDateTime(dateString: string): string {
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
+      // timeZone: "UTC", // <--- Deixe comentado se quiser ver a hora local (Brasília)
     }).format(new Date(dateString));
   } catch (e) {
     return dateString;
   }
 }
 
+// ... restante do arquivo (getStatusColor, getStatusLabel, etc) permanece igual ...
 export function getStatusColor(status: EventoStatus): string {
   const colors: Record<EventoStatus, string> = {
     rascunho: "bg-muted text-muted-foreground",
@@ -84,7 +88,6 @@ export function getRoleLabel(role: UserRole): string {
   return labels[role] || role;
 }
 
-// Mantive sua função de compressão existente
 export async function compressImage(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

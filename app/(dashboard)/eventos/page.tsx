@@ -286,10 +286,7 @@ export default function EventosPage() {
   const handleDownloadLote = async (lote: LoteDiario) => {
     toast.info("Buscando nota fiscal vinculada...");
 
-    // Converte a data original do lote (Date) para string ISO YYYY-MM-DD
-    // Precisamos garantir que o fuso horário não altere o dia.
-    // Usamos toLocaleDateString('en-CA') que retorna YYYY-MM-DD localmente
-    const dataString = lote.dataOriginal.toLocaleDateString("en-CA");
+    const dataString = lote.dataOriginal.toISOString().split("T")[0];
 
     const result = await getNotaDoLote(dataString);
 

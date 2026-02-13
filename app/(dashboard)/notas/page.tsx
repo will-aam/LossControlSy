@@ -147,7 +147,7 @@ export default function NotasFiscaisPage() {
         if (e.status !== "rascunho") {
           // CORREÇÃO CRÍTICA: Usa 'en-CA' para garantir YYYY-MM-DD respeitando o fuso local do navegador
           // Isso resolve o problema de 31/01 virar 01/02 na lista
-          const dataIso = new Date(e.dataHora).toLocaleDateString("en-CA");
+          const dataIso = new Date(e.dataHora).toISOString().split("T")[0];
           datasSet.add(dataIso);
         }
       });
@@ -232,7 +232,7 @@ export default function NotasFiscaisPage() {
     if (data.dataEmissao) {
       // CORREÇÃO CRÍTICA: Mesma lógica de leitura local para o auto-fill
       const dateObj = new Date(data.dataEmissao);
-      const dataNota = dateObj.toLocaleDateString("en-CA");
+      const dataNota = dateObj.toISOString().split("T")[0];
 
       if (lotesDisponiveis.includes(dataNota)) {
         setSelectedLoteDate(dataNota);
