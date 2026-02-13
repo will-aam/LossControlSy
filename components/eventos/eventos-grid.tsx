@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { FileText, ChevronRightSquare } from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
 import { Evento } from "@/lib/types";
+import { toast } from "sonner";
 
 export type BatchStatus = "pendente" | "aprovado" | "rejeitado";
 
@@ -16,12 +17,14 @@ export interface LoteDiario {
   autor: string;
 }
 
+// CORREÇÃO AQUI: Adicionando onDownload à interface
 interface EventosGridProps {
   lotes: LoteDiario[];
   onSelect: (lote: LoteDiario) => void;
+  onDownload: (lote: LoteDiario) => void;
 }
 
-export function EventosGrid({ lotes, onSelect }: EventosGridProps) {
+export function EventosGrid({ lotes, onSelect, onDownload }: EventosGridProps) {
   if (lotes.length === 0) {
     return (
       <div className="py-12 text-center text-muted-foreground border border-dashed rounded-lg bg-muted/5">
@@ -29,6 +32,16 @@ export function EventosGrid({ lotes, onSelect }: EventosGridProps) {
       </div>
     );
   }
+
+  const handleIconClick = (e: React.MouseEvent, lote: LoteDiario) => {
+    e.stopPropagation(); // Impede que o clique abra a pasta (onSelect)
+
+    if (lote.status === "aprovado") {
+      onDownload(lote);
+    } else {
+      toast.error("Apenas lotes aprovados podem ser baixados/impressos.");
+    }
+  };
 
   return (
     <div className="flex flex-col gap-2">
@@ -39,18 +52,26 @@ export function EventosGrid({ lotes, onSelect }: EventosGridProps) {
           onClick={() => onSelect(lote)}
         >
           <div className="flex items-center gap-4">
+            {/* Ícone de Arquivo / Botão de Download */}
             <div
+              onClick={(e) => handleIconClick(e, lote)}
               className={cn(
-                "flex h-9 w-9 items-center justify-center rounded-full border",
+                "flex h-9 w-9 items-center justify-center rounded-full border transition-all",
                 lote.status === "aprovado"
-                  ? "bg-green-500/10 text-green-600 border-green-500/20"
+                  ? "bg-green-500/10 text-green-600 border-green-500/20 hover:bg-green-500/20 hover:scale-105 cursor-pointer"
                   : lote.status === "rejeitado"
-                    ? "bg-red-500/10 text-red-600 border-red-500/20"
-                    : "bg-muted text-muted-foreground",
+                    ? "bg-red-500/10 text-red-600 border-red-500/20 cursor-not-allowed opacity-70"
+                    : "bg-muted text-muted-foreground cursor-not-allowed opacity-70",
               )}
+              title={
+                lote.status === "aprovado"
+                  ? "Baixar Nota Fiscal do Dia"
+                  : "Necessário aprovação para baixar"
+              }
             >
               <FileText className="h-4 w-4" />
             </div>
+
             <div>
               <h3 className="text-sm font-semibold">{lote.data}</h3>
               <div className="flex items-center gap-2 text-xs text-muted-foreground">

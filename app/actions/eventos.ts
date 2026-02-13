@@ -16,15 +16,14 @@ export type CreateEventoData = {
   dataPersonalizada?: Date;
 };
 
+// Função helper de upload para o R2
 async function uploadToR2(base64Image: string): Promise<string | null> {
   try {
-    // Remove o cabeçalho "data:image/..." para pegar só os dados
     const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
 
     const fileName = `eventos/${randomUUID()}.jpg`;
 
-    // Pega as configurações do .env
     const bucketName = process.env.R2_BUCKET_NAME;
     const publicDomain = process.env.R2_PUBLIC_DOMAIN;
 
@@ -32,11 +31,9 @@ async function uploadToR2(base64Image: string): Promise<string | null> {
       console.error(
         "ERRO DE CONFIGURAÇÃO: Verifique R2_BUCKET_NAME e R2_PUBLIC_DOMAIN no arquivo .env",
       );
-      // Se não tiver configurado, retorna null para evitar salvar link quebrado
       return null;
     }
 
-    // Faz o upload do arquivo
     await r2.send(
       new PutObjectCommand({
         Bucket: bucketName,
@@ -46,8 +43,6 @@ async function uploadToR2(base64Image: string): Promise<string | null> {
       }),
     );
 
-    // Remove barra final do domínio se houver e monta a URL completa
-    // Ex: https://pub-xyz.r2.dev/eventos/arquivo.jpg
     const domain = publicDomain.replace(/\/$/, "");
     return `${domain}/${fileName}`;
   } catch (error) {
@@ -108,7 +103,6 @@ export async function createEvento(data: CreateEventoData) {
     const uploadedUrls: string[] = [];
     if (data.fotos && data.fotos.length > 0) {
       for (const fotoBase64 of data.fotos) {
-        // Se já for link (http) ou base64 (data), processa
         if (fotoBase64.startsWith("http")) {
           uploadedUrls.push(fotoBase64);
         } else {
@@ -179,5 +173,56 @@ export async function deleteEvento(id: string) {
     return { success: true };
   } catch (error) {
     return { success: false, message: "Erro ao excluir evento." };
+  }
+}
+
+// 5. Buscar Nota do Lote (NOVA FUNÇÃO)
+export async function getNotaDoLote(dataString: string) {
+  try {
+    // Define o intervalo do dia para buscar a nota vinculada àquela data
+    const start = new Date(dataString);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(dataString);
+    end.setHours(23, 59, 59, 999);
+
+    const nota = await prisma.notaFiscal.findFirst({
+      where: {
+        dataEmissao: {
+          gte: start,
+          lte: end,
+        },
+      },
+      select: {
+        pdfUrl: true,
+        xmlUrl: true,
+        numero: true,
+        xmlContent: true,
+      },
+      orderBy: { dataUpload: "desc" }, // Pega a mais recente se houver duplicidade
+    });
+
+    if (!nota) {
+      return {
+        success: false,
+        message: "Nenhuma nota fiscal encontrada para esta data.",
+      };
+    }
+
+    return {
+      success: true,
+      url:
+        nota.pdfUrl ||
+        nota.xmlUrl ||
+        (nota.xmlContent
+          ? `data:text/xml;base64,${Buffer.from(nota.xmlContent).toString("base64")}`
+          : null),
+      filename: nota.numero
+        ? `nota-${nota.numero}.pdf`
+        : `nota-${dataString}.pdf`,
+      type: nota.pdfUrl ? "pdf" : "xml",
+    };
+  } catch (error) {
+    console.error("Erro ao buscar nota do lote:", error);
+    return { success: false, message: "Erro ao buscar nota fiscal." };
   }
 }

@@ -18,6 +18,7 @@ import {
   getEventos,
   updateEventoStatus,
   deleteEvento,
+  getNotaDoLote, // Importamos a nova função
 } from "@/app/actions/eventos";
 
 import {
@@ -195,13 +196,9 @@ export default function EventosPage() {
     const itemsPerPage = viewMode === "pastas" && !loteSelecionado ? 10 : 15;
 
     if (loteSelecionado) {
-      // Se tiver um lote selecionado, mostra os itens dele (filtrados pela busca global se houver)
-      // Recalcula os itens do lote com base no estado atualizado (eventosDoBanco)
-      // para garantir que edições dentro do lote sejam refletidas
       const eventosAtualizadosDoLote = eventosFiltradosGlobalmente.filter(
         (e) => formatDate(e.dataHora) === loteSelecionado.data,
       );
-
       dados = eventosAtualizadosDoLote;
     } else if (viewMode === "pastas") {
       dados = lotesDiarios;
@@ -229,7 +226,7 @@ export default function EventosPage() {
   const handleStatusChange = async (eventoId: string, novoStatus: string) => {
     const statusTyped = novoStatus as EventoStatus;
 
-    // 1. Atualização Otimista (Muda na hora na tela)
+    // 1. Atualização Otimista
     setEventosDoBanco((prev) =>
       prev.map((ev) =>
         ev.id === eventoId ? { ...ev, status: statusTyped } : ev,
@@ -242,9 +239,8 @@ export default function EventosPage() {
     if (result.success) {
       toast.success("Status atualizado");
     } else {
-      // Se der erro, reverte e avisa
       toast.error(result.message);
-      loadData(); // Recarrega o estado real do banco
+      loadData();
     }
   };
 
@@ -270,7 +266,6 @@ export default function EventosPage() {
 
   const confirmDelete = async () => {
     if (eventoToDelete) {
-      // 1. Atualização Otimista: Remove da lista visualmente
       setEventosDoBanco((prev) =>
         prev.filter((ev) => ev.id !== eventoToDelete),
       );
@@ -281,9 +276,35 @@ export default function EventosPage() {
         toast.success("Evento excluído");
       } else {
         toast.error(result.message);
-        loadData(); // Reverte se der erro
+        loadData();
       }
       setEventoToDelete(null);
+    }
+  };
+
+  // --- NOVA FUNÇÃO: DOWNLOAD DO LOTE (NOTA FISCAL) ---
+  const handleDownloadLote = async (lote: LoteDiario) => {
+    toast.info("Buscando nota fiscal vinculada...");
+
+    // Converte a data original do lote (Date) para string ISO YYYY-MM-DD
+    // Precisamos garantir que o fuso horário não altere o dia.
+    // Usamos toLocaleDateString('en-CA') que retorna YYYY-MM-DD localmente
+    const dataString = lote.dataOriginal.toLocaleDateString("en-CA");
+
+    const result = await getNotaDoLote(dataString);
+
+    if (result.success && result.url) {
+      // Cria link temporário para download
+      const link = document.createElement("a");
+      link.href = result.url;
+      link.download = result.filename || `nota-${lote.data}.pdf`;
+      link.target = "_blank"; // Abre em nova aba se for view
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      toast.success("Nota fiscal encontrada!");
+    } else {
+      toast.error(result.message || "Nenhuma nota encontrada para esta data.");
     }
   };
 
@@ -388,6 +409,7 @@ export default function EventosPage() {
             <EventosGrid
               lotes={dadosPaginados.currentItems as LoteDiario[]}
               onSelect={setLoteSelecionado}
+              onDownload={handleDownloadLote} // Passamos a nova função de download aqui
             />
           ) : (
             <EventosTable
