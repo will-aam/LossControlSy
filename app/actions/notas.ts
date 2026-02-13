@@ -28,23 +28,23 @@ export async function getNotas() {
   }
 }
 
-// 2. Salvar Nota Fiscal (Versão Corrigida para URL R2)
+// 2. Salvar Nota Fiscal
 export async function createNota(data: {
   numero?: string;
   serie?: string;
   emitente?: string;
   cnpjEmitente?: string;
   valorTotal?: number;
-  dataEmissao?: Date;
+  dataEmissao?: Date; // Data da nota em si
+  dataReferencia?: Date; // <--- NOVO: Data do lote de perdas
   chaveAcesso?: string;
 
-  xmlContent?: string; // Texto do XML
-
-  pdfUrl?: string; // <--- AQUI MUDOU: Agora aceita URL string
-  xmlUrl?: string; // <--- AQUI MUDOU: Agora aceita URL string
+  xmlContent?: string;
+  pdfUrl?: string;
+  xmlUrl?: string;
 
   fileName: string;
-  eventoId?: string;
+  eventoId?: string; // Legado, mantido por compatibilidade
 }) {
   const session = await getSession();
   if (!session) return { success: false, message: "Não autorizado" };
@@ -72,10 +72,12 @@ export async function createNota(data: {
         emitente: data.emitente || "Fornecedor Desconhecido",
         cnpjEmitente: data.cnpjEmitente,
         valorTotal: data.valorTotal || 0,
-        dataEmissao: data.dataEmissao || new Date(),
-        chaveAcesso: data.chaveAcesso,
+        dataEmissao: data.dataEmissao,
 
-        // Salvando os campos corretos agora
+        // Salvando no campo correto agora
+        dataReferencia: data.dataReferencia, // Data do lote
+
+        chaveAcesso: data.chaveAcesso,
         xmlContent: data.xmlContent,
         pdfUrl: data.pdfUrl,
         xmlUrl: data.xmlUrl,

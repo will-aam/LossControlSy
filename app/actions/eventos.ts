@@ -176,18 +176,24 @@ export async function deleteEvento(id: string) {
   }
 }
 
-// 5. Buscar Nota do Lote (NOVA FUNÇÃO)
+// 5. Buscar Nota do Lote
 export async function getNotaDoLote(dataString: string) {
   try {
-    // Define o intervalo do dia para buscar a nota vinculada àquela data
-    const start = new Date(dataString);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(dataString);
-    end.setHours(23, 59, 59, 999);
+    // A dataString vem como "YYYY-MM-DD"
+    // Vamos buscar uma nota que tenha dataReferencia no mesmo dia.
+    // Como dataReferencia é DateTime, precisamos do intervalo.
 
-    const nota = await prisma.notaFiscal.findFirst({
+    // Converte string YYYY-MM-DD para Date local
+    // Importante: new Date("2023-10-06") é UTC. new Date("2023-10-06T00:00") é local.
+    // Vamos assumir que dataString é YYYY-MM-DD e construir o intervalo UTC para garantir.
+    const start = new Date(`${dataString}T00:00:00.000Z`);
+    const end = new Date(`${dataString}T23:59:59.999Z`);
+
+    // Busca nota onde dataReferencia bate com o dia
+    // Se não achar por dataReferencia, faz fallback para dataEmissao (para compatibilidade ou erro de cadastro)
+    let nota = await prisma.notaFiscal.findFirst({
       where: {
-        dataEmissao: {
+        dataReferencia: {
           gte: start,
           lte: end,
         },
@@ -198,8 +204,28 @@ export async function getNotaDoLote(dataString: string) {
         numero: true,
         xmlContent: true,
       },
-      orderBy: { dataUpload: "desc" }, // Pega a mais recente se houver duplicidade
+      orderBy: { dataUpload: "desc" },
     });
+
+    // Fallback: Tenta buscar por dataEmissao se não achou por dataReferencia
+    if (!nota) {
+      nota = await prisma.notaFiscal.findFirst({
+        where: {
+          dataEmissao: {
+            gte: start,
+            lte: end,
+          },
+          dataReferencia: null, // Só busca aqui se não tiver sido explicitamente vinculado a outro dia
+        },
+        select: {
+          pdfUrl: true,
+          xmlUrl: true,
+          numero: true,
+          xmlContent: true,
+        },
+        orderBy: { dataUpload: "desc" },
+      });
+    }
 
     if (!nota) {
       return {
