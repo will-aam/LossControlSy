@@ -1,10 +1,11 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { FileText, ChevronRightSquare } from "lucide-react";
+import { FileText, ChevronRightSquare, Loader2 } from "lucide-react"; // Import Loader2
 import { formatCurrency, cn } from "@/lib/utils";
 import { Evento } from "@/lib/types";
 import { toast } from "sonner";
+import { useState } from "react"; // Import useState
 
 export type BatchStatus = "pendente" | "aprovado" | "rejeitado";
 
@@ -17,14 +18,15 @@ export interface LoteDiario {
   autor: string;
 }
 
-// CORREÇÃO AQUI: Adicionando onDownload à interface
 interface EventosGridProps {
   lotes: LoteDiario[];
   onSelect: (lote: LoteDiario) => void;
-  onDownload: (lote: LoteDiario) => void;
+  onDownload: (lote: LoteDiario) => Promise<void>; // Mudança para Promise
 }
 
 export function EventosGrid({ lotes, onSelect, onDownload }: EventosGridProps) {
+  const [downloadingDate, setDownloadingDate] = useState<string | null>(null);
+
   if (lotes.length === 0) {
     return (
       <div className="py-12 text-center text-muted-foreground border border-dashed rounded-lg bg-muted/5">
@@ -33,13 +35,21 @@ export function EventosGrid({ lotes, onSelect, onDownload }: EventosGridProps) {
     );
   }
 
-  const handleIconClick = (e: React.MouseEvent, lote: LoteDiario) => {
-    e.stopPropagation(); // Impede que o clique abra a pasta (onSelect)
+  const handleIconClick = async (e: React.MouseEvent, lote: LoteDiario) => {
+    e.stopPropagation();
 
-    if (lote.status === "aprovado") {
-      onDownload(lote);
-    } else {
+    if (lote.status !== "aprovado") {
       toast.error("Apenas lotes aprovados podem ser baixados/impressos.");
+      return;
+    }
+
+    setDownloadingDate(lote.data);
+    try {
+      await onDownload(lote);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setDownloadingDate(null);
     }
   };
 
@@ -69,7 +79,11 @@ export function EventosGrid({ lotes, onSelect, onDownload }: EventosGridProps) {
                   : "Necessário aprovação para baixar"
               }
             >
-              <FileText className="h-4 w-4" />
+              {downloadingDate === lote.data ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileText className="h-4 w-4" />
+              )}
             </div>
 
             <div>

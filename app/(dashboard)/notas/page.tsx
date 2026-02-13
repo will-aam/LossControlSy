@@ -341,30 +341,26 @@ export default function NotasFiscaisPage() {
     // Se for URL http (R2), precisamos assinar
     if (urlOrContent.startsWith("http")) {
       toast.loading("Gerando link seguro...");
+      // A função getDownloadLink agora usa o novo getKeyFromUrl corrigido
       const signedUrl = await getDownloadLink(urlOrContent);
       toast.dismiss();
 
       if (signedUrl) {
-        href = signedUrl;
+        // CORREÇÃO: Abre em nova guia direto
+        window.open(signedUrl, "_blank");
+        return;
       } else {
         toast.error(
-          "Erro ao gerar link de download. O arquivo pode não existir.",
+          "Erro ao gerar link de visualização. O arquivo pode não existir.",
         );
-        return; // Aborta se falhar
+        return;
       }
     } else {
-      // Se for conteúdo XML texto (base64 ou raw), cria blob
+      // Se for conteúdo XML texto (base64 ou raw), cria blob e abre
       const blob = new Blob([urlOrContent], { type: "text/xml" });
       href = URL.createObjectURL(blob);
+      window.open(href, "_blank");
     }
-
-    const link = document.createElement("a");
-    link.href = href;
-    link.download = filename;
-    link.target = "_blank";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   if (!hasPermission("notas:ver")) return null;

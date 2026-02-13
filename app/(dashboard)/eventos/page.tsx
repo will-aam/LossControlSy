@@ -285,24 +285,23 @@ export default function EventosPage() {
 
   // --- NOVA FUNÇÃO: DOWNLOAD DO LOTE (NOTA FISCAL) ---
   const handleDownloadLote = async (lote: LoteDiario) => {
-    toast.info("Buscando nota fiscal vinculada...");
+    try {
+      // CORREÇÃO: Usa toISOString para pegar a data UTC (YYYY-MM-DD)
+      // Evita o problema de fuso horário (-3h virar dia anterior)
+      const dataString = lote.dataOriginal.toISOString().split("T")[0];
 
-    const dataString = lote.dataOriginal.toISOString().split("T")[0];
+      const result = await getNotaDoLote(dataString);
 
-    const result = await getNotaDoLote(dataString);
-
-    if (result.success && result.url) {
-      // Cria link temporário para download
-      const link = document.createElement("a");
-      link.href = result.url;
-      link.download = result.filename || `nota-${lote.data}.pdf`;
-      link.target = "_blank"; // Abre em nova aba se for view
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      toast.success("Nota fiscal encontrada!");
-    } else {
-      toast.error(result.message || "Nenhuma nota encontrada para esta data.");
+      if (result.success && result.url) {
+        // CORREÇÃO: Abre em nova guia
+        window.open(result.url, "_blank");
+        toast.success("Nota fiscal aberta em nova guia.");
+      } else {
+        toast.error(result.message || "Nenhuma nota fiscal encontrada.");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao buscar nota fiscal.");
     }
   };
 
