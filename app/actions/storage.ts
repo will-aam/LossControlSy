@@ -5,25 +5,14 @@ import {
   PutObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
-} from "@aws-sdk/client-s3"; // Adicionado GetObjectCommand
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "crypto";
 
 const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME;
 
-/**
- * Helper para extrair a KEY (caminho/nome) da URL completa
- */
-export function getKeyFromUrl(url: string): string | null {
-  try {
-    if (!url.startsWith("http")) return null;
-    const urlObj = new URL(url);
-    // Remove a barra inicial e decodifica (ex: %20 vira espaço)
-    return decodeURIComponent(urlObj.pathname.substring(1));
-  } catch (e) {
-    return null;
-  }
-}
+// ATENÇÃO: A função getKeyFromUrl FOI REMOVIDA DAQUI
+// Ela agora deve ser importada de "@/lib/utils" onde for necessária.
 
 /**
  * Gera URL para Upload (PUT) com suporte a PASTAS

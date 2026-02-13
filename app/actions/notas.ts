@@ -3,11 +3,10 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/session";
-import {
-  deleteFileFromStorage,
-  getKeyFromUrl,
-  getPresignedDownloadUrl,
-} from "./storage"; // Importar as novas funções
+import { deleteFileFromStorage, getPresignedDownloadUrl } from "./storage"; // Removido getKeyFromUrl daqui
+
+// ADICIONADO: Importando do local correto (utils)
+import { getKeyFromUrl } from "@/lib/utils";
 
 // 1. Listar Notas
 export async function getNotas() {
@@ -33,7 +32,7 @@ export async function getNotas() {
   }
 }
 
-// 2. Salvar Nota (Mantém igual, só o createNota não muda lógica interna, pois recebe a URL pronta)
+// 2. Salvar Nota
 export async function createNota(data: any) {
   const session = await getSession();
   if (!session) return { success: false, message: "Não autorizado" };
@@ -80,7 +79,7 @@ export async function createNota(data: any) {
   }
 }
 
-// 3. Excluir Nota (AGORA APAGA DO R2 TAMBÉM)
+// 3. Excluir Nota
 export async function deleteNota(id: string) {
   try {
     // 1. Buscar a nota para pegar os URLs antes de deletar

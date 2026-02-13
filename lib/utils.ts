@@ -115,3 +115,13 @@ export async function compressImage(file: File): Promise<string> {
     reader.onerror = (error) => reject(error);
   });
 }
+export function getKeyFromUrl(url: string): string | null {
+  try {
+    if (!url.startsWith("http")) return null;
+    const urlObj = new URL(url);
+    // Remove a barra inicial e decodifica (ex: %20 vira espaço)
+    return decodeURIComponent(urlObj.pathname.substring(1));
+  } catch (e) {
+    return null;
+  }
+}

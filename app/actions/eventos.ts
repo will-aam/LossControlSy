@@ -5,9 +5,12 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/session";
 import { EventoStatus } from "@prisma/client";
 import { r2 } from "@/lib/r2";
-import { PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3"; // Adicionado GetObjectCommand
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner"; // Adicionado getSignedUrl
+import { PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "crypto";
+
+// ADICIONADO: Importando do local correto (utils)
+import { getKeyFromUrl } from "@/lib/utils";
 
 export type CreateEventoData = {
   itemId: string;
@@ -17,22 +20,7 @@ export type CreateEventoData = {
   dataPersonalizada?: Date;
 };
 
-// Função helper para extrair a KEY (nome do arquivo) da URL completa
-// Função helper para extrair a KEY (nome do arquivo) da URL completa
-function getKeyFromUrl(url: string): string | null {
-  try {
-    if (!url.startsWith("http")) return null; // Se não for URL, ignora
-    const urlObj = new URL(url);
-
-    // 1. Pega o caminho (ex: /eventos/Minha%20Foto.jpg)
-    // 2. Remove a barra inicial (.substring(1))
-    // 3. DECODIFICA para remover %20 e outros símbolos (decodeURIComponent)
-    const rawPath = urlObj.pathname.substring(1);
-    return decodeURIComponent(rawPath);
-  } catch (e) {
-    return null;
-  }
-}
+// A função getKeyFromUrl local foi removida daqui para usar a de @/lib/utils
 
 // Função helper de upload para o R2
 async function uploadToR2(base64Image: string): Promise<string | null> {
