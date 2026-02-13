@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
-import { UploadCloud, FileCode, FileText, X, AlertCircle } from "lucide-react";
+import { UploadCloud, FileCode, FileText, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { NotaFiscal } from "@/lib/types";
 import { toast } from "sonner";
@@ -42,6 +42,11 @@ export function UploadZone({ onFilesSelected, isUploading }: UploadZoneProps) {
       if (ide) {
         dados.numero = ide.getElementsByTagName("nNF")[0]?.textContent || "";
         dados.serie = ide.getElementsByTagName("serie")[0]?.textContent || "";
+
+        // --- NOVO: Extrair Natureza da Operação ---
+        dados.naturezaOperacao =
+          ide.getElementsByTagName("natOp")[0]?.textContent || "";
+
         const dataEmissao =
           ide.getElementsByTagName("dhEmi")[0]?.textContent ||
           ide.getElementsByTagName("dEmi")[0]?.textContent;
@@ -114,7 +119,7 @@ export function UploadZone({ onFilesSelected, isUploading }: UploadZoneProps) {
       <div
         {...getRootProps()}
         className={cn(
-          "border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors flex flex-col items-center justify-center min-h-[160px]",
+          "border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors flex flex-col items-center justify-center min-h-40",
           isDragActive
             ? "border-primary bg-primary/5"
             : "border-muted-foreground/25 hover:border-primary/50 hover:bg-muted/50",
@@ -151,7 +156,7 @@ export function UploadZone({ onFilesSelected, isUploading }: UploadZoneProps) {
                   <FileCode className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <span className="text-sm font-medium truncate max-w-[200px]">
+                  <span className="text-sm font-medium truncate max-w-50">
                     {xmlFile.name}
                   </span>
                   <span className="text-[10px] text-muted-foreground">
@@ -176,7 +181,7 @@ export function UploadZone({ onFilesSelected, isUploading }: UploadZoneProps) {
                   <FileText className="h-4 w-4 text-red-600 dark:text-red-400" />
                 </div>
                 <div className="flex flex-col min-w-0">
-                  <span className="text-sm font-medium truncate max-w-[200px]">
+                  <span className="text-sm font-medium truncate max-w-50">
                     {pdfFile.name}
                   </span>
                   <span className="text-[10px] text-muted-foreground">

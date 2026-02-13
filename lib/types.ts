@@ -89,7 +89,8 @@ export interface NotaFiscal {
   serie?: string;
   emitente?: string;
   cnpjEmitente?: string;
-  dataEmissao?: string;
+  dataEmissao?: string | Date; // Aceita Date ou string
+  dataReferencia?: string | Date; // <--- CAMPO NOVO ADICIONADO
   valorTotal?: number;
   naturezaOperacao?: string;
   chaveAcesso?: string;

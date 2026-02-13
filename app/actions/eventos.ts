@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/session";
 import { EventoStatus } from "@prisma/client";
 import { r2 } from "@/lib/r2";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3"; // Adicionado GetObjectCommand
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner"; // Adicionado getSignedUrl
 import { randomUUID } from "crypto";
 
 export type CreateEventoData = {
@@ -15,6 +16,18 @@ export type CreateEventoData = {
   fotos?: string[];
   dataPersonalizada?: Date;
 };
+
+// Função helper para extrair a KEY (nome do arquivo) da URL completa
+function getKeyFromUrl(url: string): string | null {
+  try {
+    if (!url.startsWith("http")) return null; // Se não for URL, ignora
+    const urlObj = new URL(url);
+    // Remove a barra inicial do pathname (ex: /eventos/foto.jpg -> eventos/foto.jpg)
+    return urlObj.pathname.substring(1);
+  } catch (e) {
+    return null;
+  }
+}
 
 // Função helper de upload para o R2
 async function uploadToR2(base64Image: string): Promise<string | null> {
@@ -176,21 +189,13 @@ export async function deleteEvento(id: string) {
   }
 }
 
-// 5. Buscar Nota do Lote
+// 5. Buscar Nota do Lote (COM ASSINATURA DE URL)
 export async function getNotaDoLote(dataString: string) {
   try {
-    // A dataString vem como "YYYY-MM-DD"
-    // Vamos buscar uma nota que tenha dataReferencia no mesmo dia.
-    // Como dataReferencia é DateTime, precisamos do intervalo.
-
-    // Converte string YYYY-MM-DD para Date local
-    // Importante: new Date("2023-10-06") é UTC. new Date("2023-10-06T00:00") é local.
-    // Vamos assumir que dataString é YYYY-MM-DD e construir o intervalo UTC para garantir.
     const start = new Date(`${dataString}T00:00:00.000Z`);
     const end = new Date(`${dataString}T23:59:59.999Z`);
 
     // Busca nota onde dataReferencia bate com o dia
-    // Se não achar por dataReferencia, faz fallback para dataEmissao (para compatibilidade ou erro de cadastro)
     let nota = await prisma.notaFiscal.findFirst({
       where: {
         dataReferencia: {
@@ -207,7 +212,7 @@ export async function getNotaDoLote(dataString: string) {
       orderBy: { dataUpload: "desc" },
     });
 
-    // Fallback: Tenta buscar por dataEmissao se não achou por dataReferencia
+    // Fallback: Tenta buscar por dataEmissao
     if (!nota) {
       nota = await prisma.notaFiscal.findFirst({
         where: {
@@ -215,7 +220,7 @@ export async function getNotaDoLote(dataString: string) {
             gte: start,
             lte: end,
           },
-          dataReferencia: null, // Só busca aqui se não tiver sido explicitamente vinculado a outro dia
+          dataReferencia: null,
         },
         select: {
           pdfUrl: true,
@@ -234,14 +239,32 @@ export async function getNotaDoLote(dataString: string) {
       };
     }
 
+    let finalUrl = nota.pdfUrl || nota.xmlUrl;
+
+    // --- GERAR URL ASSINADA SE FOR LINK DO R2 ---
+    if (finalUrl && finalUrl.startsWith("http")) {
+      const fileKey = getKeyFromUrl(finalUrl);
+      if (fileKey && process.env.R2_BUCKET_NAME) {
+        try {
+          const command = new GetObjectCommand({
+            Bucket: process.env.R2_BUCKET_NAME,
+            Key: fileKey,
+          });
+          // Gera URL válida por 1 hora (3600 segundos)
+          finalUrl = await getSignedUrl(r2, command, { expiresIn: 3600 });
+        } catch (signError) {
+          console.error("Erro ao assinar URL:", signError);
+          // Se falhar a assinatura, tenta retornar a URL original como fallback
+        }
+      }
+    } else if (nota.xmlContent) {
+      // Se for conteúdo XML texto
+      finalUrl = `data:text/xml;base64,${Buffer.from(nota.xmlContent).toString("base64")}`;
+    }
+
     return {
       success: true,
-      url:
-        nota.pdfUrl ||
-        nota.xmlUrl ||
-        (nota.xmlContent
-          ? `data:text/xml;base64,${Buffer.from(nota.xmlContent).toString("base64")}`
-          : null),
+      url: finalUrl,
       filename: nota.numero
         ? `nota-${nota.numero}.pdf`
         : `nota-${dataString}.pdf`,

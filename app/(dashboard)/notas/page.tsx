@@ -78,7 +78,7 @@ import { cn } from "@/lib/utils";
 export default function NotasFiscaisPage() {
   const { user, hasPermission } = useAuth();
   const [notas, setNotas] = useState<NotaFiscal[]>([]);
-  // Mudança: Agora armazenamos datas únicas de lotes, não eventos individuais
+  // Armazena datas únicas de lotes (YYYY-MM-DD)
   const [lotesDisponiveis, setLotesDisponiveis] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -104,7 +104,7 @@ export default function NotasFiscaisPage() {
   const [xmlFile, setXmlFile] = useState<File | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<Partial<NotaFiscal>>({});
-  // Mudança: Vinculamos a uma DATA (string ISO ou formatada), não ID
+  // Vinculamos a uma DATA string (YYYY-MM-DD)
   const [selectedLoteDate, setSelectedLoteDate] = useState<string>("none");
 
   // Carregar dados
@@ -128,12 +128,12 @@ export default function NotasFiscaisPage() {
           serie: n.serie,
           valorTotal: Number(n.valorTotal),
           dataEmissao: n.dataEmissao,
+          dataReferencia: n.dataReferencia, // Importante para depuração
           cnpjEmitente: n.cnpjEmitente,
           chaveAcesso: n.chaveAcesso,
           xmlContent: n.xmlContent,
           pdfUrl: n.pdfUrl,
           xmlUrl: n.xmlUrl,
-          // Se tiver eventoId, tentamos inferir a data dele, mas aqui o foco é o contrário
         }),
       );
       setNotas(mappedNotas);
@@ -145,8 +145,9 @@ export default function NotasFiscaisPage() {
       const datasSet = new Set<string>();
       (eventosResult.data as any[]).forEach((e) => {
         if (e.status !== "rascunho") {
-          // Extrai apenas a parte da data YYYY-MM-DD
-          const dataIso = new Date(e.dataHora).toISOString().split("T")[0];
+          // CORREÇÃO CRÍTICA: Usa 'en-CA' para garantir YYYY-MM-DD respeitando o fuso local do navegador
+          // Isso resolve o problema de 31/01 virar 01/02 na lista
+          const dataIso = new Date(e.dataHora).toLocaleDateString("en-CA");
           datasSet.add(dataIso);
         }
       });
@@ -169,7 +170,7 @@ export default function NotasFiscaisPage() {
     return publicUrl;
   };
 
-  // Upload Rápido (Mantido igual)
+  // Upload Rápido
   const handleQuickUploadClick = (id: string, type: "xml" | "pdf") => {
     setQuickUploadTarget({ id, type });
     if (quickUploadInputRef.current) {
@@ -227,10 +228,12 @@ export default function NotasFiscaisPage() {
     setPdfFile(pdf);
     setParsedData((prev) => ({ ...prev, ...data }));
 
-    // Tenta preencher a data do lote automaticamente se a nota tiver dataEmissao
+    // Tenta preencher a data do lote automaticamente
     if (data.dataEmissao) {
-      const dataNota = new Date(data.dataEmissao).toISOString().split("T")[0];
-      // Verifica se existe um lote com essa data
+      // CORREÇÃO CRÍTICA: Mesma lógica de leitura local para o auto-fill
+      const dateObj = new Date(data.dataEmissao);
+      const dataNota = dateObj.toLocaleDateString("en-CA");
+
       if (lotesDisponiveis.includes(dataNota)) {
         setSelectedLoteDate(dataNota);
       }
@@ -254,21 +257,20 @@ export default function NotasFiscaisPage() {
         xmlTextContent = await xmlFile.text();
       }
 
-      // Se selecionou um lote, usamos essa data como referência.
-      // Como não alteramos o schema do banco, vamos salvar essa data no campo 'dataEmissao'
-      // se ele não tiver vindo do XML, OU vamos precisar de uma lógica de busca.
-      // IMPORTANTE: Para que a busca funcione pelo dia, garantimos que a dataEmissao
-      // reflete o dia do lote escolhido, se o usuário selecionou um.
-
       let dataFinalEmissao = parsedData.dataEmissao
         ? new Date(parsedData.dataEmissao)
         : undefined;
 
+      // === CORREÇÃO CRÍTICA NA HORA DE SALVAR ===
+      // Definimos a Data de Referência (Lote)
+      let dataRef: Date | undefined = undefined;
+
       if (selectedLoteDate !== "none") {
-        // Força a data de emissão/referência para ser a do lote selecionado
-        // Isso garante o vínculo na hora de buscar "Notas do dia X"
-        // Adicionamos T12:00 para evitar problemas de fuso horário virando o dia
-        dataFinalEmissao = new Date(selectedLoteDate + "T12:00:00");
+        // selectedLoteDate vem como "YYYY-MM-DD" (ex: 2024-02-02)
+        // Adicionamos "T12:00:00.000Z" para FORÇAR que seja Meio-Dia UTC.
+        // Isso evita que o fuso horário local altere o dia ao salvar no banco.
+        // O Banco vai receber exatamente dia 02 às 12h UTC.
+        dataRef = new Date(`${selectedLoteDate}T12:00:00.000Z`);
       }
 
       const result = await createNota({
@@ -278,17 +280,20 @@ export default function NotasFiscaisPage() {
         emitente: parsedData.emitente,
         cnpjEmitente: parsedData.cnpjEmitente,
         valorTotal: parsedData.valorTotal,
-        dataEmissao: dataFinalEmissao, // Salvamos a data do lote aqui para vínculo
+
+        dataEmissao: dataFinalEmissao, // Data da nota (pode ser diferente do lote)
+        dataReferencia: dataRef, // Data do lote (usada para busca)
+        naturezaOperacao: parsedData.naturezaOperacao,
+
         chaveAcesso: parsedData.chaveAcesso,
         xmlContent: xmlTextContent,
         pdfUrl: uploadedPdfUrl,
         xmlUrl: uploadedXmlUrl,
-        // Removemos eventoId pois agora é por data
         eventoId: undefined,
       });
 
       if (result.success) {
-        toast.success("Nota salva e vinculada à data!");
+        toast.success("Nota salva e vinculada com sucesso!");
         loadData();
         setIsUploadOpen(false);
         setXmlFile(null);
@@ -396,7 +401,7 @@ export default function NotasFiscaisPage() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">
-                            Não vincular (Data da Nota)
+                            Não vincular (Apenas Salvar)
                           </SelectItem>
                           {lotesDisponiveis.map((dataIso) => (
                             <SelectItem key={dataIso} value={dataIso}>
@@ -473,7 +478,7 @@ export default function NotasFiscaisPage() {
         </div>
       </div>
 
-      {/* Lista de Notas (Tabela Simplificada) */}
+      {/* Lista de Notas */}
       <div className="border rounded-lg bg-card overflow-hidden">
         <Table>
           <TableHeader>
@@ -532,9 +537,17 @@ export default function NotasFiscaisPage() {
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                      {nota.dataEmissao
-                        ? formatDate(nota.dataEmissao.toString())
-                        : "-"}
+                      {/* Mostra a data de referência (Lote) se existir, senão a de emissão */}
+                      {nota.dataReferencia
+                        ? formatDate(nota.dataReferencia.toString())
+                        : nota.dataEmissao
+                          ? formatDate(nota.dataEmissao.toString())
+                          : "-"}
+                      {nota.dataReferencia && (
+                        <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">
+                          Lote
+                        </span>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell className="font-medium">

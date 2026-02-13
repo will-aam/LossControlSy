@@ -35,8 +35,9 @@ export async function createNota(data: {
   emitente?: string;
   cnpjEmitente?: string;
   valorTotal?: number;
-  dataEmissao?: Date; // Data da nota em si
-  dataReferencia?: Date; // <--- NOVO: Data do lote de perdas
+  dataEmissao?: Date;
+  dataReferencia?: Date;
+  naturezaOperacao?: string; // <--- NOVO CAMPO NO TYPE
   chaveAcesso?: string;
 
   xmlContent?: string;
@@ -44,12 +45,13 @@ export async function createNota(data: {
   xmlUrl?: string;
 
   fileName: string;
-  eventoId?: string; // Legado, mantido por compatibilidade
+  eventoId?: string;
 }) {
   const session = await getSession();
   if (!session) return { success: false, message: "Não autorizado" };
 
   try {
+    // Verifica duplicidade apenas se tiver chave de acesso
     if (data.chaveAcesso) {
       const existe = await prisma.notaFiscal.findFirst({
         where: { chaveAcesso: data.chaveAcesso },
@@ -73,11 +75,13 @@ export async function createNota(data: {
         cnpjEmitente: data.cnpjEmitente,
         valorTotal: data.valorTotal || 0,
         dataEmissao: data.dataEmissao,
+        dataReferencia: data.dataReferencia,
 
-        // Salvando no campo correto agora
-        dataReferencia: data.dataReferencia, // Data do lote
+        // GRAVANDO A NATUREZA DA OPERAÇÃO AGORA
+        naturezaOperacao: data.naturezaOperacao,
 
         chaveAcesso: data.chaveAcesso,
+
         xmlContent: data.xmlContent,
         pdfUrl: data.pdfUrl,
         xmlUrl: data.xmlUrl,
