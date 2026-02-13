@@ -154,13 +154,13 @@ model Evidencia {
 
 // Notas Fiscais (XML e PDF)
 model NotaFiscal {
-  id         String   @id @default(uuid())
-  dataUpload DateTime @default(now())
+  id           String   @id @default(uuid())
+  dataUpload   DateTime @default(now())
 
   // Arquivos (Links do R2)
-  pdfUrl     String?
-  xmlUrl     String?
-  xmlContent String? @db.Text // Conteúdo completo do XML para backup/leitura
+  pdfUrl       String?
+  xmlUrl       String?
+  xmlContent   String? @db.Text // Conteúdo completo do XML para backup/leitura
 
   // Metadados extraídos
   numero           String?
@@ -168,6 +168,7 @@ model NotaFiscal {
   emitente         String?
   cnpjEmitente     String?
   dataEmissao      DateTime? // Datetime para facilitar filtros
+  dataReferencia   DateTime? @map("data_referencia") // DATA DO LOTE DE PERDAS (NOVO)
   valorTotal       Decimal?  @db.Decimal(12, 2)
   naturezaOperacao String?
   chaveAcesso      String?
@@ -177,11 +178,12 @@ model NotaFiscal {
   uploadedById String
   uploadedBy   User   @relation(fields: [uploadedById], references: [id])
 
-  eventoId String? // Pode vincular a uma perda específica
+  eventoId String? // Pode vincular a uma perda específica (item individual) - LEGADO ou OPCIONAL
   evento   Evento? @relation(fields: [eventoId], references: [id])
 
   @@map("notas_fiscais")
 }
+
 model Motivo {
   id        String   @id @default(uuid())
   nome      String   @unique // O texto do motivo (ex: "Validade Vencida")
