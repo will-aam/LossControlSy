@@ -4,6 +4,13 @@ import React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+import {
   LayoutDashboard,
   PlusCircle,
   ClipboardCheck,
@@ -34,6 +41,7 @@ import {
   useSidebar,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
+
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/lib/auth-context";
@@ -135,13 +143,34 @@ export function AppSidebar() {
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton
-                  size="sm"
-                  className="text-muted-foreground hover:text-foreground"
-                >
-                  <Sparkles className="h-4 w-4" />
-                  <span>Novidades v1.0</span>
-                </SidebarMenuButton>
+                <TooltipProvider>
+                  <Tooltip delayDuration={200}>
+                    <TooltipTrigger asChild>
+                      <SidebarMenuButton
+                        size="sm"
+                        className="text-muted-foreground hover:text-emerald-600 hover:bg-emerald-600/10 data-[state=open]:bg-emerald-600/10 "
+                      >
+                        <Sparkles className="h-4 w-4 text-emerald-400 " />
+                        <span>Novidades!</span>
+                      </SidebarMenuButton>
+                    </TooltipTrigger>
+
+                    {state === "expanded" && (
+                      <TooltipContent
+                        side="top"
+                        align="start"
+                        sideOffset={10}
+                        className="max-w-62.5 p-3 shadow-lg" // Define o formato de bloco e largura
+                      >
+                        <p className="text-sm leading-relaxed">
+                          <strong>Acesso rápido à NF-e: </strong> Agora
+                          disponível via ícone de arquivo na listagem de
+                          Eventos.
+                        </p>
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                </TooltipProvider>
               </SidebarMenuItem>
             </SidebarMenu>
           </SidebarGroupContent>
