@@ -433,33 +433,27 @@ export default function NotasFiscaisPage() {
                           ))}
                         </SelectContent>
                       </Select>
-                      <p className="text-xs text-muted-foreground">
-                        Isso fará com que este PDF seja baixado ao clicar no
-                        ícone do lote do dia{" "}
-                        {selectedLoteDate !== "none"
-                          ? formatDate(selectedLoteDate)
-                          : "..."}
-                        .
-                      </p>
                     </div>
                   )}
                 </div>
 
-                <DialogFooter className="gap-2 sm:gap-0">
+                <DialogFooter className="mt-4 flex flex-row justify-end gap-3">
                   <Button
                     variant="outline"
                     onClick={() => setIsUploadOpen(false)}
                     disabled={isUploading}
+                    className="px-6" // Aumenta um pouco a largura para melhor clique
                   >
                     Cancelar
                   </Button>
                   <Button
                     onClick={handleSave}
                     disabled={(!xmlFile && !pdfFile) || isUploading}
+                    className="px-6"
                   >
                     {isUploading ? (
                       <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />{" "}
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Salvando...
                       </>
                     ) : (
