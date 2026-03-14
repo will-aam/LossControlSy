@@ -1,3 +1,4 @@
+// app/actions/configuracoes.ts
 "use server";
 
 import { prisma } from "@/lib/prisma";
@@ -12,28 +13,23 @@ export async function getSettings() {
     const session = await getSession();
     if (!session) return { success: false, message: "Não autorizado" };
 
-    // Busca configurações onde o dono é o usuário atual OU o chefe do usuário atual
-    // Se for funcionário, o session.id não é o dono, precisamos saber quem é o dono.
-    // Simplificação: Por enquanto, assumimos que quem acessa config é Dono ou Gestor.
-
-    // Se for Dono, busca pelo próprio ID. Se for equipe, precisariamos do ownerId na sessão (adicionaremos futuramente se precisar)
-    // Por hora, foca no Dono.
-    let config = await prisma.configuracao.findFirst({
-      where: { donoId: session.id },
+    // Busca configurações vinculadas ao dono da loja (ownerId da sessão)
+    let config = await prisma.configuracao.findUnique({
+      where: { donoId: session.ownerId },
     });
 
-    // Se não existir e for dono, cria
+    // Se não existir (primeiro acesso da loja), cria com valores padrão
     if (!config && session.role === "dono") {
       config = await prisma.configuracao.create({
         data: {
           empresaNome: "Minha Empresa",
-          donoId: session.id,
+          donoId: session.ownerId,
           limiteDiario: 1000,
         },
       });
     }
 
-    // Conversão do Decimal para Number
+    // Conversão do Decimal para Number para o frontend
     const plainConfig = config
       ? {
           ...config,
@@ -57,6 +53,7 @@ export async function saveSettings(data: {
 }) {
   const session = await getSession();
 
+  // Apenas o proprietário da loja pode alterar as regras globais da unidade
   if (!session || session.role !== "dono") {
     return {
       success: false,
@@ -65,10 +62,6 @@ export async function saveSettings(data: {
   }
 
   try {
-    const currentConfig = await prisma.configuracao.findFirst({
-      where: { donoId: session.id },
-    });
-
     const dataToUpdate = {
       empresaNome: data.empresaNome,
       exigirFoto: data.exigirFoto,
@@ -79,20 +72,15 @@ export async function saveSettings(data: {
       }),
     };
 
-    if (currentConfig) {
-      await prisma.configuracao.update({
-        where: { id: currentConfig.id },
-        data: dataToUpdate,
-      });
-    } else {
-      await prisma.configuracao.create({
-        data: {
-          ...dataToUpdate,
-          donoId: session.id,
-          limiteDiario: data.limiteDiario || 1000,
-        },
-      });
-    }
+    await prisma.configuracao.upsert({
+      where: { donoId: session.ownerId },
+      update: dataToUpdate,
+      create: {
+        ...dataToUpdate,
+        donoId: session.ownerId,
+        limiteDiario: data.limiteDiario || 1000,
+      },
+    });
 
     revalidatePath("/configuracoes");
     revalidatePath("/eventos/novo");
@@ -110,27 +98,14 @@ export async function getUsers() {
   if (!session) return { success: false, message: "Sem permissão" };
 
   try {
-    // REGRA DE OURO: Mostrar apenas usuários do "quadrado" do dono.
-    // Se eu sou Dono: vejo eu mesmo (id = meu) OU minha equipe (ownerId = meu)
-
-    let whereClause = {};
-
-    if (session.role === "dono") {
-      whereClause = {
-        OR: [
-          { id: session.id }, // Eu mesmo
-          { ownerId: session.id }, // Minha equipe
-        ],
-      };
-    } else {
-      // Se for gestor/fiscal, talvez veja apenas ele mesmo por enquanto,
-      // ou a mesma regra se tivermos o ownerId na sessão.
-      // Vamos restringir para segurança: vê só ele mesmo se não for dono.
-      whereClause = { id: session.id };
-    }
-
+    // Filtra para mostrar apenas o dono da loja e sua respectiva equipe
     const users = await prisma.user.findMany({
-      where: whereClause,
+      where: {
+        OR: [
+          { id: session.ownerId }, // O dono da loja
+          { ownerId: session.ownerId }, // A equipe da loja
+        ],
+      },
       orderBy: { nome: "asc" },
       select: {
         id: true,
@@ -138,7 +113,7 @@ export async function getUsers() {
         email: true,
         role: true,
         avatarUrl: true,
-        ativo: true, // Importante trazer o status
+        ativo: true,
         ownerId: true,
       },
     });
@@ -159,7 +134,6 @@ export async function saveUser(data: {
 }) {
   const session = await getSession();
 
-  // Apenas Dono pode criar/editar usuários da equipe
   if (!session || session.role !== "dono") {
     return {
       success: false,
@@ -168,34 +142,28 @@ export async function saveUser(data: {
   }
 
   try {
-    // EDIÇÃO
     if (data.id) {
-      // Segurança: Verificar se o usuário editado pertence ao Dono
+      // EDIÇÃO: Verifica se o usuário pertence ao "quadrado" desta loja
       const existingUser = await prisma.user.findUnique({
         where: { id: data.id },
       });
 
-      if (!existingUser)
-        return { success: false, message: "Usuário não encontrado." };
-
-      // Não permite editar usuários de outro dono (Multi-tenancy check)
       if (
-        existingUser.id !== session.id &&
-        existingUser.ownerId !== session.id
+        !existingUser ||
+        (existingUser.id !== session.ownerId &&
+          existingUser.ownerId !== session.ownerId)
       ) {
         return { success: false, message: "Acesso negado a este usuário." };
       }
 
-      // Regras para o PRÓPRIO Dono
-      if (existingUser.id === session.id) {
-        // O Dono NÃO pode mudar seu próprio cargo para funcionário (se travaria)
+      // Proteção para a conta do Dono
+      if (existingUser.id === session.ownerId) {
         if (data.role !== "dono") {
           return {
             success: false,
             message: "O proprietário não pode alterar seu próprio cargo.",
           };
         }
-        // O Dono NÃO pode se desativar
         if (data.ativo === false) {
           return {
             success: false,
@@ -208,7 +176,7 @@ export async function saveUser(data: {
         nome: data.nome,
         email: data.email,
         role: data.role,
-        ativo: data.ativo, // Agora permitimos atualizar o status
+        ativo: data.ativo,
       };
 
       if (data.password) {
@@ -220,9 +188,7 @@ export async function saveUser(data: {
         data: updateData,
       });
     } else {
-      // CRIAÇÃO (Novo Funcionário)
-
-      // Verifica duplicidade de email
+      // CRIAÇÃO: Novo funcionário para esta loja
       const exists = await prisma.user.findUnique({
         where: { email: data.email },
       });
@@ -238,8 +204,8 @@ export async function saveUser(data: {
           email: data.email,
           role: data.role,
           passwordHash,
-          ativo: true, // Padrão: nasce ativo
-          ownerId: session.id, // VINCULA AO DONO ATUAL
+          ativo: true,
+          ownerId: session.ownerId, // Amarra ao dono da unidade logada
         },
       });
     }
@@ -261,14 +227,14 @@ export async function deleteUser(id: string) {
   if (session.id === id) {
     return {
       success: false,
-      message: "Você não pode excluir sua própria conta principal.",
+      message: "Você não pode excluir sua própria conta.",
     };
   }
 
   try {
-    // Segurança: Só apaga se for da equipe dele
+    // Verifica se o alvo pertence à loja antes de deletar
     const targetUser = await prisma.user.findUnique({ where: { id } });
-    if (!targetUser || targetUser.ownerId !== session.id) {
+    if (!targetUser || targetUser.ownerId !== session.ownerId) {
       return { success: false, message: "Usuário não pertence à sua equipe." };
     }
 

@@ -18,6 +18,7 @@ export type SessionPayload = {
   role: UserRole;
   nome: string;
   avatarUrl?: string | null;
+  ownerId: string; // NOVO: Guarda o ID da Loja/Dono na sessão
   expiresAt: Date;
 };
 
@@ -27,6 +28,7 @@ export async function createSession(user: {
   role: UserRole;
   nome: string;
   avatarUrl?: string | null;
+  ownerId: string; // NOVO: Exige o ID da Loja/Dono ao criar a sessão
 }) {
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   const session = await new SignJWT({ ...user, expiresAt })

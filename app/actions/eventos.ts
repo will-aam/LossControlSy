@@ -1,3 +1,4 @@
+// app/actions/eventos.ts
 "use server";
 
 import { prisma } from "@/lib/prisma";
@@ -19,8 +20,6 @@ export type CreateEventoData = {
   fotos?: string[];
   dataPersonalizada?: Date;
 };
-
-// A função getKeyFromUrl local foi removida daqui para usar a de @/lib/utils
 
 // Função helper de upload para o R2
 async function uploadToR2(base64Image: string): Promise<string | null> {
@@ -59,8 +58,12 @@ async function uploadToR2(base64Image: string): Promise<string | null> {
 
 // 1. Listar Eventos
 export async function getEventos() {
+  const session = await getSession();
+  if (!session) return { success: false, data: [] };
+
   try {
     const eventos = await prisma.evento.findMany({
+      where: { ownerId: session.ownerId }, // NOVO: Traz apenas eventos da loja atual
       orderBy: { dataHora: "desc" },
       include: {
         item: { include: { categoria: true } },
@@ -102,8 +105,14 @@ export async function createEvento(data: CreateEventoData) {
   }
 
   try {
-    const item = await prisma.item.findUnique({ where: { id: data.itemId } });
-    if (!item) return { success: false, message: "Item não encontrado." };
+    // Busca o item garantindo que ele é da mesma loja
+    const item = await prisma.item.findUnique({
+      where: { id: data.itemId },
+    });
+
+    if (!item || item.ownerId !== session.ownerId) {
+      return { success: false, message: "Item não encontrado." };
+    }
 
     // UPLOAD DAS FOTOS
     const uploadedUrls: string[] = [];
@@ -131,11 +140,13 @@ export async function createEvento(data: CreateEventoData) {
         precoVendaSnapshot: item.precoVenda,
         itemId: item.id,
         criadoPorId: session.id,
+        ownerId: session.ownerId, // NOVO: Amarra o evento à loja
         evidencias: {
           create: uploadedUrls.map((url) => ({
             url: url,
             userId: session.id,
             motivo: data.motivo,
+            ownerId: session.ownerId, // NOVO: Amarra a foto enviada à loja
           })),
         },
       },
@@ -154,7 +165,17 @@ export async function createEvento(data: CreateEventoData) {
 export async function updateEventoStatus(id: string, novoStatus: EventoStatus) {
   const session = await getSession();
   if (!session) return { success: false, message: "Não autorizado" };
+
   try {
+    // NOVO: Verifica se o evento pertence à loja antes de atualizar
+    const evento = await prisma.evento.findUnique({ where: { id } });
+    if (!evento || evento.ownerId !== session.ownerId) {
+      return {
+        success: false,
+        message: "Evento não encontrado ou sem permissão.",
+      };
+    }
+
     await prisma.evento.update({
       where: { id },
       data: {
@@ -173,7 +194,19 @@ export async function updateEventoStatus(id: string, novoStatus: EventoStatus) {
 
 // 4. Delete
 export async function deleteEvento(id: string) {
+  const session = await getSession();
+  if (!session) return { success: false, message: "Não autorizado" };
+
   try {
+    // NOVO: Verifica se o evento pertence à loja antes de deletar
+    const evento = await prisma.evento.findUnique({ where: { id } });
+    if (!evento || evento.ownerId !== session.ownerId) {
+      return {
+        success: false,
+        message: "Evento não encontrado ou sem permissão.",
+      };
+    }
+
     await prisma.evento.delete({ where: { id } });
     revalidatePath("/eventos");
     return { success: true };
@@ -184,13 +217,17 @@ export async function deleteEvento(id: string) {
 
 // 5. Buscar Nota do Lote (COM ASSINATURA DE URL)
 export async function getNotaDoLote(dataString: string) {
+  const session = await getSession();
+  if (!session) return { success: false, message: "Não autorizado" };
+
   try {
     const start = new Date(`${dataString}T00:00:00.000Z`);
     const end = new Date(`${dataString}T23:59:59.999Z`);
 
-    // Busca nota onde dataReferencia bate com o dia
+    // Busca nota onde dataReferencia bate com o dia (E É DA MESMA LOJA)
     let nota = await prisma.notaFiscal.findFirst({
       where: {
+        ownerId: session.ownerId, // NOVO: Garante que não puxe nota de outra loja
         dataReferencia: {
           gte: start,
           lte: end,
@@ -209,6 +246,7 @@ export async function getNotaDoLote(dataString: string) {
     if (!nota) {
       nota = await prisma.notaFiscal.findFirst({
         where: {
+          ownerId: session.ownerId, // NOVO: Garante que não puxe nota de outra loja
           dataEmissao: {
             gte: start,
             lte: end,

@@ -3,13 +3,17 @@
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { getSession } from "@/lib/session";
 
-// 1. Listar Categorias
+// 1. Listar Categorias (Filtradas por loja)
 export async function getCategorias() {
+  const session = await getSession();
+  if (!session) return { success: false, data: [] };
+
   try {
     const categorias = await prisma.categoria.findMany({
+      where: { ownerId: session.ownerId }, // NOVO: Filtro de isolamento
       orderBy: { nome: "asc" },
-      // Trazemos todas, inclusive inativas se houver, para gestão
     });
     return { success: true, data: categorias };
   } catch (error) {
@@ -20,26 +24,38 @@ export async function getCategorias() {
 
 // 2. Criar Categoria
 export async function createCategoria(nome: string) {
+  const session = await getSession();
+  if (!session) return { success: false, message: "Não autorizado" };
+
   if (!nome) return { success: false, message: "Nome é obrigatório" };
 
   try {
-    // Verifica se já existe uma com esse nome exato
-    const existe = await prisma.categoria.findUnique({
-      where: { nome },
+    // NOVO: Verifica duplicidade apenas na mesma loja
+    // Usamos findFirst porque a constraint agora é composta (nome + ownerId)
+    const existe = await prisma.categoria.findFirst({
+      where: {
+        nome: { equals: nome, mode: "insensitive" },
+        ownerId: session.ownerId,
+      },
     });
 
     if (existe) {
       return {
         success: false,
-        message: "Já existe uma categoria com este nome.",
+        message: "Você já possui uma categoria com este nome.",
       };
     }
 
+    // RESOLVE O ERRO: Passamos o ownerId obrigatório definido no schema
     await prisma.categoria.create({
-      data: { nome, status: "ativa" },
+      data: {
+        nome,
+        status: "ativa",
+        ownerId: session.ownerId,
+      },
     });
 
-    revalidatePath("/categorias"); // Atualiza a tela de listagem automaticamente
+    revalidatePath("/categorias");
     return { success: true };
   } catch (error) {
     console.error("Erro ao criar categoria:", error);
@@ -49,7 +65,19 @@ export async function createCategoria(nome: string) {
 
 // 3. Atualizar Categoria
 export async function updateCategoria(id: string, nome: string) {
+  const session = await getSession();
+  if (!session) return { success: false, message: "Não autorizado" };
+
   try {
+    // Validação de posse: garante que a categoria pertence à loja do usuário
+    const categoria = await prisma.categoria.findUnique({ where: { id } });
+    if (!categoria || categoria.ownerId !== session.ownerId) {
+      return {
+        success: false,
+        message: "Categoria não encontrada ou sem permissão.",
+      };
+    }
+
     await prisma.categoria.update({
       where: { id },
       data: { nome },
@@ -64,8 +92,20 @@ export async function updateCategoria(id: string, nome: string) {
 
 // 4. Deletar Categoria
 export async function deleteCategoria(id: string) {
+  const session = await getSession();
+  if (!session) return { success: false, message: "Não autorizado" };
+
   try {
-    // Segurança: Verifica se tem itens usando essa categoria antes de deletar
+    // Validação de posse
+    const categoria = await prisma.categoria.findUnique({ where: { id } });
+    if (!categoria || categoria.ownerId !== session.ownerId) {
+      return {
+        success: false,
+        message: "Categoria não encontrada ou sem permissão.",
+      };
+    }
+
+    // Segurança: Verifica itens vinculados
     const itensVinculados = await prisma.item.count({
       where: { categoriaId: id },
     });

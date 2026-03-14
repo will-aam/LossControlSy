@@ -32,12 +32,17 @@ export async function loginAction(email: string, password?: string) {
       return { success: false, message: "Senha incorreta." };
     }
 
+    // NOVO: Descobre a qual loja esse usuário pertence
+    // Se ele for dono (ownerId é null no banco), a loja é o próprio ID dele.
+    const tenantId = user.ownerId || user.id;
+
     await createSession({
       id: user.id,
       email: user.email,
       role: user.role,
       nome: user.nome,
       avatarUrl: user.avatarUrl,
+      ownerId: tenantId, // Passa a loja para o token JWT
     });
 
     return { success: true, user };
@@ -64,7 +69,8 @@ export async function getClientSession() {
     email: session.email,
     role: session.role,
     avatarUrl: session.avatarUrl,
-  } as User;
+    ownerId: session.ownerId, // Retornamos o ownerId para o frontend também
+  } as User & { ownerId: string };
 }
 
 // --- GERENCIAMENTO DE USUÁRIOS (CONFIGURAÇÕES) ---
@@ -76,7 +82,14 @@ export async function getUsers() {
   }
 
   try {
+    // NOVO: Puxa apenas os usuários da mesma loja
     const users = await prisma.user.findMany({
+      where: {
+        OR: [
+          { ownerId: session.ownerId }, // Funcionários da loja
+          { id: session.ownerId }, // O próprio dono da loja
+        ],
+      },
       orderBy: { nome: "asc" },
       select: {
         id: true,
@@ -104,7 +117,6 @@ export async function createUser(data: {
   }
 
   try {
-    // Senha padrão 1234 se não for fornecida (para facilitar criação rápida)
     const passwordRaw = data.password || "1234";
     const passwordHash = await hashPassword(passwordRaw);
 
@@ -112,8 +124,9 @@ export async function createUser(data: {
       data: {
         nome: data.nome,
         email: data.email,
-        role: data.role as any, // Cast para enum do Prisma
+        role: data.role as any,
         passwordHash,
+        ownerId: session.ownerId, // NOVO: Amarra o novo funcionário à loja do Dono
       },
     });
 
@@ -139,6 +152,15 @@ export async function deleteUser(id: string) {
   }
 
   try {
+    // NOVO: Bloqueia caso tente excluir alguém de outra loja
+    const userToDelete = await prisma.user.findUnique({ where: { id } });
+    if (!userToDelete || userToDelete.ownerId !== session.ownerId) {
+      return {
+        success: false,
+        message: "Usuário não encontrado ou não pertence à sua loja.",
+      };
+    }
+
     await prisma.user.delete({ where: { id } });
     revalidatePath("/configuracoes");
     return { success: true };

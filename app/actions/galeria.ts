@@ -1,3 +1,4 @@
+// app/actions/galeria.ts
 "use server";
 
 import { prisma } from "@/lib/prisma";
@@ -20,7 +21,7 @@ async function uploadToR2(base64Image: string): Promise<string | null> {
 
     if (!bucketName || !publicDomain) {
       console.error(
-        "ERRO DE CONFIGURAÇÃO: Verifique R2_BUCKET_NAME e R2_PUBLIC_DOMAIN no .env",
+        "ERRO DE CONFIGURAÇÃO: Verifique R2_BUCKET_NAME e R2_PUBLIC_DOMAIN no arquivo .env",
       );
       return null;
     }
@@ -43,10 +44,14 @@ async function uploadToR2(base64Image: string): Promise<string | null> {
   }
 }
 
-// 1. Listar Evidências
+// 1. Listar Evidências (Filtradas por loja)
 export async function getEvidencias() {
+  const session = await getSession();
+  if (!session) return { success: false, data: [] };
+
   try {
     const evidencias = await prisma.evidencia.findMany({
+      where: { ownerId: session.ownerId }, // NOVO: Filtro de isolamento
       orderBy: { dataUpload: "desc" },
       include: {
         evento: {
@@ -60,7 +65,6 @@ export async function getEvidencias() {
 
     const formattedData = evidencias.map((ev) => ({
       ...ev,
-      // Se não tiver http, tenta corrigir (legado)
       url:
         ev.url.startsWith("http") || ev.url.startsWith("data:")
           ? ev.url
@@ -107,6 +111,7 @@ export async function createEvidenciaAvulsa(data: {
         motivo: data.motivo || "Upload Galeria",
         dataUpload: dataFinal,
         userId: session.id,
+        ownerId: session.ownerId, // NOVO: Amarra a foto à loja
         eventoId: data.eventoId || null,
       },
     });
@@ -119,9 +124,21 @@ export async function createEvidenciaAvulsa(data: {
   }
 }
 
-// 3. Excluir Evidência
+// 3. Excluir Evidência (Com validação de posse)
 export async function deleteEvidencia(id: string) {
+  const session = await getSession();
+  if (!session) return { success: false, message: "Não autorizado" };
+
   try {
+    // Verifica se a foto pertence à loja
+    const evidencia = await prisma.evidencia.findUnique({ where: { id } });
+    if (!evidencia || evidencia.ownerId !== session.ownerId) {
+      return {
+        success: false,
+        message: "Foto não encontrada ou sem permissão.",
+      };
+    }
+
     await prisma.evidencia.delete({ where: { id } });
     revalidatePath("/galeria");
     return { success: true };
@@ -130,10 +147,14 @@ export async function deleteEvidencia(id: string) {
   }
 }
 
-// 4. Buscar Eventos para Vínculo
+// 4. Buscar Eventos para Vínculo (Filtrados por loja)
 export async function buscarEventosParaVinculo() {
+  const session = await getSession();
+  if (!session) return { success: false, data: [] };
+
   try {
     const eventos = await prisma.evento.findMany({
+      where: { ownerId: session.ownerId }, // NOVO: Só permite vincular a eventos da própria loja
       take: 50,
       orderBy: { dataHora: "desc" },
       include: {
@@ -156,7 +177,7 @@ export async function buscarEventosParaVinculo() {
   }
 }
 
-// 5. Atualizar Evidência (Edição) - AGORA FORA DA OUTRA FUNÇÃO
+// 5. Atualizar Evidência (Com validação de posse)
 export async function updateEvidencia(
   id: string,
   data: {
@@ -169,6 +190,15 @@ export async function updateEvidencia(
   if (!session) return { success: false, message: "Não autorizado" };
 
   try {
+    // Verifica posse
+    const evidencia = await prisma.evidencia.findUnique({ where: { id } });
+    if (!evidencia || evidencia.ownerId !== session.ownerId) {
+      return {
+        success: false,
+        message: "Foto não encontrada ou sem permissão.",
+      };
+    }
+
     const dataFinal = data.dataPersonalizada
       ? new Date(data.dataPersonalizada)
       : undefined;

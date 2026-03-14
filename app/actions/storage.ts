@@ -1,3 +1,4 @@
+// app/actions/storage.ts
 "use server";
 
 import { r2 } from "@/lib/r2";
@@ -11,23 +12,22 @@ import { randomUUID } from "crypto";
 
 const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME;
 
-// ATENÇÃO: A função getKeyFromUrl FOI REMOVIDA DAQUI
-// Ela agora deve ser importada de "@/lib/utils" onde for necessária.
-
 /**
- * Gera URL para Upload (PUT) com suporte a PASTAS
+ * Gera URL para Upload (PUT) com isolamento por LOJA (ownerId)
  */
 export async function getPresignedUploadUrl(
   fileName: string,
   contentType: string,
-  folder: string = "geral", // <--- Novo parâmetro: Pasta
+  ownerId: string, // NOVO: Agora o ownerId é obrigatório para organizar as pastas
+  folder: string = "geral",
 ) {
   if (!R2_BUCKET_NAME) {
     throw new Error("R2_BUCKET_NAME não definido no .env");
   }
 
-  // Agora o nome do arquivo inclui a pasta: "notas/uuid-arquivo.pdf"
-  const uniqueFileName = `${folder}/${randomUUID()}-${fileName.replace(/\s+/g, "_")}`;
+  // ESTRUTURA MULTI-TENANT: "ID_DA_LOJA/pasta/uuid-nome.ext"
+  // Isso garante que os arquivos de cada loja fiquem em "gavetas" separadas no R2
+  const uniqueFileName = `${ownerId}/${folder}/${randomUUID()}-${fileName.replace(/\s+/g, "_")}`;
 
   const command = new PutObjectCommand({
     Bucket: R2_BUCKET_NAME,
@@ -37,7 +37,9 @@ export async function getPresignedUploadUrl(
 
   const signedUrl = await getSignedUrl(r2, command, { expiresIn: 3600 });
 
-  const publicUrl = `${process.env.R2_PUBLIC_URL || `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com/${R2_BUCKET_NAME}`}/${uniqueFileName}`;
+  // Constrói a URL pública baseada no domínio configurado
+  const publicDomain = process.env.R2_PUBLIC_DOMAIN?.replace(/\/$/, "");
+  const publicUrl = `${publicDomain}/${uniqueFileName}`;
 
   return {
     uploadUrl: signedUrl,
@@ -68,7 +70,6 @@ export async function deleteFileFromStorage(fileKey: string) {
 
 /**
  * Gera URL assinada para DOWNLOAD (GET)
- * Usado para abrir arquivos em buckets privados
  */
 export async function getPresignedDownloadUrl(fileKey: string) {
   if (!R2_BUCKET_NAME) return null;

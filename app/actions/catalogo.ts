@@ -1,9 +1,11 @@
+// app/actions/catalogo.ts
 "use server";
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { ItemUnidade } from "@prisma/client";
-import { Item } from "@/lib/types"; // Importamos o tipo Item
+import { Item } from "@/lib/types";
+import { getSession } from "@/lib/session"; // NOVO
 
 // Tipo para criação de item
 export type CreateItemData = {
@@ -26,17 +28,21 @@ function parseUnidade(unidade: string): ItemUnidade {
   return "UN";
 }
 
-// Helper para gerar código interno APENAS se não vier preenchido
+// Helper para gerar código interno
 function generateInternalCode() {
   return `ITEM-${Math.floor(Math.random() * 1000000)
     .toString()
     .padStart(6, "0")}`;
 }
 
-// 1. Listar Itens
+// 1. Listar Itens (Filtrados por loja)
 export async function getItens() {
+  const session = await getSession();
+  if (!session) return { success: false, data: [] };
+
   try {
     const itens = await prisma.item.findMany({
+      where: { ownerId: session.ownerId }, // NOVO: Filtro de isolamento
       orderBy: { nome: "asc" },
       include: {
         categoria: true,
@@ -59,33 +65,44 @@ export async function getItens() {
 
 // 2. Criar Item
 export async function createItem(data: CreateItemData) {
+  const session = await getSession();
+  if (!session) return { success: false, message: "Não autorizado" };
+
   if (!data.nome || !data.categoriaId) {
     return { success: false, message: "Nome e Categoria são obrigatórios." };
   }
 
   try {
+    // Verifica Código de Barras apenas NA MESMA LOJA
     if (data.codigoBarras) {
       const existeCodigo = await prisma.item.findFirst({
-        where: { codigoBarras: data.codigoBarras },
+        where: {
+          codigoBarras: data.codigoBarras,
+          ownerId: session.ownerId,
+        },
       });
       if (existeCodigo) {
         return {
           success: false,
-          message: "Já existe um item com este código de barras.",
+          message: "Você já possui um item com este código de barras.",
         };
       }
     }
 
     let finalCodigoInterno = data.codigoInterno;
 
+    // Verifica Código Interno apenas NA MESMA LOJA
     if (finalCodigoInterno) {
-      const existeInterno = await prisma.item.findUnique({
-        where: { codigoInterno: finalCodigoInterno },
+      const existeInterno = await prisma.item.findFirst({
+        where: {
+          codigoInterno: finalCodigoInterno,
+          ownerId: session.ownerId,
+        },
       });
       if (existeInterno) {
         return {
           success: false,
-          message: "Já existe um item com este Código Interno.",
+          message: "Este Código Interno já está em uso na sua loja.",
         };
       }
     } else {
@@ -103,6 +120,7 @@ export async function createItem(data: CreateItemData) {
         categoriaId: data.categoriaId,
         imagemUrl: data.fotoUrl || null,
         status: "ativo",
+        ownerId: session.ownerId, // NOVO: Amarra o item à loja
       },
     });
 
@@ -116,18 +134,32 @@ export async function createItem(data: CreateItemData) {
 
 // 3. Atualizar Item
 export async function updateItem(id: string, data: Partial<CreateItemData>) {
+  const session = await getSession();
+  if (!session) return { success: false, message: "Não autorizado" };
+
   try {
+    // Validação de posse
+    const itemExistente = await prisma.item.findUnique({ where: { id } });
+    if (!itemExistente || itemExistente.ownerId !== session.ownerId) {
+      return {
+        success: false,
+        message: "Item não encontrado ou sem permissão.",
+      };
+    }
+
     if (data.codigoBarras) {
       const existeOutro = await prisma.item.findFirst({
         where: {
           codigoBarras: data.codigoBarras,
+          ownerId: session.ownerId,
           id: { not: id },
         },
       });
       if (existeOutro) {
         return {
           success: false,
-          message: "Este código de barras já pertence a outro item.",
+          message:
+            "Este código de barras já pertence a outro item da sua loja.",
         };
       }
     }
@@ -156,9 +188,17 @@ export async function updateItem(id: string, data: Partial<CreateItemData>) {
 
 // 4. Alternar Status
 export async function toggleItemStatus(id: string) {
+  const session = await getSession();
+  if (!session) return { success: false, message: "Não autorizado" };
+
   try {
     const item = await prisma.item.findUnique({ where: { id } });
-    if (!item) return { success: false, message: "Item não encontrado." };
+    if (!item || item.ownerId !== session.ownerId) {
+      return {
+        success: false,
+        message: "Item não encontrado ou sem permissão.",
+      };
+    }
 
     const novoStatus = item.status === "ativo" ? "inativo" : "ativo";
 
@@ -176,10 +216,19 @@ export async function toggleItemStatus(id: string) {
 
 // 5. Deletar Item
 export async function deleteItem(id: string) {
+  const session = await getSession();
+  if (!session) return { success: false, message: "Não autorizado" };
+
   try {
-    await prisma.item.delete({
-      where: { id },
-    });
+    const item = await prisma.item.findUnique({ where: { id } });
+    if (!item || item.ownerId !== session.ownerId) {
+      return {
+        success: false,
+        message: "Item não encontrado ou sem permissão.",
+      };
+    }
+
+    await prisma.item.delete({ where: { id } });
 
     revalidatePath("/catalogo");
     return { success: true };
@@ -189,52 +238,59 @@ export async function deleteItem(id: string) {
   }
 }
 
-// 6. IMPORTAÇÃO EM MASSA (NOVA FUNÇÃO)
+// 6. IMPORTAÇÃO EM MASSA (AJUSTADA PARA MULTI-TENANT)
 export async function importarItens(itensImportados: Item[]) {
+  const session = await getSession();
+  if (!session) return { success: false, message: "Não autorizado" };
+
   try {
     let count = 0;
-
-    // Cache simples de categorias para não consultar o banco a cada linha
     const categoriaCache = new Map<string, string>();
 
     for (const item of itensImportados) {
-      if (!item.nome) continue; // Pula linhas inválidas
+      if (!item.nome) continue;
 
-      // 1. Resolver Categoria (Find or Create)
-      // O CSV traz o nome da categoria. Precisamos do ID.
       const nomeCategoria = item.categoria || "Geral";
       let categoriaId = categoriaCache.get(nomeCategoria);
 
       if (!categoriaId) {
-        // Tenta achar no banco
         const catExistente = await prisma.categoria.findFirst({
-          where: { nome: { equals: nomeCategoria, mode: "insensitive" } },
+          where: {
+            nome: { equals: nomeCategoria, mode: "insensitive" },
+            ownerId: session.ownerId, // Busca apenas categorias da própria loja
+          },
         });
 
         if (catExistente) {
           categoriaId = catExistente.id;
         } else {
-          // Cria nova categoria se não existir
           const novaCat = await prisma.categoria.create({
-            data: { nome: nomeCategoria, status: "ativa" },
+            data: {
+              nome: nomeCategoria,
+              status: "ativa",
+              ownerId: session.ownerId, // Cria categoria vinculada à loja
+            },
           });
           categoriaId = novaCat.id;
         }
-        // Salva no cache
         categoriaCache.set(nomeCategoria, categoriaId);
       }
 
-      // 2. Salvar ou Atualizar Item (Upsert)
-      // Usamos o codigoInterno como chave única para saber se atualizamos ou criamos
+      // Upsert agora precisa considerar o ownerId na chave única composta
       await prisma.item.upsert({
-        where: { codigoInterno: item.codigoInterno },
+        where: {
+          codigoInterno_ownerId: {
+            // NOVO: Usa a chave composta definida no schema
+            codigoInterno: item.codigoInterno,
+            ownerId: session.ownerId,
+          },
+        },
         update: {
           nome: item.nome,
           precoVenda: item.precoVenda,
           custo: item.custo,
           unidade: parseUnidade(item.unidade),
           categoriaId: categoriaId,
-          // Não atualizamos codigoBarras ou Imagem para não sobrescrever dados manuais
         },
         create: {
           codigoInterno: item.codigoInterno,
@@ -245,6 +301,7 @@ export async function importarItens(itensImportados: Item[]) {
           unidade: parseUnidade(item.unidade),
           categoriaId: categoriaId,
           status: "ativo",
+          ownerId: session.ownerId, // Vincula à loja
         },
       });
 

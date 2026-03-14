@@ -44,10 +44,10 @@ model User {
   role         UserRole @default(funcionario)
   avatarUrl    String?
   
-  // NOVO: Controle de Acesso
+  // Controle de Acesso
   ativo        Boolean  @default(true) // Permite bloquear acesso sem deletar dados
 
-  // NOVO: Hierarquia (Multi-tenancy)
+  // Hierarquia (Multi-tenancy)
   ownerId      String?  // Se for null, é um Dono independente. Se tiver ID, pertence a esse Dono.
   owner        User?    @relation("TeamHierarchy", fields: [ownerId], references: [id])
   team         User[]   @relation("TeamHierarchy")
@@ -55,12 +55,20 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  // Relacionamentos Inversos
+  // Relacionamentos Inversos (Ações do usuário)
   eventosCriados   Evento[]     @relation("CriadoPor")
   eventosAprovados Evento[]     @relation("AprovadoPor")
-  notasFiscais     NotaFiscal[]
-  evidencias       Evidencia[] // Evidências avulsas da galeria enviadas por ele
-  Configuracao     Configuracao[] // Geralmente só o dono terá uma, mas mantemos relação
+  notasFiscais     NotaFiscal[] @relation("UploadedBy")
+  evidencias       Evidencia[]  @relation("UploadedBy")
+  Configuracao     Configuracao[] 
+
+  // Relacionamentos Multi-tenant (Dados que pertencem à loja/dono)
+  categoriasLoja   Categoria[]  @relation("CategoriaDono")
+  itensLoja        Item[]       @relation("ItemDono")
+  eventosLoja      Evento[]     @relation("EventoDono")
+  evidenciasLoja   Evidencia[]  @relation("EvidenciaDono")
+  notasLoja        NotaFiscal[] @relation("NotaDono")
+  motivosLoja      Motivo[]     @relation("MotivoDono")
 
   @@map("users")
 }
@@ -68,39 +76,44 @@ model User {
 // Categorias de Produtos
 model Categoria {
   id        String   @id @default(uuid())
-  nome      String   @unique
+  nome      String   // Removido o @unique simples
   descricao String?
   status    String   @default("ativa") // ativa, inativa
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relacionamentos
+  ownerId   String
+  owner     User     @relation("CategoriaDono", fields: [ownerId], references: [id])
+
   items Item[]
 
+  @@unique([nome, ownerId]) // O nome agora é único apenas DENTRO da mesma loja
   @@map("categorias")
 }
 
 // Itens (Produtos)
 model Item {
   id            String      @id @default(uuid())
-  codigoInterno String      @unique
+  codigoInterno String      // Removido o @unique simples
   codigoBarras  String?
   nome          String
   unidade       ItemUnidade @default(UN)
-  custo         Decimal     @db.Decimal(10, 2) // Ex: 12345.67
+  custo         Decimal     @db.Decimal(10, 2)
   precoVenda    Decimal     @db.Decimal(10, 2)
   imagemUrl     String?
   status        String      @default("ativo") // ativo, inativo
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
-  // Chave Estrangeira
   categoriaId String
   categoria   Categoria @relation(fields: [categoriaId], references: [id])
 
-  // Relacionamentos
+  ownerId     String
+  owner       User   @relation("ItemDono", fields: [ownerId], references: [id])
+
   eventos Evento[]
 
+  @@unique([codigoInterno, ownerId]) // Código é único apenas DENTRO da mesma loja
   @@map("items")
 }
 
@@ -113,14 +126,12 @@ model Evento {
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
 
-  // Dados do Item (Snapshots para histórico financeiro)
-  quantidade         Decimal @db.Decimal(10, 3) // Permite 1.500 KG
+  quantidade         Decimal @db.Decimal(10, 3)
   unidade            String
-  custoSnapshot      Decimal @db.Decimal(10, 2) // Custo no momento da perda
-  precoVendaSnapshot Decimal @db.Decimal(10, 2) // Preço no momento da perda
+  custoSnapshot      Decimal @db.Decimal(10, 2)
+  precoVendaSnapshot Decimal @db.Decimal(10, 2)
 
-  // Relacionamentos
-  itemId String? // Opcional caso o item seja deletado (manter histórico)
+  itemId String? 
   item   Item?   @relation(fields: [itemId], references: [id], onDelete: SetNull)
 
   criadoPorId String
@@ -129,25 +140,30 @@ model Evento {
   aprovadoPorId String?
   aprovadoPor   User?   @relation("AprovadoPor", fields: [aprovadoPorId], references: [id])
 
+  ownerId       String
+  owner         User   @relation("EventoDono", fields: [ownerId], references: [id])
+
   evidencias   Evidencia[]
   notasFiscais NotaFiscal[]
 
   @@map("eventos")
 }
 
-// Evidências (Fotos) - Galeria e Eventos
+// Evidências (Fotos)
 model Evidencia {
   id         String   @id @default(uuid())
-  url        String // URL pública do Cloudflare R2
+  url        String 
   motivo     String?
   dataUpload DateTime @default(now())
 
-  // Relacionamentos
-  eventoId String? // Se null, é uma "evidência avulsa" da galeria
+  eventoId String? 
   evento   Evento? @relation(fields: [eventoId], references: [id], onDelete: Cascade)
 
-  userId String // Quem subiu a foto
-  user   User   @relation(fields: [userId], references: [id])
+  userId String 
+  user   User   @relation("UploadedBy", fields: [userId], references: [id])
+
+  ownerId  String
+  owner    User   @relation("EvidenciaDono", fields: [ownerId], references: [id])
 
   @@map("evidencias")
 }
@@ -156,44 +172,46 @@ model Evidencia {
 model NotaFiscal {
   id           String   @id @default(uuid())
   dataUpload   DateTime @default(now())
-
-  // Arquivos (Links do R2)
   pdfUrl       String?
   xmlUrl       String?
-  xmlContent   String? @db.Text // Conteúdo completo do XML para backup/leitura
-
-  // Metadados extraídos
+  xmlContent   String? @db.Text 
   numero           String?
   serie            String?
   emitente         String?
   cnpjEmitente     String?
-  dataEmissao      DateTime? // Datetime para facilitar filtros
-  dataReferencia   DateTime? @map("data_referencia") // DATA DO LOTE DE PERDAS (NOVO)
+  dataEmissao      DateTime? 
+  dataReferencia   DateTime? @map("data_referencia") 
   valorTotal       Decimal?  @db.Decimal(12, 2)
   naturezaOperacao String?
   chaveAcesso      String?
   observacoes      String?
 
-  // Relacionamentos
   uploadedById String
-  uploadedBy   User   @relation(fields: [uploadedById], references: [id])
+  uploadedBy   User   @relation("UploadedBy", fields: [uploadedById], references: [id])
 
-  eventoId String? // Pode vincular a uma perda específica (item individual) - LEGADO ou OPCIONAL
+  eventoId String? 
   evento   Evento? @relation(fields: [eventoId], references: [id])
+
+  ownerId    String
+  owner      User   @relation("NotaDono", fields: [ownerId], references: [id])
 
   @@map("notas_fiscais")
 }
 
 model Motivo {
   id        String   @id @default(uuid())
-  nome      String   @unique // O texto do motivo (ex: "Validade Vencida")
+  nome      String   // Removido o @unique simples
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  ownerId   String
+  owner     User     @relation("MotivoDono", fields: [ownerId], references: [id])
+
+  @@unique([nome, ownerId]) // Único apenas na mesma loja
   @@map("motivos")
 }
 
-// Configurações do Sistema (Singleton)
+// Configurações do Sistema
 model Configuracao {
   id                         String  @id @default(uuid())
   empresaNome                String  @default("Minha Empresa")
@@ -202,7 +220,6 @@ model Configuracao {
   limiteDiario               Decimal @default(1000.00) @db.Decimal(10, 2)
   permitirFuncionarioGaleria Boolean @default(false)
 
-  // Vincula a configuração ao Dono (opcional, mas bom para multi-tenant futuro)
   donoId String @unique
   dono   User   @relation(fields: [donoId], references: [id])
 
