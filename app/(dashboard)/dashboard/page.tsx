@@ -24,7 +24,7 @@ export default function DashboardPage() {
       setIsLoading(true);
       const result = await getEventos();
       if (result.success && result.data) {
-        // Mapeamento
+        // Mapeamento corrigido para incluir notasFiscais
         const mappedEventos: Evento[] = (result.data as any[]).map((ev) => ({
           id: ev.id,
           dataHora: ev.dataHora,
@@ -49,6 +49,7 @@ export default function DashboardPage() {
             : undefined,
           criadoPor: ev.criadoPor,
           evidencias: ev.evidencias,
+          notasFiscais: ev.notasFiscais || [], // CORREÇÃO: Adicionado o campo obrigatório
         }));
         setEventos(mappedEventos);
       } else {
@@ -108,7 +109,6 @@ export default function DashboardPage() {
           const diaKey = dataEv.toLocaleDateString("pt-BR", {
             weekday: "short",
           });
-          // Tenta encontrar chave exata ou aproximada para evitar bugs de locale
           const keyEncontrada = Object.keys(tendenciaMap).find(
             (k) => k === diaKey,
           );
@@ -197,10 +197,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Cartões de Resumo */}
       <DashboardCards stats={stats} />
 
-      {/* Tabs Mobile / Grid Desktop */}
       <div className="block md:hidden">
         <Tabs defaultValue="tendencia" className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-4">
@@ -212,17 +210,8 @@ export default function DashboardPage() {
               tendenciaSemanal={stats.tendenciaSemanal}
               perdasPorCategoria={[]}
             />
-            {/* Nota: Em mobile, separamos os gráficos. O componente DashboardCharts renderiza os dois,
-                 então se quiser separação real, teria que componentizar ainda mais. 
-                 Para simplificar, vou renderizar tudo junto no mobile por enquanto ou ajustar o componente charts.
-                 Para esta versão, o DashboardCharts já adapta a altura.
-             */}
           </TabsContent>
           <TabsContent value="categorias">
-            {/* Reutilizando, mas o ideal seria separar se quiser abas distintas. 
-                 Vou deixar as abas controlando a visibilidade via CSS ou classes se necessário,
-                 mas aqui vou simplificar renderizando o componente completo que é responsivo.
-             */}
             <DashboardCharts
               tendenciaSemanal={[]}
               perdasPorCategoria={stats.perdasPorCategoria}
@@ -231,7 +220,6 @@ export default function DashboardPage() {
         </Tabs>
       </div>
 
-      {/* Desktop: Renderiza tudo */}
       <div className="hidden md:block">
         <DashboardCharts
           tendenciaSemanal={stats.tendenciaSemanal}
@@ -239,7 +227,6 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Lista de Itens Críticos */}
       <CriticalItems topItens={stats.topItens} />
     </div>
   );
