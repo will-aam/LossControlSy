@@ -1,3 +1,4 @@
+// lib/pdf-generator.ts
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { formatCurrency, formatDate, formatQuantity } from "./utils";
@@ -152,20 +153,31 @@ export const generateReportPDF = (data: ReportData) => {
     finalY = 20;
   }
 
-  // 3. Motivos
+  // 3. Motivos (AGORA COM OS ITENS DENTRO NO PDF)
   doc.setFontSize(11);
   doc.setTextColor(PRIMARY_COLOR);
-  doc.text("Distribuição por Motivo", 14, finalY);
+  doc.text("Distribuição por Motivo e Principais Vilões", 14, finalY);
 
-  const motivosData = data.topMotivos.map((m) => [
-    m.motivo,
-    formatQuantity(m.quantidade),
-    formatCurrency(m.custo),
-  ]);
+  const motivosData = data.topMotivos.map((m) => {
+    let motivoTexto = m.motivo.toUpperCase();
+
+    // Monta a string dos sub-itens usando quebra de linha para o PDF entender
+    if (m.topItens && m.topItens.length > 0) {
+      const itensStr = m.topItens
+        .map(
+          (i: any) =>
+            `  > ${i.nome} (${formatQuantity(i.qtd)} ${i.unidade}) - ${formatCurrency(i.custo)}`,
+        )
+        .join("\n");
+      motivoTexto += `\nPrincipais itens afetados:\n${itensStr}`;
+    }
+
+    return [motivoTexto, formatQuantity(m.quantidade), formatCurrency(m.custo)];
+  });
 
   autoTable(doc, {
     startY: finalY + 4,
-    head: [["MOTIVO", "QTD.", "IMPACTO (R$)"]],
+    head: [["MOTIVO / PRODUTOS AFETADOS", "QTD TOTAL", "IMPACTO TOTAL"]],
     body: motivosData,
     theme: "grid",
     headStyles: {
@@ -173,10 +185,11 @@ export const generateReportPDF = (data: ReportData) => {
       textColor: [0, 0, 0],
       fontSize: 9,
     },
-    styles: { fontSize: 9 },
+    // Adicionamos valign: "top" para que o texto longo fique alinhado no topo da célula
+    styles: { fontSize: 9, cellPadding: 4 },
     columnStyles: {
-      1: { halign: "right" },
-      2: { halign: "right", fontStyle: "bold" },
+      1: { halign: "right", cellWidth: 30, valign: "top" },
+      2: { halign: "right", cellWidth: 40, fontStyle: "bold", valign: "top" },
     },
   });
 

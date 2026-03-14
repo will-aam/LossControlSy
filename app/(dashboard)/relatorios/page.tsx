@@ -10,13 +10,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Button } from "@/components/ui/button"; // NOVO: Importando o botão
+import { Button } from "@/components/ui/button";
 import { getEventos } from "@/app/actions/eventos";
 import { useAuth } from "@/lib/auth-context";
-import { AlertTriangle, Calendar, Loader2, Download } from "lucide-react"; // NOVO: Ícone de Download
+import { AlertTriangle, Calendar, Loader2, Download } from "lucide-react";
 import { Evento, Item } from "@/lib/types";
 import { toast } from "sonner";
-import { generateReportPDF } from "@/lib/pdf-generator"; // NOVO: Importando o gerador de PDF
+import { generateReportPDF } from "@/lib/pdf-generator";
 
 // Componentes Refatorados
 import { SummaryCards } from "@/components/relatorios/summary-cards";
@@ -120,23 +120,62 @@ export default function RelatoriosPage() {
       ...val,
     }));
 
-    const motivosMap: Record<string, { qtd: number; custo: number }> = {};
+    // --- NOVA LÓGICA DE MOTIVOS COM DRILL-DOWN DE ITENS ---
+    const motivosMap: Record<
+      string,
+      {
+        qtd: number;
+        custo: number;
+        itens: Record<
+          string,
+          { nome: string; qtd: number; custo: number; unidade: string }
+        >;
+      }
+    > = {};
+
     validEventos.forEach((ev) => {
       const motivo = ev.motivo || "Não especificado";
-      if (!motivosMap[motivo]) motivosMap[motivo] = { qtd: 0, custo: 0 };
+      if (!motivosMap[motivo])
+        motivosMap[motivo] = { qtd: 0, custo: 0, itens: {} };
+
       motivosMap[motivo].qtd += ev.quantidade;
       motivosMap[motivo].custo += (ev.custoSnapshot || 0) * ev.quantidade;
+
+      // Agrupa os itens dentro deste motivo
+      if (ev.item) {
+        const itemId = ev.item.id;
+        if (!motivosMap[motivo].itens[itemId]) {
+          motivosMap[motivo].itens[itemId] = {
+            nome: ev.item.nome,
+            qtd: 0,
+            custo: 0,
+            unidade: ev.unidade,
+          };
+        }
+        motivosMap[motivo].itens[itemId].qtd += ev.quantidade;
+        motivosMap[motivo].itens[itemId].custo +=
+          (ev.custoSnapshot || 0) * ev.quantidade;
+      }
     });
 
     const topMotivosPerdas = Object.entries(motivosMap)
-      .map(([motivo, val]) => ({
-        motivo,
-        quantidade: val.qtd,
-        custo: val.custo,
-      }))
+      .map(([motivo, val]) => {
+        // Pega os itens, transforma em array, ordena por custo e pega os top 3
+        const topItensDoMotivo = Object.values(val.itens)
+          .sort((a, b) => b.custo - a.custo)
+          .slice(0, 3);
+
+        return {
+          motivo,
+          quantidade: val.qtd,
+          custo: val.custo,
+          topItens: topItensDoMotivo, // Exportamos os itens junto com o motivo
+        };
+      })
       .sort((a, b) => b.custo - a.custo)
       .slice(0, 5);
 
+    // Por Dia da Semana
     const diasMap: Record<string, { qtd: number; custo: number }> = {
       Domingo: { qtd: 0, custo: 0 },
       Segunda: { qtd: 0, custo: 0 },
@@ -150,8 +189,9 @@ export default function RelatoriosPage() {
     validEventos.forEach((ev) => {
       const d = new Date(ev.dataHora);
       const dia = d.toLocaleDateString("pt-BR", { weekday: "long" });
-      const diaKey = dia.charAt(0).toUpperCase() + dia.slice(1);
-      const simpleKey = diaKey.split("-")[0];
+      const simpleKey = (dia.charAt(0).toUpperCase() + dia.slice(1)).split(
+        "-",
+      )[0];
       const normalizedKey =
         Object.keys(diasMap).find((k) => k.startsWith(simpleKey)) || "Outro";
 
@@ -167,6 +207,7 @@ export default function RelatoriosPage() {
       custo: val.custo,
     }));
 
+    // Ranking Global de Itens
     const itemMap: Record<string, { item: Item; qtd: number; custo: number }> =
       {};
     validEventos.forEach((ev) => {
@@ -181,12 +222,7 @@ export default function RelatoriosPage() {
       .sort((a, b) => b.custo - a.custo)
       .slice(0, 10);
 
-    return {
-      monthlyData,
-      topMotivosPerdas,
-      perdasPorDiaSemana,
-      topItens,
-    };
+    return { monthlyData, topMotivosPerdas, perdasPorDiaSemana, topItens };
   }, [eventos]);
 
   const summary = useMemo(() => {
@@ -207,7 +243,6 @@ export default function RelatoriosPage() {
     };
   }, [stats]);
 
-  // NOVO: Função que compila os dados e chama o gerador de PDF
   const handleDownloadPDF = () => {
     try {
       const periodoTexto = {
@@ -216,7 +251,6 @@ export default function RelatoriosPage() {
         trimestre: "Último Trimestre",
         ano: "Último Ano",
       }[periodo];
-
       const reportData = {
         summary: {
           totalCusto: summary.totalCusto,
@@ -225,14 +259,12 @@ export default function RelatoriosPage() {
           margemPerda: summary.margemPerda,
         },
         topItens: stats.topItens,
-        topMotivos: stats.topMotivosPerdas,
+        topMotivos: stats.topMotivosPerdas, // Passa o objeto completo, agora com .topItens embutido
         periodoTexto: periodoTexto || "Período Geral",
       };
-
       generateReportPDF(reportData);
       toast.success("Relatório gerado com sucesso!");
     } catch (error) {
-      console.error("Erro ao gerar PDF:", error);
       toast.error("Ocorreu um erro ao gerar o relatório.");
     }
   };
@@ -265,7 +297,6 @@ export default function RelatoriosPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          {/* NOVO: Botão de Gerar PDF */}
           <Button
             onClick={handleDownloadPDF}
             variant="outline"
@@ -274,13 +305,7 @@ export default function RelatoriosPage() {
             <Download className="h-4 w-4" />
             Baixar PDF
           </Button>
-
-          <Select
-            value={periodo}
-            onValueChange={(v) =>
-              setPeriodo(v as "semana" | "mes" | "trimestre" | "ano")
-            }
-          >
+          <Select value={periodo} onValueChange={(v) => setPeriodo(v as any)}>
             <SelectTrigger className="w-40">
               <Calendar className="mr-2 h-4 w-4" />
               <SelectValue />
