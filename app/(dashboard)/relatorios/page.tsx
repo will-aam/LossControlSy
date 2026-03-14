@@ -10,11 +10,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Button } from "@/components/ui/button"; // NOVO: Importando o botão
 import { getEventos } from "@/app/actions/eventos";
 import { useAuth } from "@/lib/auth-context";
-import { AlertTriangle, Calendar, Loader2 } from "lucide-react";
+import { AlertTriangle, Calendar, Loader2, Download } from "lucide-react"; // NOVO: Ícone de Download
 import { Evento, Item } from "@/lib/types";
 import { toast } from "sonner";
+import { generateReportPDF } from "@/lib/pdf-generator"; // NOVO: Importando o gerador de PDF
 
 // Componentes Refatorados
 import { SummaryCards } from "@/components/relatorios/summary-cards";
@@ -36,7 +38,6 @@ export default function RelatoriosPage() {
       setIsLoading(true);
       const result = await getEventos();
       if (result.success && result.data) {
-        // Mapeamento corrigido para incluir notasFiscais
         const mappedEventos: Evento[] = (result.data as any[]).map((ev) => ({
           id: ev.id,
           dataHora: ev.dataHora,
@@ -61,7 +62,7 @@ export default function RelatoriosPage() {
             : undefined,
           criadoPor: ev.criadoPor,
           evidencias: ev.evidencias,
-          notasFiscais: ev.notasFiscais || [], // CORREÇÃO: Adicionado o campo obrigatório
+          notasFiscais: ev.notasFiscais || [],
         }));
         setEventos(mappedEventos);
       } else {
@@ -72,7 +73,6 @@ export default function RelatoriosPage() {
     loadData();
   }, []);
 
-  // ... (restante do código permanece igual)
   const stats = useMemo(() => {
     const validEventos = eventos.filter(
       (e) => e.status !== "rascunho" && e.status !== "rejeitado",
@@ -207,6 +207,36 @@ export default function RelatoriosPage() {
     };
   }, [stats]);
 
+  // NOVO: Função que compila os dados e chama o gerador de PDF
+  const handleDownloadPDF = () => {
+    try {
+      const periodoTexto = {
+        semana: "Última Semana",
+        mes: "Último Mês",
+        trimestre: "Último Trimestre",
+        ano: "Último Ano",
+      }[periodo];
+
+      const reportData = {
+        summary: {
+          totalCusto: summary.totalCusto,
+          totalVenda: summary.totalVenda,
+          totalQtd: summary.totalQtd,
+          margemPerda: summary.margemPerda,
+        },
+        topItens: stats.topItens,
+        topMotivos: stats.topMotivosPerdas,
+        periodoTexto: periodoTexto || "Período Geral",
+      };
+
+      generateReportPDF(reportData);
+      toast.success("Relatório gerado com sucesso!");
+    } catch (error) {
+      console.error("Erro ao gerar PDF:", error);
+      toast.error("Ocorreu um erro ao gerar o relatório.");
+    }
+  };
+
   if (!hasPermission("relatorios:ver")) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
@@ -235,6 +265,16 @@ export default function RelatoriosPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          {/* NOVO: Botão de Gerar PDF */}
+          <Button
+            onClick={handleDownloadPDF}
+            variant="outline"
+            className="gap-2 border-primary/20 hover:bg-primary/5"
+          >
+            <Download className="h-4 w-4" />
+            Baixar PDF
+          </Button>
+
           <Select
             value={periodo}
             onValueChange={(v) =>

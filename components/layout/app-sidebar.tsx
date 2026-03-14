@@ -138,43 +138,6 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
-        <SidebarGroup className="mt-auto">
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <TooltipProvider>
-                  <Tooltip delayDuration={200}>
-                    <TooltipTrigger asChild>
-                      <SidebarMenuButton
-                        size="sm"
-                        className="text-muted-foreground hover:text-emerald-600 hover:bg-emerald-600/10 data-[state=open]:bg-emerald-600/10 "
-                      >
-                        <Sparkles className="h-4 w-4 text-emerald-400 " />
-                        <span>Novidades!</span>
-                      </SidebarMenuButton>
-                    </TooltipTrigger>
-
-                    {state === "expanded" && (
-                      <TooltipContent
-                        side="top"
-                        align="start"
-                        sideOffset={10}
-                        className="max-w-62.5 p-3 shadow-lg" // Define o formato de bloco e largura
-                      >
-                        <p className="text-sm leading-relaxed">
-                          <strong>Acesso rápido à NF-e: </strong> Agora
-                          disponível via ícone de arquivo na listagem de
-                          Eventos.
-                        </p>
-                      </TooltipContent>
-                    )}
-                  </Tooltip>
-                </TooltipProvider>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
       </SidebarContent>
 
       <SidebarFooter className="p-2 border-t">
