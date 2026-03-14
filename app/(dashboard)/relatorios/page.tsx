@@ -74,15 +74,35 @@ export default function RelatoriosPage() {
   }, []);
 
   const stats = useMemo(() => {
-    const validEventos = eventos.filter(
+    const hoje = new Date();
+    let dataInicioGlobal = new Date();
+
+    // 1. DATA DE CORTE BASEADA NO FILTRO
+    if (periodo === "semana") dataInicioGlobal.setDate(hoje.getDate() - 7);
+    if (periodo === "mes") dataInicioGlobal.setMonth(hoje.getMonth() - 1);
+    if (periodo === "trimestre") dataInicioGlobal.setMonth(hoje.getMonth() - 3);
+    if (periodo === "ano") dataInicioGlobal.setFullYear(hoje.getFullYear() - 1);
+    dataInicioGlobal.setHours(0, 0, 0, 0);
+
+    const baseEventos = eventos.filter(
       (e) => e.status !== "rascunho" && e.status !== "rejeitado",
     );
 
-    const monthlyDataMap: Record<
+    // Eventos estritamente dentro do período selecionado (Para as tabelas e cards)
+    const validEventos = baseEventos.filter(
+      (e) => new Date(e.dataHora) >= dataInicioGlobal,
+    );
+
+    // --- 2. GRÁFICO DE TENDÊNCIA (SEMPRE EM MESES COMO SOLICITADO) ---
+    let qtdMesesChart = 6;
+    if (periodo === "trimestre") qtdMesesChart = 3;
+    if (periodo === "ano") qtdMesesChart = 12;
+
+    const chartDataMap: Record<
       string,
       { custo: number; venda: number; qtd: number }
     > = {};
-    const meses = [
+    const mesesNomes = [
       "Jan",
       "Fev",
       "Mar",
@@ -96,31 +116,46 @@ export default function RelatoriosPage() {
       "Nov",
       "Dez",
     ];
-    const hoje = new Date();
 
-    for (let i = 5; i >= 0; i--) {
+    // Inicializa o eixo X (Ex: Jan, Fev, Mar...)
+    for (let i = qtdMesesChart - 1; i >= 0; i--) {
       const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
-      const key = meses[d.getMonth()];
-      monthlyDataMap[key] = { custo: 0, venda: 0, qtd: 0 };
+      const key =
+        qtdMesesChart > 6
+          ? `${mesesNomes[d.getMonth()]}/${d.getFullYear().toString().slice(-2)}`
+          : mesesNomes[d.getMonth()];
+      chartDataMap[key] = { custo: 0, venda: 0, qtd: 0 };
     }
 
-    validEventos.forEach((ev) => {
+    const dataInicioChart = new Date(
+      hoje.getFullYear(),
+      hoje.getMonth() - qtdMesesChart + 1,
+      1,
+    );
+
+    baseEventos.forEach((ev) => {
       const d = new Date(ev.dataHora);
-      const key = meses[d.getMonth()];
-      if (monthlyDataMap[key]) {
-        monthlyDataMap[key].custo += (ev.custoSnapshot || 0) * ev.quantidade;
-        monthlyDataMap[key].venda +=
-          (ev.precoVendaSnapshot || 0) * ev.quantidade;
-        monthlyDataMap[key].qtd += ev.quantidade;
+      // O Gráfico usa sua própria linha do tempo para mostrar a evolução
+      if (d >= dataInicioChart) {
+        const key =
+          qtdMesesChart > 6
+            ? `${mesesNomes[d.getMonth()]}/${d.getFullYear().toString().slice(-2)}`
+            : mesesNomes[d.getMonth()];
+        if (chartDataMap[key]) {
+          chartDataMap[key].custo += (ev.custoSnapshot || 0) * ev.quantidade;
+          chartDataMap[key].venda +=
+            (ev.precoVendaSnapshot || 0) * ev.quantidade;
+          chartDataMap[key].qtd += ev.quantidade;
+        }
       }
     });
 
-    const monthlyData = Object.entries(monthlyDataMap).map(([mes, val]) => ({
+    const monthlyData = Object.entries(chartDataMap).map(([mes, val]) => ({
       mes,
       ...val,
     }));
 
-    // --- NOVA LÓGICA DE MOTIVOS COM DRILL-DOWN DE ITENS ---
+    // --- 3. MOTIVOS E ITENS COM DRILL-DOWN (Usa APENAS os dados do período filtrado) ---
     const motivosMap: Record<
       string,
       {
@@ -141,7 +176,6 @@ export default function RelatoriosPage() {
       motivosMap[motivo].qtd += ev.quantidade;
       motivosMap[motivo].custo += (ev.custoSnapshot || 0) * ev.quantidade;
 
-      // Agrupa os itens dentro deste motivo
       if (ev.item) {
         const itemId = ev.item.id;
         if (!motivosMap[motivo].itens[itemId]) {
@@ -159,23 +193,18 @@ export default function RelatoriosPage() {
     });
 
     const topMotivosPerdas = Object.entries(motivosMap)
-      .map(([motivo, val]) => {
-        // Pega os itens, transforma em array, ordena por custo e pega os top 3
-        const topItensDoMotivo = Object.values(val.itens)
+      .map(([motivo, val]) => ({
+        motivo,
+        quantidade: val.qtd,
+        custo: val.custo,
+        topItens: Object.values(val.itens)
           .sort((a, b) => b.custo - a.custo)
-          .slice(0, 3);
-
-        return {
-          motivo,
-          quantidade: val.qtd,
-          custo: val.custo,
-          topItens: topItensDoMotivo, // Exportamos os itens junto com o motivo
-        };
-      })
+          .slice(0, 3),
+      }))
       .sort((a, b) => b.custo - a.custo)
       .slice(0, 5);
 
-    // Por Dia da Semana
+    // --- 4. DIA DA SEMANA ---
     const diasMap: Record<string, { qtd: number; custo: number }> = {
       Domingo: { qtd: 0, custo: 0 },
       Segunda: { qtd: 0, custo: 0 },
@@ -207,7 +236,7 @@ export default function RelatoriosPage() {
       custo: val.custo,
     }));
 
-    // Ranking Global de Itens
+    // --- 5. TOP ITENS GERAL ---
     const itemMap: Record<string, { item: Item; qtd: number; custo: number }> =
       {};
     validEventos.forEach((ev) => {
@@ -222,14 +251,37 @@ export default function RelatoriosPage() {
       .sort((a, b) => b.custo - a.custo)
       .slice(0, 10);
 
-    return { monthlyData, topMotivosPerdas, perdasPorDiaSemana, topItens };
-  }, [eventos]);
+    // Retorna os eventos validados para os Cards usarem no cálculo
+    return {
+      monthlyData,
+      topMotivosPerdas,
+      perdasPorDiaSemana,
+      topItens,
+      validEventos,
+    };
+  }, [eventos, periodo]); // <-- O Array agora escuta o periodo, refazendo o calculo instantaneamente
 
   const summary = useMemo(() => {
-    const totalCusto = stats.monthlyData.reduce((acc, m) => acc + m.custo, 0);
-    const totalVenda = stats.monthlyData.reduce((acc, m) => acc + m.venda, 0);
-    const totalQtd = stats.monthlyData.reduce((acc, m) => acc + m.qtd, 0);
-    const mediaQtdDia = Math.round(totalQtd / 180) || 0;
+    // CORREÇÃO MESTRA: Calcula os Cards baseado nos eventos do PERÍODO, não do gráfico
+    const totalCusto = stats.validEventos.reduce(
+      (acc, e) => acc + (e.custoSnapshot || 0) * e.quantidade,
+      0,
+    );
+    const totalVenda = stats.validEventos.reduce(
+      (acc, e) => acc + (e.precoVendaSnapshot || 0) * e.quantidade,
+      0,
+    );
+    const totalQtd = stats.validEventos.reduce(
+      (acc, e) => acc + e.quantidade,
+      0,
+    );
+
+    let diasNoPeriodo = 30;
+    if (periodo === "semana") diasNoPeriodo = 7;
+    if (periodo === "trimestre") diasNoPeriodo = 90;
+    if (periodo === "ano") diasNoPeriodo = 365;
+
+    const mediaQtdDia = Math.round(totalQtd / diasNoPeriodo) || 0;
 
     return {
       totalCusto,
@@ -241,7 +293,7 @@ export default function RelatoriosPage() {
           ? (((totalVenda - totalCusto) / totalVenda) * 100).toFixed(1)
           : "0.0",
     };
-  }, [stats]);
+  }, [stats, periodo]);
 
   const handleDownloadPDF = () => {
     try {
@@ -259,7 +311,7 @@ export default function RelatoriosPage() {
           margemPerda: summary.margemPerda,
         },
         topItens: stats.topItens,
-        topMotivos: stats.topMotivosPerdas, // Passa o objeto completo, agora com .topItens embutido
+        topMotivos: stats.topMotivosPerdas,
         periodoTexto: periodoTexto || "Período Geral",
       };
       generateReportPDF(reportData);

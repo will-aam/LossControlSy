@@ -1,10 +1,9 @@
-// lib/pdf-generator.ts
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { formatCurrency, formatDate, formatQuantity } from "./utils";
 import { Evento } from "./types";
 
-// Tipos para os dados do relatório
+// --- TIPOS ---
 interface ReportData {
   summary: {
     totalCusto: number;
@@ -17,103 +16,182 @@ interface ReportData {
   periodoTexto: string;
 }
 
-// Configurações visuais
-const COMPANY_NAME = "Loss Control System";
-const PRIMARY_COLOR = "#1a1a1a"; // Preto suave
-const ACCENT_COLOR = "#404040"; // Cinza escuro para detalhes
+// --- CONFIGURAÇÕES VISUAIS (THEME) ---
+const COLORS = {
+  primary: [79, 70, 229] as [number, number, number], // Indigo-600
+  secondary: [100, 116, 139] as [number, number, number], // Slate-500
+  background: [248, 250, 252] as [number, number, number], // Slate-50
+  white: [255, 255, 255] as [number, number, number],
+  black: [15, 23, 42] as [number, number, number], // Slate-900
+  danger: [220, 38, 38] as [number, number, number], // Red-600
+  success: [22, 163, 74] as [number, number, number], // Green-600
+  border: [226, 232, 240] as [number, number, number], // Slate-200
+};
 
-// Helper para adicionar cabeçalho padrão
-const addHeader = (doc: jsPDF, title: string, subtitle?: string) => {
+const COMPANY_NAME = "Loss Control System";
+const FOOTER_TEXT = "Relatório gerado automaticamente pelo sistema.";
+
+// --- HELPERS VISUAIS ---
+
+const addModernHeader = (doc: jsPDF, title: string, subtitle?: string) => {
   const pageWidth = doc.internal.pageSize.width;
 
-  // Linha superior decorativa
-  doc.setDrawColor(0, 0, 0);
-  doc.setLineWidth(1.5);
-  doc.line(14, 15, pageWidth - 14, 15);
+  // 1. Faixa Superior (Banner)
+  doc.setFillColor(...COLORS.primary);
+  doc.rect(0, 0, pageWidth, 35, "F");
 
-  // Nome da Empresa
+  // 2. Nome da Empresa (Banner)
+  doc.setTextColor(...COLORS.white);
+  doc.setFontSize(18);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
-  doc.setTextColor(PRIMARY_COLOR);
-  doc.text(COMPANY_NAME, 14, 25);
+  doc.text(COMPANY_NAME, 14, 15);
 
-  // Data de Emissão (Direita)
-  doc.setFont("helvetica", "normal");
+  // 3. Data de Emissão (Banner)
   doc.setFontSize(9);
-  doc.setTextColor(100);
-  const dataEmissao = `Emissão: ${new Date().toLocaleDateString("pt-BR")} ${new Date().toLocaleTimeString("pt-BR")}`;
-  doc.text(dataEmissao, pageWidth - 14, 25, { align: "right" });
+  doc.setFont("helvetica", "normal");
+  const dataEmissao = `Emissão: ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
+  doc.text(dataEmissao, pageWidth - 14, 15, { align: "right" });
 
-  // Título do Relatório
-  doc.setFontSize(14);
-  doc.setTextColor(PRIMARY_COLOR);
+  // 4. Título do Relatório (Abaixo do banner)
+  doc.setTextColor(...COLORS.black);
+  doc.setFontSize(16);
   doc.setFont("helvetica", "bold");
-  doc.text(title.toUpperCase(), 14, 38);
+  doc.text(title, 14, 45);
 
-  // Subtítulo (Ex: Período ou Lote)
+  // 5. Subtítulo
   if (subtitle) {
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
-    doc.setTextColor(ACCENT_COLOR);
-    doc.text(subtitle, 14, 44);
+    doc.setTextColor(...COLORS.secondary);
+    doc.text(subtitle, 14, 52);
   }
 };
 
-// --- 1. GERAR PDF DE RELATÓRIO GERAL (DASHBOARD) ---
+const drawKpiCard = (
+  doc: jsPDF,
+  x: number,
+  y: number,
+  width: number,
+  label: string,
+  value: string,
+  iconChar: string = "$",
+) => {
+  const height = 30;
+  const radius = 3;
+
+  // Fundo do card
+  doc.setFillColor(...COLORS.white);
+  doc.roundedRect(x, y, width, height, radius, radius, "F");
+
+  // Borda sutil
+  doc.setDrawColor(...COLORS.border);
+  doc.setLineWidth(0.5);
+  doc.roundedRect(x, y, width, height, radius, radius, "S");
+
+  // Ícone (círculo colorido)
+  doc.setFillColor(...COLORS.background);
+  doc.circle(x + 10, y + 10, 5, "F");
+  doc.setFontSize(10);
+  doc.setTextColor(...COLORS.primary);
+  doc.text(iconChar, x + 10, y + 12, { align: "center" });
+
+  // Label
+  doc.setFontSize(8);
+  doc.setTextColor(...COLORS.secondary);
+  doc.text(label, x + 20, y + 10);
+
+  // Value
+  doc.setFontSize(14);
+  doc.setTextColor(...COLORS.black);
+  doc.setFont("helvetica", "bold");
+  doc.text(value, x + 20, y + 22);
+
+  return height;
+};
+
+const addFooter = (doc: jsPDF, pageNum: number) => {
+  const pageHeight = doc.internal.pageSize.height;
+  const pageWidth = doc.internal.pageSize.width;
+
+  doc.setFontSize(8);
+  doc.setTextColor(...COLORS.secondary);
+  doc.text(FOOTER_TEXT, 14, pageHeight - 10);
+  doc.text(`Página ${pageNum}`, pageWidth - 14, pageHeight - 10, {
+    align: "right",
+  });
+
+  doc.setDrawColor(...COLORS.border);
+  doc.line(14, pageHeight - 15, pageWidth - 14, pageHeight - 15);
+};
+
+// --- 1. RELATÓRIO GERENCIAL (DASHBOARD) ---
 export const generateReportPDF = (data: ReportData) => {
   const doc = new jsPDF();
+  let pageNum = 1;
 
-  addHeader(
+  addModernHeader(
     doc,
     "Relatório Gerencial de Perdas",
     `Período: ${data.periodoTexto}`,
   );
 
-  let finalY = 50;
+  // --- SEÇÃO 1: KPIs (Cards) ---
+  const kpiY = 60;
+  const cardWidth = 43;
+  const gap = 5;
+  const pageWidth = doc.internal.pageSize.width;
+  const startX = (pageWidth - (cardWidth * 4 + gap * 3)) / 2;
 
-  // 1. Cards de Resumo
-  const summaryData = [
-    ["CUSTO TOTAL", "PERDA VENDA", "OCORRÊNCIAS", "MARGEM"],
-    [
-      formatCurrency(data.summary.totalCusto),
-      formatCurrency(data.summary.totalVenda),
-      formatQuantity(data.summary.totalQtd),
-      `${data.summary.margemPerda}%`,
-    ],
-  ];
+  // Card 1: Custo Total
+  drawKpiCard(
+    doc,
+    startX,
+    kpiY,
+    cardWidth,
+    "CUSTO TOTAL",
+    formatCurrency(data.summary.totalCusto),
+    "C",
+  );
+  // Card 2: Perda Venda
+  drawKpiCard(
+    doc,
+    startX + cardWidth + gap,
+    kpiY,
+    cardWidth,
+    "VENDA PERDIDA",
+    formatCurrency(data.summary.totalVenda),
+    "V",
+  );
+  // Card 3: Ocorrências
+  drawKpiCard(
+    doc,
+    startX + (cardWidth + gap) * 2,
+    kpiY,
+    cardWidth,
+    "OCORRÊNCIAS",
+    formatQuantity(data.summary.totalQtd),
+    "#",
+  );
+  // Card 4: Margem
+  drawKpiCard(
+    doc,
+    startX + (cardWidth + gap) * 3,
+    kpiY,
+    cardWidth,
+    "MARGEM",
+    `${data.summary.margemPerda}%`,
+    "%",
+  );
 
-  autoTable(doc, {
-    startY: finalY,
-    head: [summaryData[0]],
-    body: [summaryData[1]],
-    theme: "plain",
-    headStyles: {
-      fillColor: [245, 245, 245],
-      textColor: [80, 80, 80],
-      fontStyle: "bold",
-      fontSize: 8,
-      halign: "center",
-    },
-    styles: {
-      halign: "center",
-      fontSize: 12,
-      fontStyle: "bold",
-      cellPadding: 6,
-      lineWidth: 0.1,
-      lineColor: [200, 200, 200],
-    },
-  });
+  let finalY = kpiY + 45;
 
-  // @ts-ignore
-  finalY = doc.lastAutoTable.finalY + 15;
-
-  // 2. Tabela de Ranking
+  // --- SEÇÃO 2: RANKING DE ITENS ---
   doc.setFontSize(11);
+  doc.setTextColor(...COLORS.black);
   doc.setFont("helvetica", "bold");
-  doc.setTextColor(PRIMARY_COLOR);
-  doc.text("Ranking de Itens Críticos", 14, finalY);
+  doc.text("Top 10 Itens Críticos", 14, finalY);
 
-  const itensData = data.topItens.map((item, index) => [
+  const itensData = data.topItens.map((item: any, index: number) => [
     index + 1,
     item.item.codigoInterno || "-",
     item.item.nome,
@@ -124,86 +202,100 @@ export const generateReportPDF = (data: ReportData) => {
 
   autoTable(doc, {
     startY: finalY + 4,
-    head: [["#", "CÓD.", "PRODUTO", "QTD.", "CUSTO TOTAL", "VENDA PERDIDA"]],
+    head: [["RANK", "CÓD.", "PRODUTO", "QTD.", "CUSTO", "VENDA PERDIDA"]],
     body: itensData,
-    theme: "grid",
+    theme: "plain",
     headStyles: {
-      fillColor: [40, 40, 40],
-      textColor: [255, 255, 255],
+      fillColor: COLORS.background,
+      textColor: COLORS.secondary,
+      fontStyle: "bold",
       fontSize: 9,
     },
-    styles: { fontSize: 9, cellPadding: 3 },
+    styles: {
+      fontSize: 9,
+      cellPadding: 4,
+      lineColor: COLORS.border,
+      lineWidth: { top: 0, right: 0, bottom: 0.5, left: 0 },
+    },
     columnStyles: {
-      0: { cellWidth: 10, halign: "center" },
+      0: { cellWidth: 12, halign: "center", fontStyle: "bold" },
       1: { cellWidth: 25 },
       2: { cellWidth: "auto" },
       3: { halign: "right" },
-      4: { halign: "right", fontStyle: "bold" },
-      5: { halign: "right", textColor: [200, 50, 50] },
+      4: { halign: "right" },
+      5: { halign: "right", textColor: COLORS.danger, fontStyle: "bold" },
     },
-    alternateRowStyles: { fillColor: [250, 250, 250] },
+    didParseCell: (data) => {
+      if (data.row.index === 0 && data.section === "body") {
+        data.cell.styles.fillColor = [254, 242, 242]; // Fundo vermelho claro
+      }
+    },
   });
 
   // @ts-ignore
   finalY = doc.lastAutoTable.finalY + 15;
 
-  // Quebra de página se necessário
-  if (finalY > 240) {
+  // --- SEÇÃO 3: MOTIVOS ---
+  if (finalY > 230) {
     doc.addPage();
+    addFooter(doc, pageNum);
+    pageNum++;
     finalY = 20;
   }
 
-  // 3. Motivos (AGORA COM OS ITENS DENTRO NO PDF)
   doc.setFontSize(11);
-  doc.setTextColor(PRIMARY_COLOR);
-  doc.text("Distribuição por Motivo e Principais Vilões", 14, finalY);
+  doc.setTextColor(...COLORS.black);
+  doc.setFont("helvetica", "bold");
+  doc.text("Análise por Motivo", 14, finalY);
 
-  const motivosData = data.topMotivos.map((m) => {
+  const motivosData = data.topMotivos.map((m: any) => {
     let motivoTexto = m.motivo.toUpperCase();
-
-    // Monta a string dos sub-itens usando quebra de linha para o PDF entender
     if (m.topItens && m.topItens.length > 0) {
       const itensStr = m.topItens
         .map(
-          (i: any) =>
-            `  > ${i.nome} (${formatQuantity(i.qtd)} ${i.unidade}) - ${formatCurrency(i.custo)}`,
+          (i: any) => `  • ${i.nome} (${formatQuantity(i.qtd)} ${i.unidade})`,
         )
         .join("\n");
-      motivoTexto += `\nPrincipais itens afetados:\n${itensStr}`;
+      motivoTexto += `\n${itensStr}`;
     }
-
     return [motivoTexto, formatQuantity(m.quantidade), formatCurrency(m.custo)];
   });
 
   autoTable(doc, {
     startY: finalY + 4,
-    head: [["MOTIVO / PRODUTOS AFETADOS", "QTD TOTAL", "IMPACTO TOTAL"]],
+    head: [["MOTIVO / ITENS AFETADOS", "QTD", "IMPACTO"]],
     body: motivosData,
     theme: "grid",
     headStyles: {
-      fillColor: [220, 220, 220],
-      textColor: [0, 0, 0],
+      fillColor: COLORS.primary,
+      textColor: COLORS.white,
       fontSize: 9,
     },
-    // Adicionamos valign: "top" para que o texto longo fique alinhado no topo da célula
-    styles: { fontSize: 9, cellPadding: 4 },
-    columnStyles: {
-      1: { halign: "right", cellWidth: 30, valign: "top" },
-      2: { halign: "right", cellWidth: 40, fontStyle: "bold", valign: "top" },
+    styles: {
+      fontSize: 9,
+      cellPadding: 4,
+      lineColor: COLORS.border,
     },
+    columnStyles: {
+      0: { cellWidth: "auto" },
+      1: { halign: "right", cellWidth: 25, valign: "top" },
+      2: { halign: "right", cellWidth: 35, fontStyle: "bold", valign: "top" },
+    },
+    alternateRowStyles: { fillColor: COLORS.background },
   });
 
+  addFooter(doc, pageNum);
   doc.save(`relatorio_gerencial_${new Date().toISOString().split("T")[0]}.pdf`);
 };
 
-// --- 2. GERAR PDF DE EVENTOS (LOTE / INDIVIDUAL) ---
+// --- 2. RELATÓRIO DE EVENTOS (LOTE/INDIVIDUAL) ---
 export const generateEventPDF = (
   eventos: Evento[],
   titulo: string = "Relatório de Lote",
 ) => {
   const doc = new jsPDF();
+  let pageNum = 1;
 
-  // Se for um lote de um dia específico, tentamos pegar a data do primeiro item
   const dataReferencia =
     eventos.length > 0
       ? formatDate(eventos[0].dataHora)
@@ -213,13 +305,12 @@ export const generateEventPDF = (
       ? `Data de Referência: ${dataReferencia}`
       : `Registro Individual`;
 
-  addHeader(doc, titulo, subtitulo);
+  addModernHeader(doc, titulo, subtitulo);
 
-  let finalY = 50;
+  let finalY = 60;
   let totalCustoGeral = 0;
 
-  // Prepara os dados para uma tabela única consolidada
-  const tableRows = eventos.map((evento, index) => {
+  const tableRows = eventos.map((evento: Evento, index: number) => {
     const custoTotal = (evento.custoSnapshot || 0) * Number(evento.quantidade);
     totalCustoGeral += custoTotal;
 
@@ -234,99 +325,83 @@ export const generateEventPDF = (
     ];
   });
 
-  // Tabela Consolidada
   autoTable(doc, {
     startY: finalY,
-    head: [["#", "CÓD.", "PRODUTO", "MOTIVO", "QTD.", "UNIT.", "TOTAL"]],
+    head: [["#", "CÓDIGO", "PRODUTO", "MOTIVO", "QTD", "UNITÁRIO", "TOTAL"]],
     body: tableRows,
-    theme: "grid",
-    // Estilo do Cabeçalho
+    theme: "plain",
     headStyles: {
-      fillColor: [240, 240, 240], // Cinza bem claro
-      textColor: [0, 0, 0], // Texto preto
-      lineWidth: 0.1,
-      lineColor: [200, 200, 200],
+      fillColor: COLORS.background,
+      textColor: COLORS.secondary,
       fontStyle: "bold",
       fontSize: 8,
     },
-    // Estilo do Corpo
     styles: {
       fontSize: 9,
-      cellPadding: 3,
-      textColor: [50, 50, 50],
-      lineWidth: 0.1,
-      lineColor: [230, 230, 230],
+      cellPadding: 4,
+      lineColor: COLORS.border,
+      lineWidth: { bottom: 0.5 },
     },
-    // Estilo das Colunas
     columnStyles: {
       0: { cellWidth: 10, halign: "center" },
       1: { cellWidth: 20 },
-      2: { cellWidth: "auto", fontStyle: "bold" }, // Nome do produto em negrito
+      2: { cellWidth: "auto", fontStyle: "bold" },
       3: { cellWidth: 30 },
       4: { halign: "right", cellWidth: 20 },
       5: { halign: "right", cellWidth: 25 },
-      6: { halign: "right", cellWidth: 25, fontStyle: "bold" }, // Total em negrito
+      6: { halign: "right", cellWidth: 25, textColor: COLORS.danger },
     },
-    // Zebra striping leve
-    alternateRowStyles: {
-      fillColor: [252, 252, 252],
-    },
+    alternateRowStyles: { fillColor: COLORS.background },
   });
 
   // @ts-ignore
   finalY = doc.lastAutoTable.finalY + 10;
 
-  // --- CARD DE TOTALIZAÇÃO ---
-  // Verifica se cabe na página, senão quebra
+  // --- TOTALIZADOR ---
   if (finalY > 250) {
     doc.addPage();
+    addFooter(doc, pageNum);
+    pageNum++;
     finalY = 20;
   }
 
-  // Caixa Totalizadora
-  doc.setDrawColor(200, 200, 200);
-  doc.setFillColor(250, 250, 250);
-  doc.roundedRect(doc.internal.pageSize.width - 80, finalY, 66, 12, 1, 1, "FD");
+  const boxX = 14;
+  const boxWidth = doc.internal.pageSize.width - 28;
+  doc.setFillColor(...COLORS.primary);
+  doc.roundedRect(boxX, finalY, boxWidth, 15, 2, 2, "F");
 
+  doc.setTextColor(...COLORS.white);
   doc.setFontSize(10);
-  doc.setTextColor(100);
-  doc.text("TOTAL GERAL:", doc.internal.pageSize.width - 75, finalY + 8);
-
+  doc.text("CUSTO TOTAL DO LOTE:", boxX + 5, finalY + 10);
   doc.setFontSize(12);
-  doc.setTextColor(0);
   doc.setFont("helvetica", "bold");
-  doc.text(
-    formatCurrency(totalCustoGeral),
-    doc.internal.pageSize.width - 18,
-    finalY + 8,
-    { align: "right" },
-  );
+  doc.text(formatCurrency(totalCustoGeral), boxX + boxWidth - 5, finalY + 10, {
+    align: "right",
+  });
 
-  // --- ÁREA DE ASSINATURAS ---
-  // Posiciona no rodapé da página
+  // --- ASSINATURAS ---
   const pageHeight = doc.internal.pageSize.height;
-  let signY = pageHeight - 40;
+  let signY = pageHeight - 50;
 
-  // Se a tabela for muito longa e estiver perto do fim, adiciona página para assinaturas
-  if (finalY > signY - 20) {
+  if (finalY > signY - 30) {
     doc.addPage();
-    signY = pageHeight - 40;
+    signY = 40;
+    pageNum++;
   }
 
-  doc.setDrawColor(0, 0, 0);
+  doc.setDrawColor(...COLORS.border);
   doc.setLineWidth(0.5);
 
-  // Assinatura 1: Autor/Responsável
   doc.line(20, signY, 90, signY);
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(...COLORS.secondary);
   doc.text("Autor / Responsável", 55, signY + 5, { align: "center" });
 
-  // Assinatura 2: Auditoria
   doc.line(120, signY, 190, signY);
   doc.text("Auditoria / Conferência", 155, signY + 5, { align: "center" });
 
-  // Nome do arquivo
+  addFooter(doc, pageNum);
+
   const nomeArquivo =
     eventos.length === 1
       ? `registro_individual_${formatDate(eventos[0].dataHora).replace(/\//g, "-")}.pdf`
