@@ -520,6 +520,9 @@ export default function NotasFiscaisPage() {
             ) : (
               currentNotas.map((nota) => (
                 <TableRow key={nota.id}>
+                  // Localize o bloco de código por volta da linha 520 no
+                  arquivo app/(dashboard)/notas/page.tsx // ... dentro do
+                  mapeamento da tabela de notas ...
                   <TableCell className="text-center">
                     <div className="flex justify-center gap-2">
                       {nota.xmlContent && (
@@ -529,8 +532,8 @@ export default function NotasFiscaisPage() {
                           className="h-8 w-8 text-blue-600 bg-blue-50"
                           onClick={() =>
                             downloadFile(
-                              nota.xmlUrl || nota.xmlContent,
-                              `nota-${nota.numero}.xml`,
+                              (nota.xmlUrl || nota.xmlContent) ?? undefined, // CORREÇÃO: Converte null para undefined
+                              `nota-${nota.numero || "sem-numero"}.xml`,
                             )
                           }
                         >
@@ -543,7 +546,10 @@ export default function NotasFiscaisPage() {
                           size="icon"
                           className="h-8 w-8 text-red-600 bg-red-50"
                           onClick={() =>
-                            downloadFile(nota.pdfUrl, `nota-${nota.numero}.pdf`)
+                            downloadFile(
+                              nota.pdfUrl ?? undefined, // CORREÇÃO: Converte null para undefined
+                              `nota-${nota.numero || "sem-numero"}.pdf`,
+                            )
                           }
                         >
                           <FileIcon className="h-4 w-4" />
@@ -551,6 +557,7 @@ export default function NotasFiscaisPage() {
                       )}
                     </div>
                   </TableCell>
+                  // ...
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <CalendarIcon className="h-4 w-4 text-muted-foreground" />

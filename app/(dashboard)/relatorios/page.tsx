@@ -1,3 +1,4 @@
+// app/(dashboard)/relatorios/page.tsx
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -35,7 +36,7 @@ export default function RelatoriosPage() {
       setIsLoading(true);
       const result = await getEventos();
       if (result.success && result.data) {
-        // Mapeamento
+        // Mapeamento corrigido para incluir notasFiscais
         const mappedEventos: Evento[] = (result.data as any[]).map((ev) => ({
           id: ev.id,
           dataHora: ev.dataHora,
@@ -60,6 +61,7 @@ export default function RelatoriosPage() {
             : undefined,
           criadoPor: ev.criadoPor,
           evidencias: ev.evidencias,
+          notasFiscais: ev.notasFiscais || [], // CORREÇÃO: Adicionado o campo obrigatório
         }));
         setEventos(mappedEventos);
       } else {
@@ -70,13 +72,12 @@ export default function RelatoriosPage() {
     loadData();
   }, []);
 
-  // --- CÁLCULOS (Lógica de Negócio) ---
+  // ... (restante do código permanece igual)
   const stats = useMemo(() => {
     const validEventos = eventos.filter(
       (e) => e.status !== "rascunho" && e.status !== "rejeitado",
     );
 
-    // Dados Mensais (Últimos 6 meses)
     const monthlyDataMap: Record<
       string,
       { custo: number; venda: number; qtd: number }
@@ -119,7 +120,6 @@ export default function RelatoriosPage() {
       ...val,
     }));
 
-    // Por Motivo
     const motivosMap: Record<string, { qtd: number; custo: number }> = {};
     validEventos.forEach((ev) => {
       const motivo = ev.motivo || "Não especificado";
@@ -137,7 +137,6 @@ export default function RelatoriosPage() {
       .sort((a, b) => b.custo - a.custo)
       .slice(0, 5);
 
-    // Por Dia da Semana
     const diasMap: Record<string, { qtd: number; custo: number }> = {
       Domingo: { qtd: 0, custo: 0 },
       Segunda: { qtd: 0, custo: 0 },
@@ -152,7 +151,6 @@ export default function RelatoriosPage() {
       const d = new Date(ev.dataHora);
       const dia = d.toLocaleDateString("pt-BR", { weekday: "long" });
       const diaKey = dia.charAt(0).toUpperCase() + dia.slice(1);
-      // Remove sufixo "-feira" se houver para bater com as chaves
       const simpleKey = diaKey.split("-")[0];
       const normalizedKey =
         Object.keys(diasMap).find((k) => k.startsWith(simpleKey)) || "Outro";
@@ -169,7 +167,6 @@ export default function RelatoriosPage() {
       custo: val.custo,
     }));
 
-    // Por Item
     const itemMap: Record<string, { item: Item; qtd: number; custo: number }> =
       {};
     validEventos.forEach((ev) => {
@@ -230,7 +227,6 @@ export default function RelatoriosPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Relatórios</h1>
@@ -259,10 +255,8 @@ export default function RelatoriosPage() {
         </div>
       </div>
 
-      {/* Cards de Resumo */}
       <SummaryCards summary={summary} />
 
-      {/* Abas de Conteúdo */}
       <Tabs value={selectedTab} onValueChange={setSelectedTab}>
         <TabsList>
           <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
