@@ -19,7 +19,7 @@ import {
   getEventos,
   updateEventoStatus,
   deleteEvento,
-  getNotaDoLote, // Importamos a nova função
+  getNotaDoLote,
 } from "@/app/actions/eventos";
 
 import {
@@ -33,7 +33,7 @@ import { DateRange } from "react-day-picker";
 import { isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { Button } from "@/components/ui/button";
 
-// Importando os novos componentes
+// Importando os componentes
 import { EventosToolbar } from "@/components/eventos/eventos-toolbar";
 import {
   EventosGrid,
@@ -48,30 +48,20 @@ const hideScrollClass =
   "[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]";
 
 export default function EventosPage() {
-  const { hasPermission, settings } = useAuth();
+  const { hasPermission } = useAuth();
 
-  // Estados de Navegação e Filtro
   const [viewMode, setViewMode] = useState<ViewMode>("pastas");
   const [loteSelecionado, setLoteSelecionado] = useState<LoteDiario | null>(
     null,
   );
-
-  // Filtros
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [globalSearch, setGlobalSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
-
-  // Paginação
   const [currentPage, setCurrentPage] = useState(1);
-
-  // Dados do Banco
   const [eventosDoBanco, setEventosDoBanco] = useState<Evento[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-
-  // Ações
   const [eventoToDelete, setEventoToDelete] = useState<string | null>(null);
 
-  // Carregar dados
   useEffect(() => {
     loadData();
   }, []);
@@ -81,7 +71,6 @@ export default function EventosPage() {
     const result = await getEventos();
 
     if (result.success && result.data) {
-      // Mapeamento para garantir compatibilidade
       const mappedEventos: Evento[] = (result.data as any[]).map((ev) => ({
         id: ev.id,
         dataHora: ev.dataHora,
@@ -107,6 +96,7 @@ export default function EventosPage() {
           : undefined,
         criadoPor: ev.criadoPor,
         evidencias: ev.evidencias,
+        notasFiscais: ev.notasFiscais || [],
       }));
 
       setEventosDoBanco(mappedEventos);
@@ -116,22 +106,18 @@ export default function EventosPage() {
     setIsLoading(false);
   };
 
-  // Resetar página quando mudar filtros
   useEffect(() => {
     setCurrentPage(1);
   }, [viewMode, dateRange, globalSearch, statusFilter, loteSelecionado]);
 
-  // Lógica de Filtragem
   const eventosFiltradosGlobalmente = useMemo(() => {
     return eventosDoBanco.filter((evento) => {
-      // 1. Data
       if (dateRange?.from) {
         const eventoDate = new Date(evento.dataHora);
         const start = startOfDay(dateRange.from);
         const end = endOfDay(dateRange.to || dateRange.from);
         if (!isWithinInterval(eventoDate, { start, end })) return false;
       }
-      // 2. Busca Texto (Nome ou Código)
       if (globalSearch) {
         const s = globalSearch.toLowerCase();
         const matches =
@@ -140,11 +126,9 @@ export default function EventosPage() {
           evento.criadoPor?.nome.toLowerCase().includes(s);
         if (!matches) return false;
       }
-      // 3. Status
       if (statusFilter !== "todos") {
         const targetStatus =
           statusFilter === "pendente" ? "enviado" : statusFilter;
-        // Se filtro for pendente, aceita rascunho e enviado
         if (targetStatus === "enviado" && evento.status === "rascunho")
           return true;
         if (evento.status !== targetStatus) return false;
@@ -153,7 +137,6 @@ export default function EventosPage() {
     });
   }, [eventosDoBanco, dateRange, globalSearch, statusFilter]);
 
-  // Lógica de Agrupamento (Lotes)
   const lotesDiarios = useMemo(() => {
     if (viewMode === "lista-completa") return [];
 
@@ -176,6 +159,12 @@ export default function EventosPage() {
         if (todosOk) status = "aprovado";
         else if (temRejeitado) status = "rejeitado";
 
+        const notaReferencia = eventos.find(
+          (e) => e.notasFiscais && e.notasFiscais.length > 0,
+        )?.notasFiscais[0];
+        const isExpired =
+          !!notaReferencia && !notaReferencia.pdfUrl && !notaReferencia.xmlUrl;
+
         return {
           data,
           dataOriginal: new Date(eventos[0].dataHora),
@@ -186,21 +175,21 @@ export default function EventosPage() {
           ),
           status,
           autor: eventos[0].criadoPor?.nome || "Sistema",
+          nfNumero: notaReferencia?.numero,
+          isExpired: isExpired,
         } as LoteDiario;
       })
       .sort((a, b) => b.dataOriginal.getTime() - a.dataOriginal.getTime());
   }, [eventosFiltradosGlobalmente, viewMode]);
 
-  // Paginação
   const dadosPaginados = useMemo(() => {
     let dados: any[] = [];
     const itemsPerPage = viewMode === "pastas" && !loteSelecionado ? 10 : 15;
 
     if (loteSelecionado) {
-      const eventosAtualizadosDoLote = eventosFiltradosGlobalmente.filter(
+      dados = eventosFiltradosGlobalmente.filter(
         (e) => formatDate(e.dataHora) === loteSelecionado.data,
       );
-      dados = eventosAtualizadosDoLote;
     } else if (viewMode === "pastas") {
       dados = lotesDiarios;
     } else {
@@ -209,11 +198,14 @@ export default function EventosPage() {
 
     const totalItems = dados.length;
     const totalPages = Math.ceil(totalItems / itemsPerPage);
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    const currentItems = dados.slice(startIndex, endIndex);
-
-    return { currentItems, totalPages, totalItems, itemsPerPage };
+    return {
+      currentItems: dados.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage,
+      ),
+      totalPages,
+      totalItems,
+    };
   }, [
     loteSelecionado,
     viewMode,
@@ -222,46 +214,31 @@ export default function EventosPage() {
     currentPage,
   ]);
 
-  // --- AÇÕES COM ATUALIZAÇÃO OTIMISTA ---
-
   const handleStatusChange = async (eventoId: string, novoStatus: string) => {
     const statusTyped = novoStatus as EventoStatus;
-
-    // 1. Atualização Otimista
     setEventosDoBanco((prev) =>
       prev.map((ev) =>
         ev.id === eventoId ? { ...ev, status: statusTyped } : ev,
       ),
     );
-
-    // 2. Chama o Backend
     const result = await updateEventoStatus(eventoId, statusTyped);
-
-    if (result.success) {
-      toast.success("Status atualizado");
-    } else {
+    if (!result.success) {
       toast.error(result.message);
       loadData();
+    } else {
+      toast.success("Status atualizado");
     }
   };
 
   const handleAprovarLoteInteiro = async () => {
     if (!loteSelecionado) return;
-
-    const idsParaAprovar = loteSelecionado.eventos.map((e) => e.id);
-
-    // 1. Atualização Otimista
+    const ids = loteSelecionado.eventos.map((e) => e.id);
     setEventosDoBanco((prev) =>
       prev.map((ev) =>
-        idsParaAprovar.includes(ev.id) ? { ...ev, status: "aprovado" } : ev,
+        ids.includes(ev.id) ? { ...ev, status: "aprovado" } : ev,
       ),
     );
-
-    const promises = idsParaAprovar.map((id) =>
-      updateEventoStatus(id, "aprovado"),
-    );
-
-    await Promise.all(promises);
+    await Promise.all(ids.map((id) => updateEventoStatus(id, "aprovado")));
     toast.success("Lote aprovado!");
   };
 
@@ -270,37 +247,35 @@ export default function EventosPage() {
       setEventosDoBanco((prev) =>
         prev.filter((ev) => ev.id !== eventoToDelete),
       );
-
       const result = await deleteEvento(eventoToDelete);
-
-      if (result.success) {
-        toast.success("Evento excluído");
-      } else {
+      if (!result.success) {
         toast.error(result.message);
         loadData();
+      } else {
+        toast.success("Evento excluído");
       }
       setEventoToDelete(null);
     }
   };
 
-  // --- NOVA FUNÇÃO: DOWNLOAD DO LOTE (NOTA FISCAL) ---
   const handleDownloadLote = async (lote: LoteDiario) => {
     try {
-      // CORREÇÃO: Usa toISOString para pegar a data UTC (YYYY-MM-DD)
-      // Evita o problema de fuso horário (-3h virar dia anterior)
       const dataString = lote.dataOriginal.toISOString().split("T")[0];
-
       const result = await getNotaDoLote(dataString);
 
       if (result.success && result.url) {
-        // CORREÇÃO: Abre em nova guia
         window.open(result.url, "_blank");
-        toast.success("Nota fiscal aberta em nova guia.");
+        toast.success("Nota fiscal aberta.");
+      } else if (result.isExpired) {
+        toast.error(result.message, {
+          description:
+            "Documentos fiscais são removidos permanentemente após 30 dias.",
+          duration: 5000,
+        });
       } else {
-        toast.error(result.message || "Nenhuma nota fiscal encontrada.");
+        toast.error(result.message || "Nenhuma nota encontrada.");
       }
     } catch (error) {
-      console.error(error);
       toast.error("Erro ao buscar nota fiscal.");
     }
   };
@@ -314,7 +289,6 @@ export default function EventosPage() {
     );
   }
 
-  // Se estiver dentro de um lote (Visualização Detalhada do Lote)
   if (loteSelecionado) {
     const eventosDoLote = dadosPaginados.currentItems as Evento[];
     const todosOk =
@@ -335,9 +309,7 @@ export default function EventosPage() {
               <ChevronLeft className="h-5 w-5" />
             </Button>
             <div>
-              <h1 className="text-xl font-semibold flex items-center gap-3">
-                {loteSelecionado.data}
-              </h1>
+              <h1 className="text-xl font-semibold">{loteSelecionado.data}</h1>
               <p className="text-sm text-muted-foreground">
                 Autor: {loteSelecionado.autor}
               </p>
@@ -371,14 +343,13 @@ export default function EventosPage() {
 
         <AlertDialogDelete
           open={!!eventoToDelete}
-          onOpenChange={(open) => !open && setEventoToDelete(null)}
+          onOpenChange={(open: boolean) => !open && setEventoToDelete(null)}
           onConfirm={confirmDelete}
         />
       </div>
     );
   }
 
-  // Visualização Principal (Pastas ou Lista)
   return (
     <div
       className={`flex flex-col h-[calc(100vh-2rem)] space-y-4 overflow-hidden ${hideScrollClass}`}
@@ -406,7 +377,7 @@ export default function EventosPage() {
             <EventosGrid
               lotes={dadosPaginados.currentItems as LoteDiario[]}
               onSelect={setLoteSelecionado}
-              onDownload={handleDownloadLote} // Passamos a nova função de download aqui
+              onDownload={handleDownloadLote}
             />
           ) : (
             <EventosTable
@@ -428,14 +399,14 @@ export default function EventosPage() {
 
       <AlertDialogDelete
         open={!!eventoToDelete}
-        onOpenChange={(open) => !open && setEventoToDelete(null)}
+        onOpenChange={(open: boolean) => !open && setEventoToDelete(null)}
         onConfirm={confirmDelete}
       />
     </div>
   );
 }
 
-// Componentes Auxiliares Locais Tipados (Para não dar erro de 'any')
+// --- COMPONENTES AUXILIARES DEVIDAMENTE TIPADOS ---
 
 interface PaginationControlsProps {
   currentPage: number;

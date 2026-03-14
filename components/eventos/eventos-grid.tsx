@@ -1,11 +1,16 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
-import { FileText, ChevronRightSquare, Loader2 } from "lucide-react"; // Import Loader2
+import {
+  FileText,
+  ChevronRightSquare,
+  Loader2,
+  FileWarning,
+} from "lucide-react";
 import { formatCurrency, cn } from "@/lib/utils";
 import { Evento } from "@/lib/types";
 import { toast } from "sonner";
-import { useState } from "react"; // Import useState
+import { useState } from "react";
 
 export type BatchStatus = "pendente" | "aprovado" | "rejeitado";
 
@@ -16,12 +21,14 @@ export interface LoteDiario {
   totalCusto: number;
   status: BatchStatus;
   autor: string;
+  isExpired?: boolean; // NOVO: Indica se os arquivos foram apagados pelo Cron
+  nfNumero?: string; // NOVO: Número da NF para consulta
 }
 
 interface EventosGridProps {
   lotes: LoteDiario[];
   onSelect: (lote: LoteDiario) => void;
-  onDownload: (lote: LoteDiario) => Promise<void>; // Mudança para Promise
+  onDownload: (lote: LoteDiario) => Promise<void>;
 }
 
 export function EventosGrid({ lotes, onSelect, onDownload }: EventosGridProps) {
@@ -37,6 +44,14 @@ export function EventosGrid({ lotes, onSelect, onDownload }: EventosGridProps) {
 
   const handleIconClick = async (e: React.MouseEvent, lote: LoteDiario) => {
     e.stopPropagation();
+
+    // Se estiver expirado, apenas avisa o usuário e não tenta baixar
+    if (lote.isExpired) {
+      toast.info(
+        `O documento da NF ${lote.nfNumero || "N/A"} foi removido permanentemente após 30 dias.`,
+      );
+      return;
+    }
 
     if (lote.status !== "aprovado") {
       toast.error("Apenas lotes aprovados podem ser baixados/impressos.");
@@ -67,20 +82,26 @@ export function EventosGrid({ lotes, onSelect, onDownload }: EventosGridProps) {
               onClick={(e) => handleIconClick(e, lote)}
               className={cn(
                 "flex h-9 w-9 items-center justify-center rounded-full border transition-all",
-                lote.status === "aprovado"
+                lote.status === "aprovado" && !lote.isExpired
                   ? "bg-green-500/10 text-green-600 border-green-500/20 hover:bg-green-500/20 hover:scale-105 cursor-pointer"
-                  : lote.status === "rejeitado"
-                    ? "bg-red-500/10 text-red-600 border-red-500/20 cursor-not-allowed opacity-70"
-                    : "bg-muted text-muted-foreground cursor-not-allowed opacity-70",
+                  : lote.isExpired
+                    ? "bg-amber-500/10 text-amber-600 border-amber-500/20 cursor-help" // Visual de aviso para expirados
+                    : lote.status === "rejeitado"
+                      ? "bg-red-500/10 text-red-600 border-red-500/20 cursor-not-allowed opacity-70"
+                      : "bg-muted text-muted-foreground cursor-not-allowed opacity-70",
               )}
               title={
-                lote.status === "aprovado"
-                  ? "Baixar Nota Fiscal do Dia"
-                  : "Necessário aprovação para baixar"
+                lote.isExpired
+                  ? `Documento removido (NF: ${lote.nfNumero})`
+                  : lote.status === "aprovado"
+                    ? "Baixar Nota Fiscal do Dia"
+                    : "Necessário aprovação para baixar"
               }
             >
               {downloadingDate === lote.data ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
+              ) : lote.isExpired ? (
+                <FileWarning className="h-4 w-4" /> // Ícone diferente para expiração
               ) : (
                 <FileText className="h-4 w-4" />
               )}
@@ -104,6 +125,15 @@ export function EventosGrid({ lotes, onSelect, onDownload }: EventosGridProps) {
                 >
                   {lote.status.toUpperCase()}
                 </Badge>
+                {/* Exibição do número da NF para consulta, mesmo se expirada */}
+                {lote.nfNumero && (
+                  <>
+                    <span>•</span>
+                    <span className="font-mono text-[10px] bg-muted px-1 rounded">
+                      NF: {lote.nfNumero}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           </div>

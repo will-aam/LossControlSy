@@ -32,7 +32,7 @@ const ALL_NAV_ITEMS: NavItemWithPermission[] = [
     permission: "eventos:criar",
   },
   {
-    title: "Eventos / Perdas",
+    title: "Eventos",
     href: "/eventos",
     icon: "ClipboardCheck",
     permission: "eventos:menu",

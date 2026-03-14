@@ -9,8 +9,6 @@ import { r2 } from "@/lib/r2";
 import { PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "crypto";
-
-// ADICIONADO: Importando do local correto (utils)
 import { getKeyFromUrl } from "@/lib/utils";
 
 export type CreateEventoData = {
@@ -21,23 +19,15 @@ export type CreateEventoData = {
   dataPersonalizada?: Date;
 };
 
-// Função helper de upload para o R2
 async function uploadToR2(base64Image: string): Promise<string | null> {
   try {
     const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
-
     const fileName = `eventos/${randomUUID()}.jpg`;
-
     const bucketName = process.env.R2_BUCKET_NAME;
     const publicDomain = process.env.R2_PUBLIC_DOMAIN;
 
-    if (!bucketName || !publicDomain) {
-      console.error(
-        "ERRO DE CONFIGURAÇÃO: Verifique R2_BUCKET_NAME e R2_PUBLIC_DOMAIN no arquivo .env",
-      );
-      return null;
-    }
+    if (!bucketName || !publicDomain) return null;
 
     await r2.send(
       new PutObjectCommand({
@@ -56,19 +46,23 @@ async function uploadToR2(base64Image: string): Promise<string | null> {
   }
 }
 
-// 1. Listar Eventos
+// 1. Listar Eventos (ATUALIZADO: Inclui Notas Fiscais)
 export async function getEventos() {
   const session = await getSession();
   if (!session) return { success: false, data: [] };
 
   try {
     const eventos = await prisma.evento.findMany({
-      where: { ownerId: session.ownerId }, // NOVO: Traz apenas eventos da loja atual
+      where: { ownerId: session.ownerId },
       orderBy: { dataHora: "desc" },
       include: {
         item: { include: { categoria: true } },
         criadoPor: { select: { nome: true, email: true, role: true } },
         evidencias: true,
+        notasFiscais: {
+          // NOVO: Traz info da nota vinculada ao item
+          select: { id: true, numero: true, pdfUrl: true, xmlUrl: true },
+        },
       },
     });
 
@@ -94,44 +88,26 @@ export async function getEventos() {
   }
 }
 
-// 2. Criar Evento
 export async function createEvento(data: CreateEventoData) {
   const session = await getSession();
   if (!session || !session.id)
     return { success: false, message: "Não autorizado." };
-
-  if (!data.itemId || !data.quantidade || data.quantidade <= 0) {
-    return { success: false, message: "Dados inválidos." };
-  }
-
   try {
-    // Busca o item garantindo que ele é da mesma loja
-    const item = await prisma.item.findUnique({
-      where: { id: data.itemId },
-    });
-
-    if (!item || item.ownerId !== session.ownerId) {
+    const item = await prisma.item.findUnique({ where: { id: data.itemId } });
+    if (!item || item.ownerId !== session.ownerId)
       return { success: false, message: "Item não encontrado." };
-    }
 
-    // UPLOAD DAS FOTOS
     const uploadedUrls: string[] = [];
-    if (data.fotos && data.fotos.length > 0) {
-      for (const fotoBase64 of data.fotos) {
-        if (fotoBase64.startsWith("http")) {
-          uploadedUrls.push(fotoBase64);
-        } else {
-          const url = await uploadToR2(fotoBase64);
-          if (url) uploadedUrls.push(url);
-        }
+    if (data.fotos) {
+      for (const foto of data.fotos) {
+        const url = foto.startsWith("http") ? foto : await uploadToR2(foto);
+        if (url) uploadedUrls.push(url);
       }
     }
 
-    const dataDoEvento = data.dataPersonalizada || new Date();
-
     await prisma.evento.create({
       data: {
-        dataHora: dataDoEvento,
+        dataHora: data.dataPersonalizada || new Date(),
         motivo: data.motivo,
         status: "rascunho",
         quantidade: data.quantidade,
@@ -140,44 +116,30 @@ export async function createEvento(data: CreateEventoData) {
         precoVendaSnapshot: item.precoVenda,
         itemId: item.id,
         criadoPorId: session.id,
-        ownerId: session.ownerId, // NOVO: Amarra o evento à loja
+        ownerId: session.ownerId,
         evidencias: {
           create: uploadedUrls.map((url) => ({
-            url: url,
+            url,
             userId: session.id,
             motivo: data.motivo,
-            ownerId: session.ownerId, // NOVO: Amarra a foto enviada à loja
+            ownerId: session.ownerId,
           })),
         },
       },
     });
-
     revalidatePath("/eventos");
-    revalidatePath("/dashboard");
     return { success: true };
   } catch (error) {
-    console.error("Erro ao registrar perda:", error);
     return { success: false, message: "Erro ao salvar evento." };
   }
 }
 
-// 3. Status
 export async function updateEventoStatus(id: string, novoStatus: EventoStatus) {
   const session = await getSession();
   if (!session) return { success: false, message: "Não autorizado" };
-
   try {
-    // NOVO: Verifica se o evento pertence à loja antes de atualizar
-    const evento = await prisma.evento.findUnique({ where: { id } });
-    if (!evento || evento.ownerId !== session.ownerId) {
-      return {
-        success: false,
-        message: "Evento não encontrado ou sem permissão.",
-      };
-    }
-
     await prisma.evento.update({
-      where: { id },
+      where: { id, ownerId: session.ownerId },
       data: {
         status: novoStatus,
         aprovadoPorId: ["aprovado", "rejeitado"].includes(novoStatus)
@@ -188,34 +150,23 @@ export async function updateEventoStatus(id: string, novoStatus: EventoStatus) {
     revalidatePath("/eventos");
     return { success: true };
   } catch (error) {
-    return { success: false, message: "Erro ao atualizar status." };
+    return { success: false, message: "Erro ao atualizar." };
   }
 }
 
-// 4. Delete
 export async function deleteEvento(id: string) {
   const session = await getSession();
   if (!session) return { success: false, message: "Não autorizado" };
-
   try {
-    // NOVO: Verifica se o evento pertence à loja antes de deletar
-    const evento = await prisma.evento.findUnique({ where: { id } });
-    if (!evento || evento.ownerId !== session.ownerId) {
-      return {
-        success: false,
-        message: "Evento não encontrado ou sem permissão.",
-      };
-    }
-
-    await prisma.evento.delete({ where: { id } });
+    await prisma.evento.delete({ where: { id, ownerId: session.ownerId } });
     revalidatePath("/eventos");
     return { success: true };
   } catch (error) {
-    return { success: false, message: "Erro ao excluir evento." };
+    return { success: false, message: "Erro ao excluir." };
   }
 }
 
-// 5. Buscar Nota do Lote (COM ASSINATURA DE URL)
+// 5. Buscar Nota do Lote (ATUALIZADO: Detecta Expiração)
 export async function getNotaDoLote(dataString: string) {
   const session = await getSession();
   if (!session) return { success: false, message: "Não autorizado" };
@@ -224,72 +175,45 @@ export async function getNotaDoLote(dataString: string) {
     const start = new Date(`${dataString}T00:00:00.000Z`);
     const end = new Date(`${dataString}T23:59:59.999Z`);
 
-    // Busca nota onde dataReferencia bate com o dia (E É DA MESMA LOJA)
-    let nota = await prisma.notaFiscal.findFirst({
+    const nota = await prisma.notaFiscal.findFirst({
       where: {
-        ownerId: session.ownerId, // NOVO: Garante que não puxe nota de outra loja
-        dataReferencia: {
-          gte: start,
-          lte: end,
-        },
+        ownerId: session.ownerId,
+        OR: [
+          { dataReferencia: { gte: start, lte: end } },
+          { dataEmissao: { gte: start, lte: end }, dataReferencia: null },
+        ],
       },
-      select: {
-        pdfUrl: true,
-        xmlUrl: true,
-        numero: true,
-        xmlContent: true,
-      },
+      select: { pdfUrl: true, xmlUrl: true, numero: true, xmlContent: true },
       orderBy: { dataUpload: "desc" },
     });
 
-    // Fallback: Tenta buscar por dataEmissao
-    if (!nota) {
-      nota = await prisma.notaFiscal.findFirst({
-        where: {
-          ownerId: session.ownerId, // NOVO: Garante que não puxe nota de outra loja
-          dataEmissao: {
-            gte: start,
-            lte: end,
-          },
-          dataReferencia: null,
-        },
-        select: {
-          pdfUrl: true,
-          xmlUrl: true,
-          numero: true,
-          xmlContent: true,
-        },
-        orderBy: { dataUpload: "desc" },
-      });
-    }
-
-    if (!nota) {
+    if (!nota)
       return {
         success: false,
-        message: "Nenhuma nota fiscal encontrada para esta data.",
+        message: "Nenhuma nota fiscal vinculada a este dia.",
+      };
+
+    // NOVO: Se o registro existe mas os arquivos foram apagados pelo Cron
+    if (!nota.pdfUrl && !nota.xmlUrl && !nota.xmlContent) {
+      return {
+        success: false,
+        isExpired: true, // Flag para o front-end
+        message: `Nota Fiscal Nº ${nota.numero} expirou e o documento foi removido.`,
       };
     }
 
     let finalUrl = nota.pdfUrl || nota.xmlUrl;
 
-    // --- GERAR URL ASSINADA SE FOR LINK DO R2 ---
     if (finalUrl && finalUrl.startsWith("http")) {
       const fileKey = getKeyFromUrl(finalUrl);
       if (fileKey && process.env.R2_BUCKET_NAME) {
-        try {
-          const command = new GetObjectCommand({
-            Bucket: process.env.R2_BUCKET_NAME,
-            Key: fileKey,
-          });
-          // Gera URL válida por 1 hora (3600 segundos)
-          finalUrl = await getSignedUrl(r2, command, { expiresIn: 3600 });
-        } catch (signError) {
-          console.error("Erro ao assinar URL:", signError);
-          // Se falhar a assinatura, tenta retornar a URL original como fallback
-        }
+        const command = new GetObjectCommand({
+          Bucket: process.env.R2_BUCKET_NAME,
+          Key: fileKey,
+        });
+        finalUrl = await getSignedUrl(r2, command, { expiresIn: 3600 });
       }
     } else if (nota.xmlContent) {
-      // Se for conteúdo XML texto
       finalUrl = `data:text/xml;base64,${Buffer.from(nota.xmlContent).toString("base64")}`;
     }
 
@@ -302,7 +226,6 @@ export async function getNotaDoLote(dataString: string) {
       type: nota.pdfUrl ? "pdf" : "xml",
     };
   } catch (error) {
-    console.error("Erro ao buscar nota do lote:", error);
     return { success: false, message: "Erro ao buscar nota fiscal." };
   }
 }
