@@ -1,0 +1,160 @@
+// app/actions/dashboard.ts
+"use server";
+
+import { prisma } from "@/lib/prisma";
+
+export async function getDashboardStats() {
+  try {
+    const hoje = new Date();
+    const inicioHoje = new Date(hoje.setHours(0, 0, 0, 0));
+
+    const inicioSemana = new Date(hoje);
+    inicioSemana.setDate(hoje.getDate() - 7);
+
+    // O mês atual
+    const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+
+    // Pegamos a menor data (semana ou mês) para buscar todos os eventos de uma vez
+    const dataMinima = inicioSemana < inicioMes ? inicioSemana : inicioMes;
+
+    // Busca no banco SOMENTE os campos que importam para os cálculos,
+    // e apenas do período necessário, ignorando rascunhos e rejeitados.
+    const eventos = await prisma.evento.findMany({
+      where: {
+        dataHora: {
+          gte: dataMinima,
+        },
+        status: {
+          notIn: ["rascunho", "rejeitado"],
+        },
+      },
+      select: {
+        dataHora: true,
+        quantidade: true,
+        custoSnapshot: true,
+        precoVendaSnapshot: true,
+        item: {
+          select: {
+            id: true,
+            nome: true,
+            codigoInterno: true,
+            imagemUrl: true,
+            categoria: {
+              select: {
+                nome: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // --- CÁLCULOS NO SERVIDOR ---
+    const perdasHoje = { qtd: 0, custo: 0 };
+    const perdasSemana = { qtd: 0, custo: 0 };
+    const perdasMes = { qtd: 0, custo: 0, venda: 0 };
+
+    const perdasPorCatMap: Record<string, number> = {};
+    const topItensMap: Record<
+      string,
+      { item: any; qtd: number; custo: number }
+    > = {};
+    const tendenciaMap: Record<string, { custo: number; venda: number }> = {};
+
+    // Inicializa últimos 7 dias para o gráfico
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const diaKey = d.toLocaleDateString("pt-BR", { weekday: "short" });
+      tendenciaMap[diaKey] = { custo: 0, venda: 0 };
+    }
+
+    // Processa os eventos
+    eventos.forEach((ev) => {
+      const dataEv = new Date(ev.dataHora);
+      const quantidade = Number(ev.quantidade) || 0;
+      const custoSnapshot = Number(ev.custoSnapshot) || 0;
+      const precoVendaSnapshot = Number(ev.precoVendaSnapshot) || 0;
+
+      const custoTotal = custoSnapshot * quantidade;
+      const vendaTotal = precoVendaSnapshot * quantidade;
+
+      if (dataEv >= inicioHoje) {
+        perdasHoje.qtd += 1;
+        perdasHoje.custo += custoTotal;
+      }
+      if (dataEv >= inicioSemana) {
+        perdasSemana.qtd += 1;
+        perdasSemana.custo += custoTotal;
+
+        const diffDays = Math.floor(
+          (new Date().getTime() - dataEv.getTime()) / (1000 * 3600 * 24),
+        );
+        if (diffDays <= 7) {
+          const diaKey = dataEv.toLocaleDateString("pt-BR", {
+            weekday: "short",
+          });
+          if (tendenciaMap[diaKey]) {
+            tendenciaMap[diaKey].custo += custoTotal;
+            tendenciaMap[diaKey].venda += vendaTotal;
+          }
+        }
+      }
+      if (dataEv >= inicioMes) {
+        perdasMes.qtd += 1;
+        perdasMes.custo += custoTotal;
+        perdasMes.venda += vendaTotal;
+
+        const cat = ev.item?.categoria?.nome || "Sem Categoria";
+        perdasPorCatMap[cat] = (perdasPorCatMap[cat] || 0) + custoTotal;
+
+        if (ev.item) {
+          if (!topItensMap[ev.item.id]) {
+            topItensMap[ev.item.id] = { item: ev.item, qtd: 0, custo: 0 };
+          }
+          topItensMap[ev.item.id].qtd += quantidade;
+          topItensMap[ev.item.id].custo += custoTotal;
+        }
+      }
+    });
+
+    // Formatações finais para os componentes
+    const perdasPorCategoria = Object.entries(perdasPorCatMap)
+      .map(([cat, val]) => ({ categoria: cat, custo: val }))
+      .sort((a, b) => b.custo - a.custo)
+      .slice(0, 5);
+
+    const topItensList = Object.values(topItensMap)
+      .sort((a, b) => b.custo - a.custo)
+      .slice(0, 5);
+
+    const maxCusto = Math.max(...topItensList.map((item) => item.custo), 1);
+    const topItens = topItensList.map((item) => ({
+      ...item,
+      percentual: (item.custo / maxCusto) * 100,
+    }));
+
+    const tendenciaSemanal = Object.entries(tendenciaMap).map(
+      ([dia, vals]) => ({
+        dia,
+        ...vals,
+      }),
+    );
+
+    // Devolvemos apenas os totais enxutos
+    return {
+      success: true,
+      data: {
+        perdasHoje,
+        perdasSemana,
+        perdasMes,
+        perdasPorCategoria,
+        topItens,
+        tendenciaSemanal,
+      },
+    };
+  } catch (error) {
+    console.error("Erro ao gerar as estatísticas do dashboard:", error);
+    return { success: false, error: "Falha ao calcular dados do dashboard." };
+  }
+}
