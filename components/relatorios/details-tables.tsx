@@ -1,3 +1,4 @@
+// components/relatorios/details-tables.tsx
 "use client";
 
 import {
@@ -7,17 +8,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Package } from "lucide-react";
-import { formatCurrency, formatQuantity } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
+import { Package, AlertTriangle } from "lucide-react";
 
 interface DetailsTablesProps {
   topItens: any[];
@@ -26,107 +19,129 @@ interface DetailsTablesProps {
 
 export function DetailsTables({ topItens, topMotivos }: DetailsTablesProps) {
   return (
-    <div className="space-y-6">
-      {/* Tabela de Itens */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Top Itens com Maior Perda</CardTitle>
-          <CardDescription>Ranking de itens por custo de perda</CardDescription>
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6 mt-6">
+      {/* Top Itens */}
+      <Card className="flex flex-col shadow-sm">
+        <CardHeader className="px-4 md:px-6">
+          <CardTitle className="text-lg md:text-xl flex items-center gap-2">
+            <Package className="h-5 w-5 text-muted-foreground" />
+            Top 10 Itens com Maior Perda
+          </CardTitle>
+          <CardDescription>
+            Itens que mais geraram prejuízo financeiro no período
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-10">#</TableHead>
-                <TableHead>Item</TableHead>
-                <TableHead className="hidden sm:table-cell">
-                  Categoria
-                </TableHead>
-                <TableHead className="text-right">Qtd</TableHead>
-                <TableHead className="text-right">Custo Total</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {topItens.map((entry, index) => (
-                <TableRow key={entry.item.id}>
-                  <TableCell className="font-medium">{index + 1}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      {entry.item.imagemUrl ? (
-                        <img
-                          src={entry.item.imagemUrl}
-                          alt={entry.item.nome}
-                          className="h-8 w-8 rounded object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-8 w-8 items-center justify-center rounded bg-muted">
-                          <Package className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      )}
-                      <div>
-                        <p className="font-medium text-sm">{entry.item.nome}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {entry.item.codigoInterno}
-                        </p>
-                      </div>
+        <CardContent className="px-4 md:px-6 flex-1">
+          {topItens.length === 0 ? (
+            <div className="py-8 text-center text-sm text-muted-foreground border border-dashed rounded-lg">
+              Nenhum dado no período selecionado.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {topItens.map((d, i) => (
+                <div
+                  key={d.item.id}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-lg border bg-muted/20 gap-3"
+                >
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary font-bold text-xs">
+                      {i + 1}º
                     </div>
-                  </TableCell>
-                  <TableCell className="hidden sm:table-cell">
-                    <Badge variant="outline">{entry.item.categoria}</Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {formatQuantity(entry.qtd)}{" "}
-                    <span className="text-[10px] text-muted-foreground">
-                      {entry.item.unidade}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right font-medium">
-                    {formatCurrency(entry.custo)}
-                  </TableCell>
-                </TableRow>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm truncate">
+                        {d.item.nome}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {d.item.codigoInterno} •{" "}
+                        {d.item.categoria?.nome || d.item.categoria}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-1 shrink-0">
+                    <div className="text-sm font-bold text-destructive">
+                      {formatCurrency(d.custo)}
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] font-normal h-5"
+                    >
+                      {Number(d.qtd).toLocaleString("pt-BR", {
+                        maximumFractionDigits: 3,
+                      })}{" "}
+                      {d.item.unidade}
+                    </Badge>
+                  </div>
+                </div>
               ))}
-            </TableBody>
-          </Table>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Tabela de Motivos */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Perdas por Motivo</CardTitle>
+      {/* Top Motivos */}
+      <Card className="flex flex-col shadow-sm">
+        <CardHeader className="px-4 md:px-6">
+          <CardTitle className="text-lg md:text-xl flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 text-muted-foreground" />
+            Principais Motivos
+          </CardTitle>
+          <CardDescription>
+            Causas mais frequentes de perdas financeiras no período
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Motivo</TableHead>
-                <TableHead className="text-right">Qtd</TableHead>
-                <TableHead className="text-right">Custo Total</TableHead>
-                <TableHead className="text-right">% do Total</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {topMotivos.map((item) => {
-                const total = topMotivos.reduce((acc, i) => acc + i.custo, 0);
-                const percent =
-                  total > 0 ? ((item.custo / total) * 100).toFixed(1) : "0.0";
-                return (
-                  <TableRow key={item.motivo}>
-                    <TableCell className="font-medium">{item.motivo}</TableCell>
-                    <TableCell className="text-right">
-                      {formatQuantity(item.quantidade)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {formatCurrency(item.custo)}
-                    </TableCell>
-                    <TableCell className="text-right text-muted-foreground">
-                      {percent}%
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+        <CardContent className="px-4 md:px-6 flex-1">
+          {topMotivos.length === 0 ? (
+            <div className="py-8 text-center text-sm text-muted-foreground border border-dashed rounded-lg">
+              Nenhum dado no período selecionado.
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {topMotivos.map((d, i) => (
+                <div
+                  key={d.motivo}
+                  className="p-4 rounded-lg border bg-muted/10 space-y-3"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h4 className="font-semibold text-sm">{d.motivo}</h4>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {Number(d.quantidade).toLocaleString("pt-BR", {
+                          maximumFractionDigits: 3,
+                        })}{" "}
+                        itens afetados
+                      </p>
+                    </div>
+                    <div className="text-sm font-bold whitespace-nowrap">
+                      {formatCurrency(d.custo)}
+                    </div>
+                  </div>
+
+                  {d.topItens && d.topItens.length > 0 && (
+                    <div className="pt-3 border-t border-dashed mt-2">
+                      <p className="text-[10px] uppercase text-muted-foreground mb-2 font-semibold tracking-wider">
+                        Itens mais afetados por este motivo:
+                      </p>
+                      <div className="space-y-2">
+                        {d.topItens.map((sub: any, idx: number) => (
+                          <div
+                            key={idx}
+                            className="flex justify-between items-center text-xs"
+                          >
+                            <span className="truncate pr-2 text-muted-foreground flex-1">
+                              • {sub.nome}
+                            </span>
+                            <span className="font-medium shrink-0">
+                              {formatCurrency(sub.custo)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -1,3 +1,4 @@
+// componentes/eventos/evento-card.tsx
 "use client";
 
 import { useState } from "react";

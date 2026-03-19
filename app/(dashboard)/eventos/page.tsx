@@ -297,7 +297,8 @@ export default function EventosPage() {
 
     return (
       <div
-        className={`flex flex-col h-[calc(100vh-2rem)] space-y-4 ${hideScrollClass}`}
+        // Adicionado "overflow-hidden" aqui na raiz para segurar o layout na tela
+        className={`flex flex-col h-[calc(100vh-2rem)] space-y-4 overflow-hidden ${hideScrollClass}`}
       >
         <div className="flex items-center justify-between shrink-0">
           <div className="flex items-center gap-4">
@@ -327,12 +328,20 @@ export default function EventosPage() {
           </div>
         </div>
 
-        <EventosTable
-          data={eventosDoLote}
-          onStatusChange={handleStatusChange}
-          onDelete={setEventoToDelete}
-          onViewDetails={(ev) => console.log("Detalhes", ev)}
-        />
+        {/* --- CORREÇÃO AQUI: Wrapper flexível com rolagem (Scroll) --- */}
+        <div className="flex-1 min-h-0 border rounded-md bg-card relative overflow-hidden shadow-sm">
+          <div
+            className={`absolute inset-0 overflow-y-auto p-2 ${hideScrollClass}`}
+          >
+            <EventosTable
+              data={eventosDoLote}
+              onStatusChange={handleStatusChange}
+              onDelete={setEventoToDelete}
+              onViewDetails={(ev) => console.log("Detalhes", ev)}
+            />
+          </div>
+        </div>
+        {/* --- FIM DA CORREÇÃO --- */}
 
         <PaginationControls
           currentPage={currentPage}

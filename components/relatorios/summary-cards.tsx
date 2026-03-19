@@ -1,167 +1,80 @@
-"use client";
-
-import { useState, useEffect } from "react";
+// components/relatorios/summary-cards.tsx
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  DollarSign,
-  TrendingDown,
-  Package,
-  BarChart3,
-  LucideIcon,
-} from "lucide-react";
-import { formatCurrency, formatQuantity } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
+import { TrendingDown, AlertCircle, Package, Activity } from "lucide-react";
 
-interface SummaryData {
-  totalCusto: number;
-  totalVenda: number;
-  totalQtd: number;
-  mediaQtdDia: number;
-  margemPerda: string;
-}
-
-interface SummaryCardsProps {
-  summary: SummaryData;
-}
-
-export function SummaryCards({ summary }: SummaryCardsProps) {
-  const [activeCardIndex, setActiveCardIndex] = useState(0);
-
-  const cardsData = [
-    {
-      title: "Total Perdas (Custo)",
-      icon: DollarSign,
-      mainValue: formatCurrency(summary.totalCusto),
-      subText: "no período selecionado",
-      iconColor: "text-muted-foreground",
-      valueColor: "text-foreground",
-      borderColor: "border-primary/20",
-    },
-    {
-      title: "Perda em Venda",
-      icon: TrendingDown,
-      mainValue: formatCurrency(summary.totalVenda),
-      subText: "receita não realizada",
-      iconColor: "text-destructive",
-      valueColor: "text-destructive",
-      borderColor: "border-destructive/20",
-    },
-    {
-      title: "Total de Eventos",
-      icon: Package,
-      mainValue: formatQuantity(summary.totalQtd),
-      subText: `~${formatQuantity(summary.mediaQtdDia)} eventos/dia`,
-      iconColor: "text-muted-foreground",
-      valueColor: "text-foreground",
-      borderColor: "border-blue-500/20",
-    },
-    {
-      title: "Margem de Perda",
-      icon: BarChart3,
-      mainValue: `${summary.margemPerda}%`,
-      subText: "diferença custo vs. venda",
-      iconColor: "text-muted-foreground",
-      valueColor: "text-foreground",
-      borderColor: "border-emerald-500/20",
-    },
-  ];
-
-  // Rotação automática Mobile
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setActiveCardIndex((prev) => (prev + 1) % cardsData.length);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, [cardsData.length]);
-
+export function SummaryCards({ summary }: { summary: any }) {
   return (
-    <>
-      {/* MOBILE: STACKED DECK */}
-      <div className="block md:hidden py-4 px-2">
-        <div
-          className="relative w-full h-40"
-          onClick={() => setActiveCardIndex((prev) => (prev + 1) % 4)}
-        >
-          {cardsData.map((card, index) => {
-            const position = (index - activeCardIndex + 4) % 4;
-            let zIndex = 0,
-              scale = 1,
-              translateX = 0,
-              opacity = 1;
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <Card className="shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            Custo Total de Perda
+          </CardTitle>
+          <TrendingDown className="h-4 w-4 text-destructive" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">
+            {formatCurrency(summary.totalCusto)}
+          </div>
+        </CardContent>
+      </Card>
 
-            if (position === 0) {
-              zIndex = 30;
-              scale = 1;
-              translateX = 0;
-              opacity = 1;
-            } else if (position === 1) {
-              zIndex = 20;
-              scale = 0.95;
-              translateX = 12;
-              opacity = 0.9;
-            } else if (position === 2) {
-              zIndex = 10;
-              scale = 0.9;
-              translateX = 24;
-              opacity = 0.7;
-            } else {
-              zIndex = 0;
-              scale = 0.85;
-              translateX = 0;
-              opacity = 0;
-            }
+      <Card className="shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            Perda em Vendas
+          </CardTitle>
+          <AlertCircle className="h-4 w-4 text-orange-500" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold text-orange-600">
+            {formatCurrency(summary.totalVenda)}
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Margem de{" "}
+            {Number(summary.margemPerda).toLocaleString("pt-BR", {
+              maximumFractionDigits: 1,
+            })}
+            %
+          </p>
+        </CardContent>
+      </Card>
 
-            return (
-              <Card
-                key={index}
-                className="absolute inset-0 transition-all duration-500 ease-in-out cursor-pointer shadow-lg border bg-card"
-                style={{
-                  zIndex,
-                  transform: `translateX(${translateX}px) scale(${scale})`,
-                  opacity,
-                }}
-              >
-                <CardHeader className="flex flex-row items-center justify-between pb-2 pl-6">
-                  <CardTitle className="text-sm font-medium">
-                    {card.title}
-                  </CardTitle>
-                  <card.icon className={`h-4 w-4 ${card.iconColor}`} />
-                </CardHeader>
-                <CardContent className="pl-6">
-                  <div className={`text-3xl font-bold ${card.valueColor}`}>
-                    {card.mainValue}
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {card.subText}
-                  </p>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-        <p className="text-[10px] text-center text-muted-foreground mt-2 opacity-50">
-          Toque para ver o próximo
-        </p>
-      </div>
+      <Card className="shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            Total de Itens
+          </CardTitle>
+          <Package className="h-4 w-4 text-blue-500" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">
+            {Number(summary.totalQtd).toLocaleString("pt-BR", {
+              maximumFractionDigits: 3,
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
-      {/* DESKTOP: GRID */}
-      <div className="hidden md:grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {cardsData.map((card, index) => (
-          <Card key={index} className={`border-l-4 ${card.borderColor}`}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">
-                {card.title}
-              </CardTitle>
-              <card.icon className={`h-4 w-4 ${card.iconColor}`} />
-            </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${card.valueColor}`}>
-                {card.mainValue}
-              </div>
-              <p className="text-xs text-muted-foreground">{card.subText}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </>
+      <Card className="shadow-sm">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            Média Diária
+          </CardTitle>
+          <Activity className="h-4 w-4 text-green-500" />
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">
+            {Number(summary.mediaQtdDia).toLocaleString("pt-BR", {
+              maximumFractionDigits: 3,
+            })}
+          </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            itens / dia no período
+          </p>
+        </CardContent>
+      </Card>
+    </div>
   );
 }

@@ -1,3 +1,4 @@
+// components/relatorios/charts-overview.tsx
 "use client";
 
 import {
@@ -8,193 +9,206 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
-import {
-  LineChart,
-  Line,
-  BarChart,
   Bar,
+  BarChart,
   CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  ResponsiveContainer,
+  ComposedChart,
 } from "recharts";
-import { formatCurrency, formatQuantity } from "@/lib/utils";
-
-// CORREÇÃO: Removido o 'hsl()' que estava causando a cor preta
-const chartConfig = {
-  custo: { label: "Custo", color: "var(--chart-1)" },
-  precoVenda: { label: "Preço Venda", color: "var(--chart-2)" },
-  quantidade: { label: "Quantidade", color: "var(--chart-3)" },
-};
+import { formatCurrency } from "@/lib/utils";
 
 interface ChartsOverviewProps {
   monthlyData: any[];
   perdasPorDiaSemana: any[];
+  isDiario: boolean;
 }
 
 export function ChartsOverview({
   monthlyData,
   perdasPorDiaSemana,
+  isDiario,
 }: ChartsOverviewProps) {
   return (
-    <div className="space-y-6">
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Gráfico de Linha (Mensal) */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Tendência Mensal</CardTitle>
-            <CardDescription>
-              Evolução de perdas nos últimos 6 meses
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {/* ChartContainer DEVE envolver o gráfico e ter altura fixa */}
-            <ChartContainer config={chartConfig} className="h-80 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={monthlyData}
-                  margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    className="stroke-border"
-                    vertical={false}
-                  />
-                  <XAxis
-                    dataKey="mes"
-                    className="text-xs"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                  />
-                  <YAxis
-                    className="text-xs"
-                    tickFormatter={(v) => `R$${v}`}
-                    width={40}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Line
-                    type="monotone"
-                    dataKey="custo"
-                    stroke="var(--color-custo)"
-                    strokeWidth={2}
-                    dot={{ fill: "var(--color-custo)", r: 4 }}
-                    activeDot={{ r: 6 }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="venda"
-                    stroke="var(--color-precoVenda)"
-                    strokeWidth={2}
-                    dot={{ fill: "var(--color-precoVenda)", r: 4 }}
-                    activeDot={{ r: 6 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-
-        {/* Gráfico de Barras (Dias Semana) */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Perdas por Dia da Semana</CardTitle>
-            <CardDescription>
-              Identificar dias com maior incidência
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <ChartContainer config={chartConfig} className="h-80 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={perdasPorDiaSemana}
-                  margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
-                >
-                  <CartesianGrid
-                    strokeDasharray="3 3"
-                    className="stroke-border"
-                    vertical={false}
-                  />
-                  <XAxis
-                    dataKey="dia"
-                    className="text-xs"
-                    tickLine={false}
-                    axisLine={false}
-                    tickMargin={8}
-                  />
-                  <YAxis
-                    className="text-xs"
-                    tickLine={false}
-                    axisLine={false}
-                    width={30}
-                  />
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                  <Bar
-                    dataKey="quantidade"
-                    fill="var(--color-quantidade)"
-                    radius={[4, 4, 0, 0]}
-                    barSize={40}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </ChartContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Tabela Resumo */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Resumo do Período</CardTitle>
-          <CardDescription>Detalhamento mensal</CardDescription>
+    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6">
+      {/* Gráfico de Evolução (Linha/Barra) */}
+      <Card className="flex flex-col shadow-sm">
+        <CardHeader className="px-4 md:px-6">
+          <CardTitle className="text-lg md:text-xl">
+            Evolução no Período
+          </CardTitle>
+          <CardDescription>
+            {isDiario
+              ? "Acompanhamento diário das perdas registradas"
+              : "Acompanhamento mensal das perdas registradas"}
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Mês</TableHead>
-                <TableHead className="text-right">Qtd</TableHead>
-                <TableHead className="text-right">Custo</TableHead>
-                <TableHead className="text-right hidden sm:table-cell">
-                  Preço Venda
-                </TableHead>
-                <TableHead className="text-right">Diferença</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {monthlyData.map((row) => (
-                <TableRow key={row.mes}>
-                  <TableCell className="font-medium">{row.mes}</TableCell>
-                  <TableCell className="text-right">
-                    {formatQuantity(row.qtd)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {formatCurrency(row.custo)}
-                  </TableCell>
-                  <TableCell className="text-right hidden sm:table-cell">
-                    {formatCurrency(row.venda)}
-                  </TableCell>
-                  <TableCell className="text-right text-destructive font-medium">
-                    {formatCurrency(row.venda - row.custo)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <CardContent className="flex-1 px-2 md:px-6 pb-4">
+          {/* CORREÇÃO AQUI: Altura definida para 300px */}
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart
+                data={monthlyData}
+                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  className="stroke-muted"
+                />
+                <XAxis
+                  dataKey="mes"
+                  tickLine={false}
+                  axisLine={false}
+                  className="text-xs text-muted-foreground"
+                  tickMargin={10}
+                />
+                <YAxis
+                  yAxisId="left"
+                  tickLine={false}
+                  axisLine={false}
+                  className="text-xs text-muted-foreground"
+                  tickFormatter={(value) => `R$${value}`}
+                />
+                <Tooltip
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div className="rounded-lg border bg-background p-3 shadow-md">
+                          <p className="mb-2 font-medium">{label}</p>
+                          {payload.map((entry, index) => (
+                            <div
+                              key={index}
+                              className="flex items-center gap-2 text-sm"
+                            >
+                              <div
+                                className="h-2 w-2 rounded-full"
+                                style={{ backgroundColor: entry.color }}
+                              />
+                              <span className="text-muted-foreground">
+                                {entry.name}:
+                              </span>
+                              <span className="font-medium">
+                                {entry.name === "Qtd. Itens"
+                                  ? Number(entry.value).toLocaleString(
+                                      "pt-BR",
+                                      { maximumFractionDigits: 3 },
+                                    )
+                                  : formatCurrency(entry.value as number)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Legend
+                  wrapperStyle={{ fontSize: "12px", paddingTop: "10px" }}
+                />
+                <Bar
+                  yAxisId="left"
+                  dataKey="custo"
+                  name="Custo de Perda"
+                  fill="#ef4444"
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={40}
+                />
+                <Bar
+                  yAxisId="left"
+                  dataKey="venda"
+                  name="Perda em Venda"
+                  fill="#f97316"
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={40}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Gráfico de Dia da Semana */}
+      <Card className="flex flex-col shadow-sm">
+        <CardHeader className="px-4 md:px-6">
+          <CardTitle className="text-lg md:text-xl">
+            Perdas por Dia da Semana
+          </CardTitle>
+          <CardDescription>
+            Distribuição de custo nos dias do período filtrado
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex-1 px-2 md:px-6 pb-4">
+          {/* CORREÇÃO AQUI: Altura definida para 300px */}
+          <div className="h-[300px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={perdasPorDiaSemana}
+                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  className="stroke-muted"
+                />
+                <XAxis
+                  dataKey="dia"
+                  tickLine={false}
+                  axisLine={false}
+                  className="text-[10px] md:text-xs text-muted-foreground"
+                  tickMargin={10}
+                />
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  className="text-xs text-muted-foreground"
+                  tickFormatter={(value) => `R$${value}`}
+                />
+                <Tooltip
+                  cursor={{ fill: "transparent" }}
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div className="rounded-lg border bg-background p-3 shadow-md">
+                          <p className="mb-2 font-medium">{label}</p>
+                          <div className="flex flex-col gap-1 text-sm">
+                            <span className="text-muted-foreground">
+                              Custo Total:{" "}
+                              <span className="font-medium text-foreground">
+                                {formatCurrency(payload[0].value as number)}
+                              </span>
+                            </span>
+                            <span className="text-muted-foreground">
+                              Quantidade:{" "}
+                              <span className="font-medium text-foreground">
+                                {Number(
+                                  payload[0].payload.quantidade,
+                                ).toLocaleString("pt-BR", {
+                                  maximumFractionDigits: 3,
+                                })}{" "}
+                                itens
+                              </span>
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Bar
+                  dataKey="custo"
+                  fill="#3b82f6"
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={50}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </CardContent>
       </Card>
     </div>

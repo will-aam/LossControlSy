@@ -1,6 +1,7 @@
+// lib/pdf-generator.ts
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { formatCurrency, formatDate, formatQuantity } from "./utils";
+import { formatCurrency, formatDate } from "./utils";
 import { Evento } from "./types";
 
 // --- TIPOS ---
@@ -18,47 +19,46 @@ interface ReportData {
 
 // --- CONFIGURAÇÕES VISUAIS (THEME) ---
 const COLORS = {
-  primary: [79, 70, 229] as [number, number, number], // Indigo-600
-  secondary: [100, 116, 139] as [number, number, number], // Slate-500
-  background: [248, 250, 252] as [number, number, number], // Slate-50
+  primary: [79, 70, 229] as [number, number, number],
+  secondary: [100, 116, 139] as [number, number, number],
+  background: [248, 250, 252] as [number, number, number],
   white: [255, 255, 255] as [number, number, number],
-  black: [15, 23, 42] as [number, number, number], // Slate-900
-  danger: [220, 38, 38] as [number, number, number], // Red-600
-  success: [22, 163, 74] as [number, number, number], // Green-600
-  border: [226, 232, 240] as [number, number, number], // Slate-200
+  black: [15, 23, 42] as [number, number, number],
+  danger: [220, 38, 38] as [number, number, number],
+  success: [22, 163, 74] as [number, number, number],
+  border: [226, 232, 240] as [number, number, number],
 };
 
-const COMPANY_NAME = "Loss Control System";
+const COMPANY_NAME = "Jardins Delicatessen";
 const FOOTER_TEXT = "Relatório gerado automaticamente pelo sistema.";
 
-// --- HELPERS VISUAIS ---
+// --- HELPERS DE FORMATAÇÃO ---
+const formatQuantityPDF = (value: number) => {
+  return value.toLocaleString("pt-BR", { maximumFractionDigits: 3 });
+};
 
+// --- HELPERS VISUAIS ---
 const addModernHeader = (doc: jsPDF, title: string, subtitle?: string) => {
   const pageWidth = doc.internal.pageSize.width;
 
-  // 1. Faixa Superior (Banner)
   doc.setFillColor(...COLORS.primary);
   doc.rect(0, 0, pageWidth, 35, "F");
 
-  // 2. Nome da Empresa (Banner)
   doc.setTextColor(...COLORS.white);
   doc.setFontSize(18);
   doc.setFont("helvetica", "bold");
   doc.text(COMPANY_NAME, 14, 15);
 
-  // 3. Data de Emissão (Banner)
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
   const dataEmissao = `Emissão: ${new Date().toLocaleDateString("pt-BR")} às ${new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}`;
   doc.text(dataEmissao, pageWidth - 14, 15, { align: "right" });
 
-  // 4. Título do Relatório (Abaixo do banner)
   doc.setTextColor(...COLORS.black);
   doc.setFontSize(16);
   doc.setFont("helvetica", "bold");
   doc.text(title, 14, 45);
 
-  // 5. Subtítulo
   if (subtitle) {
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
@@ -74,51 +74,58 @@ const drawKpiCard = (
   width: number,
   label: string,
   value: string,
-  iconChar: string = "$",
 ) => {
-  const height = 30;
+  const height = 25;
   const radius = 3;
 
-  // Fundo do card
   doc.setFillColor(...COLORS.white);
   doc.roundedRect(x, y, width, height, radius, radius, "F");
 
-  // Borda sutil
   doc.setDrawColor(...COLORS.border);
   doc.setLineWidth(0.5);
   doc.roundedRect(x, y, width, height, radius, radius, "S");
 
-  // Ícone (círculo colorido)
-  doc.setFillColor(...COLORS.background);
-  doc.circle(x + 10, y + 10, 5, "F");
-  doc.setFontSize(10);
-  doc.setTextColor(...COLORS.primary);
-  doc.text(iconChar, x + 10, y + 12, { align: "center" });
-
-  // Label
   doc.setFontSize(8);
   doc.setTextColor(...COLORS.secondary);
-  doc.text(label, x + 20, y + 10);
+  doc.setFont("helvetica", "normal");
+  doc.text(label, x + width / 2, y + 9, { align: "center" });
 
-  // Value
-  doc.setFontSize(14);
   doc.setTextColor(...COLORS.black);
   doc.setFont("helvetica", "bold");
-  doc.text(value, x + 20, y + 22);
 
+  let fontSize = 13;
+  doc.setFontSize(fontSize);
+  let textWidth = doc.getTextWidth(value);
+  const maxWidth = width - 4;
+
+  while (textWidth > maxWidth && fontSize > 9) {
+    fontSize -= 1;
+    doc.setFontSize(fontSize);
+    textWidth = doc.getTextWidth(value);
+  }
+
+  doc.text(value, x + width / 2, y + 19, { align: "center" });
   return height;
 };
 
-const addFooter = (doc: jsPDF, pageNum: number) => {
+// Melhoria: Adicionado "Total Pages" dinâmico
+const addFooter = (doc: jsPDF, pageNum: number, totalPages: number) => {
   const pageHeight = doc.internal.pageSize.height;
   const pageWidth = doc.internal.pageSize.width;
 
   doc.setFontSize(8);
   doc.setTextColor(...COLORS.secondary);
   doc.text(FOOTER_TEXT, 14, pageHeight - 10);
-  doc.text(`Página ${pageNum}`, pageWidth - 14, pageHeight - 10, {
-    align: "right",
-  });
+
+  // Agora exibe ex: "Página 1 de 3"
+  doc.text(
+    `Página ${pageNum} de ${totalPages}`,
+    pageWidth - 14,
+    pageHeight - 10,
+    {
+      align: "right",
+    },
+  );
 
   doc.setDrawColor(...COLORS.border);
   doc.line(14, pageHeight - 15, pageWidth - 14, pageHeight - 15);
@@ -127,7 +134,6 @@ const addFooter = (doc: jsPDF, pageNum: number) => {
 // --- 1. RELATÓRIO GERENCIAL (DASHBOARD) ---
 export const generateReportPDF = (data: ReportData) => {
   const doc = new jsPDF();
-  let pageNum = 1;
 
   addModernHeader(
     doc,
@@ -135,14 +141,12 @@ export const generateReportPDF = (data: ReportData) => {
     `Período: ${data.periodoTexto}`,
   );
 
-  // --- SEÇÃO 1: KPIs (Cards) ---
   const kpiY = 60;
   const cardWidth = 43;
   const gap = 5;
   const pageWidth = doc.internal.pageSize.width;
   const startX = (pageWidth - (cardWidth * 4 + gap * 3)) / 2;
 
-  // Card 1: Custo Total
   drawKpiCard(
     doc,
     startX,
@@ -150,9 +154,7 @@ export const generateReportPDF = (data: ReportData) => {
     cardWidth,
     "CUSTO TOTAL",
     formatCurrency(data.summary.totalCusto),
-    "C",
   );
-  // Card 2: Perda Venda
   drawKpiCard(
     doc,
     startX + cardWidth + gap,
@@ -160,32 +162,26 @@ export const generateReportPDF = (data: ReportData) => {
     cardWidth,
     "VENDA PERDIDA",
     formatCurrency(data.summary.totalVenda),
-    "V",
   );
-  // Card 3: Ocorrências
   drawKpiCard(
     doc,
     startX + (cardWidth + gap) * 2,
     kpiY,
     cardWidth,
     "OCORRÊNCIAS",
-    formatQuantity(data.summary.totalQtd),
-    "#",
+    formatQuantityPDF(data.summary.totalQtd),
   );
-  // Card 4: Margem
   drawKpiCard(
     doc,
     startX + (cardWidth + gap) * 3,
     kpiY,
     cardWidth,
     "MARGEM",
-    `${data.summary.margemPerda}%`,
-    "%",
+    data.summary.margemPerda,
   );
 
-  let finalY = kpiY + 45;
+  let finalY = kpiY + 35;
 
-  // --- SEÇÃO 2: RANKING DE ITENS ---
   doc.setFontSize(11);
   doc.setTextColor(...COLORS.black);
   doc.setFont("helvetica", "bold");
@@ -195,7 +191,7 @@ export const generateReportPDF = (data: ReportData) => {
     index + 1,
     item.item.codigoInterno || "-",
     item.item.nome,
-    `${formatQuantity(item.qtd)} ${item.item.unidade}`,
+    `${formatQuantityPDF(item.qtd)} ${item.item.unidade}`,
     formatCurrency(item.custo),
     formatCurrency(item.qtd * (item.item.precoVenda || 0)),
   ]);
@@ -221,25 +217,27 @@ export const generateReportPDF = (data: ReportData) => {
       0: { cellWidth: 12, halign: "center", fontStyle: "bold" },
       1: { cellWidth: 25 },
       2: { cellWidth: "auto" },
-      3: { halign: "right" },
-      4: { halign: "right" },
-      5: { halign: "right", textColor: COLORS.danger, fontStyle: "bold" },
+      3: { cellWidth: 25, halign: "right" },
+      4: { cellWidth: 30, halign: "right" },
+      5: {
+        cellWidth: 30,
+        halign: "right",
+        textColor: COLORS.danger,
+        fontStyle: "bold",
+      },
     },
     didParseCell: (data) => {
       if (data.row.index === 0 && data.section === "body") {
-        data.cell.styles.fillColor = [254, 242, 242]; // Fundo vermelho claro
+        data.cell.styles.fillColor = [254, 242, 242];
       }
     },
   });
 
-  // @ts-ignore
-  finalY = doc.lastAutoTable.finalY + 15;
+  // Removido o @ts-ignore usando casting no objeto interno do doc
+  finalY = (doc as any).lastAutoTable.finalY + 15;
 
-  // --- SEÇÃO 3: MOTIVOS ---
-  if (finalY > 230) {
+  if (finalY > 220) {
     doc.addPage();
-    addFooter(doc, pageNum);
-    pageNum++;
     finalY = 20;
   }
 
@@ -249,21 +247,28 @@ export const generateReportPDF = (data: ReportData) => {
   doc.text("Análise por Motivo", 14, finalY);
 
   const motivosData = data.topMotivos.map((m: any) => {
-    let motivoTexto = m.motivo.toUpperCase();
-    if (m.topItens && m.topItens.length > 0) {
-      const itensStr = m.topItens
-        .map(
-          (i: any) => `  • ${i.nome} (${formatQuantity(i.qtd)} ${i.unidade})`,
-        )
-        .join("\n");
-      motivoTexto += `\n${itensStr}`;
-    }
-    return [motivoTexto, formatQuantity(m.quantidade), formatCurrency(m.custo)];
+    const motivoTexto = m.motivo.toUpperCase();
+    const itensStr =
+      m.topItens && m.topItens.length > 0
+        ? m.topItens
+            .map(
+              (i: any) =>
+                `${i.nome} (${formatQuantityPDF(i.qtd)} ${i.unidade})`,
+            )
+            .join("\n")
+        : "-";
+
+    return [
+      motivoTexto,
+      itensStr,
+      formatQuantityPDF(m.quantidade),
+      formatCurrency(m.custo),
+    ];
   });
 
   autoTable(doc, {
     startY: finalY + 4,
-    head: [["MOTIVO / ITENS AFETADOS", "QTD", "IMPACTO"]],
+    head: [["MOTIVO", "ITENS AFETADOS", "QTD", "IMPACTO"]],
     body: motivosData,
     theme: "grid",
     headStyles: {
@@ -275,16 +280,24 @@ export const generateReportPDF = (data: ReportData) => {
       fontSize: 9,
       cellPadding: 4,
       lineColor: COLORS.border,
+      valign: "top",
     },
     columnStyles: {
-      0: { cellWidth: "auto" },
-      1: { halign: "right", cellWidth: 25, valign: "top" },
-      2: { halign: "right", cellWidth: 35, fontStyle: "bold", valign: "top" },
+      0: { cellWidth: 40, fontStyle: "bold" },
+      1: { cellWidth: "auto" },
+      2: { halign: "right", cellWidth: 25 },
+      3: { halign: "right", cellWidth: 35, fontStyle: "bold" },
     },
     alternateRowStyles: { fillColor: COLORS.background },
   });
 
-  addFooter(doc, pageNum);
+  // A MÁGICA DO RODAPÉ AQUI: Roda em todas as páginas criadas no final
+  const totalPages = (doc.internal as any).getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    addFooter(doc, i, totalPages);
+  }
+
   doc.save(`relatorio_gerencial_${new Date().toISOString().split("T")[0]}.pdf`);
 };
 
@@ -294,7 +307,6 @@ export const generateEventPDF = (
   titulo: string = "Relatório de Lote",
 ) => {
   const doc = new jsPDF();
-  let pageNum = 1;
 
   const dataReferencia =
     eventos.length > 0
@@ -319,7 +331,7 @@ export const generateEventPDF = (
       evento.item?.codigoInterno || "-",
       evento.item?.nome || "Item desconhecido",
       evento.motivo || "-",
-      `${formatQuantity(Number(evento.quantidade))} ${evento.unidade}`,
+      `${formatQuantityPDF(Number(evento.quantidade))} ${evento.unidade}`,
       formatCurrency(Number(evento.custoSnapshot)),
       formatCurrency(custoTotal),
     ];
@@ -354,14 +366,10 @@ export const generateEventPDF = (
     alternateRowStyles: { fillColor: COLORS.background },
   });
 
-  // @ts-ignore
-  finalY = doc.lastAutoTable.finalY + 10;
+  finalY = (doc as any).lastAutoTable.finalY + 10;
 
-  // --- TOTALIZADOR ---
   if (finalY > 250) {
     doc.addPage();
-    addFooter(doc, pageNum);
-    pageNum++;
     finalY = 20;
   }
 
@@ -379,14 +387,12 @@ export const generateEventPDF = (
     align: "right",
   });
 
-  // --- ASSINATURAS ---
   const pageHeight = doc.internal.pageSize.height;
   let signY = pageHeight - 50;
 
   if (finalY > signY - 30) {
     doc.addPage();
     signY = 40;
-    pageNum++;
   }
 
   doc.setDrawColor(...COLORS.border);
@@ -400,7 +406,12 @@ export const generateEventPDF = (
   doc.line(120, signY, 190, signY);
   doc.text("Auditoria / Conferência", 155, signY + 5, { align: "center" });
 
-  addFooter(doc, pageNum);
+  // A MÁGICA DO RODAPÉ AQUI TAMBÉM
+  const totalPages = (doc.internal as any).getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    addFooter(doc, i, totalPages);
+  }
 
   const nomeArquivo =
     eventos.length === 1

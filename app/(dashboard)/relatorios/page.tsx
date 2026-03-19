@@ -2,37 +2,51 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { getEventos } from "@/app/actions/eventos";
 import { useAuth } from "@/lib/auth-context";
-import { AlertTriangle, Calendar, Loader2, Download } from "lucide-react";
+import {
+  AlertTriangle,
+  Calendar as CalendarIcon,
+  Loader2,
+  Download,
+} from "lucide-react";
 import { Evento, Item } from "@/lib/types";
 import { toast } from "sonner";
 import { generateReportPDF } from "@/lib/pdf-generator";
+import { cn } from "@/lib/utils";
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  startOfDay,
+  endOfDay,
+  differenceInDays,
+} from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { DateRange } from "react-day-picker";
 
-// Componentes Refatorados
 import { SummaryCards } from "@/components/relatorios/summary-cards";
 import { ChartsOverview } from "@/components/relatorios/charts-overview";
 import { DetailsTables } from "@/components/relatorios/details-tables";
 
 export default function RelatoriosPage() {
   const { hasPermission } = useAuth();
-  const [periodo, setPeriodo] = useState<
-    "semana" | "mes" | "trimestre" | "ano"
-  >("mes");
-  const [selectedTab, setSelectedTab] = useState("visao-geral");
+
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date()),
+  });
+
   const [eventos, setEventos] = useState<Evento[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Carregar dados
   useEffect(() => {
     async function loadData() {
       setIsLoading(true);
@@ -74,79 +88,55 @@ export default function RelatoriosPage() {
   }, []);
 
   const stats = useMemo(() => {
-    const hoje = new Date();
-    let dataInicioGlobal = new Date();
-
-    // 1. DATA DE CORTE BASEADA NO FILTRO
-    if (periodo === "semana") dataInicioGlobal.setDate(hoje.getDate() - 7);
-    if (periodo === "mes") dataInicioGlobal.setMonth(hoje.getMonth() - 1);
-    if (periodo === "trimestre") dataInicioGlobal.setMonth(hoje.getMonth() - 3);
-    if (periodo === "ano") dataInicioGlobal.setFullYear(hoje.getFullYear() - 1);
-    dataInicioGlobal.setHours(0, 0, 0, 0);
+    const from = dateRange?.from || startOfMonth(new Date());
+    const to = dateRange?.to || endOfMonth(new Date());
 
     const baseEventos = eventos.filter(
       (e) => e.status !== "rascunho" && e.status !== "rejeitado",
     );
 
-    // Eventos estritamente dentro do período selecionado (Para as tabelas e cards)
-    const validEventos = baseEventos.filter(
-      (e) => new Date(e.dataHora) >= dataInicioGlobal,
-    );
+    const validEventos = baseEventos.filter((e) => {
+      const d = new Date(e.dataHora);
+      return d >= startOfDay(from) && d <= endOfDay(to);
+    });
 
-    // --- 2. GRÁFICO DE TENDÊNCIA (SEMPRE EM MESES COMO SOLICITADO) ---
-    let qtdMesesChart = 6;
-    if (periodo === "trimestre") qtdMesesChart = 3;
-    if (periodo === "ano") qtdMesesChart = 12;
-
+    const diffDias = differenceInDays(to, from);
+    const isDiario = diffDias <= 35;
     const chartDataMap: Record<
       string,
       { custo: number; venda: number; qtd: number }
     > = {};
-    const mesesNomes = [
-      "Jan",
-      "Fev",
-      "Mar",
-      "Abr",
-      "Mai",
-      "Jun",
-      "Jul",
-      "Ago",
-      "Set",
-      "Out",
-      "Nov",
-      "Dez",
-    ];
 
-    // Inicializa o eixo X (Ex: Jan, Fev, Mar...)
-    for (let i = qtdMesesChart - 1; i >= 0; i--) {
-      const d = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
-      const key =
-        qtdMesesChart > 6
-          ? `${mesesNomes[d.getMonth()]}/${d.getFullYear().toString().slice(-2)}`
-          : mesesNomes[d.getMonth()];
-      chartDataMap[key] = { custo: 0, venda: 0, qtd: 0 };
+    if (isDiario) {
+      for (let i = 0; i <= diffDias; i++) {
+        const d = new Date(from);
+        d.setDate(d.getDate() + i);
+        chartDataMap[format(d, "dd/MM")] = { custo: 0, venda: 0, qtd: 0 };
+      }
+    } else {
+      const d = new Date(from);
+      d.setDate(1);
+      const endLimit = endOfMonth(to);
+      while (d <= endLimit) {
+        chartDataMap[format(d, "MMM/yy", { locale: ptBR })] = {
+          custo: 0,
+          venda: 0,
+          qtd: 0,
+        };
+        d.setMonth(d.getMonth() + 1);
+      }
     }
 
-    const dataInicioChart = new Date(
-      hoje.getFullYear(),
-      hoje.getMonth() - qtdMesesChart + 1,
-      1,
-    );
-
-    baseEventos.forEach((ev) => {
+    validEventos.forEach((ev) => {
       const d = new Date(ev.dataHora);
-      // O Gráfico usa sua própria linha do tempo para mostrar a evolução
-      if (d >= dataInicioChart) {
-        const key =
-          qtdMesesChart > 6
-            ? `${mesesNomes[d.getMonth()]}/${d.getFullYear().toString().slice(-2)}`
-            : mesesNomes[d.getMonth()];
-        if (chartDataMap[key]) {
-          chartDataMap[key].custo += (ev.custoSnapshot || 0) * ev.quantidade;
-          chartDataMap[key].venda +=
-            (ev.precoVendaSnapshot || 0) * ev.quantidade;
-          chartDataMap[key].qtd += ev.quantidade;
-        }
+      const key = isDiario
+        ? format(d, "dd/MM")
+        : format(d, "MMM/yy", { locale: ptBR });
+
+      if (chartDataMap[key]) {
+        chartDataMap[key].custo += (ev.custoSnapshot || 0) * ev.quantidade;
+        chartDataMap[key].venda += (ev.precoVendaSnapshot || 0) * ev.quantidade;
+        chartDataMap[key].qtd += ev.quantidade;
       }
     });
 
@@ -155,7 +145,6 @@ export default function RelatoriosPage() {
       ...val,
     }));
 
-    // --- 3. MOTIVOS E ITENS COM DRILL-DOWN (Usa APENAS os dados do período filtrado) ---
     const motivosMap: Record<
       string,
       {
@@ -204,7 +193,6 @@ export default function RelatoriosPage() {
       .sort((a, b) => b.custo - a.custo)
       .slice(0, 5);
 
-    // --- 4. DIA DA SEMANA ---
     const diasMap: Record<string, { qtd: number; custo: number }> = {
       Domingo: { qtd: 0, custo: 0 },
       Segunda: { qtd: 0, custo: 0 },
@@ -236,7 +224,6 @@ export default function RelatoriosPage() {
       custo: val.custo,
     }));
 
-    // --- 5. TOP ITENS GERAL ---
     const itemMap: Record<string, { item: Item; qtd: number; custo: number }> =
       {};
     validEventos.forEach((ev) => {
@@ -251,18 +238,17 @@ export default function RelatoriosPage() {
       .sort((a, b) => b.custo - a.custo)
       .slice(0, 10);
 
-    // Retorna os eventos validados para os Cards usarem no cálculo
     return {
       monthlyData,
       topMotivosPerdas,
       perdasPorDiaSemana,
       topItens,
       validEventos,
+      diffDias,
     };
-  }, [eventos, periodo]); // <-- O Array agora escuta o periodo, refazendo o calculo instantaneamente
+  }, [eventos, dateRange]);
 
   const summary = useMemo(() => {
-    // CORREÇÃO MESTRA: Calcula os Cards baseado nos eventos do PERÍODO, não do gráfico
     const totalCusto = stats.validEventos.reduce(
       (acc, e) => acc + (e.custoSnapshot || 0) * e.quantidade,
       0,
@@ -276,12 +262,8 @@ export default function RelatoriosPage() {
       0,
     );
 
-    let diasNoPeriodo = 30;
-    if (periodo === "semana") diasNoPeriodo = 7;
-    if (periodo === "trimestre") diasNoPeriodo = 90;
-    if (periodo === "ano") diasNoPeriodo = 365;
-
-    const mediaQtdDia = Math.round(totalQtd / diasNoPeriodo) || 0;
+    const diasValidos = Math.max(1, stats.diffDias + 1);
+    const mediaQtdDia = totalQtd / diasValidos; // Removido o Math.round() para permitir decimais precisos
 
     return {
       totalCusto,
@@ -289,30 +271,34 @@ export default function RelatoriosPage() {
       totalQtd,
       mediaQtdDia,
       margemPerda:
-        totalVenda > 0
-          ? (((totalVenda - totalCusto) / totalVenda) * 100).toFixed(1)
-          : "0.0",
+        totalVenda > 0 ? ((totalVenda - totalCusto) / totalVenda) * 100 : 0,
     };
-  }, [stats, periodo]);
+  }, [stats]);
 
   const handleDownloadPDF = () => {
     try {
-      const periodoTexto = {
-        semana: "Última Semana",
-        mes: "Último Mês",
-        trimestre: "Último Trimestre",
-        ano: "Último Ano",
-      }[periodo];
+      const fromFormatted = dateRange?.from
+        ? format(dateRange.from, "dd/MM/yyyy")
+        : "";
+      const toFormatted = dateRange?.to
+        ? format(dateRange.to, "dd/MM/yyyy")
+        : "";
+      const periodoTexto = `${fromFormatted} a ${toFormatted}`;
+
       const reportData = {
         summary: {
           totalCusto: summary.totalCusto,
           totalVenda: summary.totalVenda,
+          // VOLTOU PARA NUMBER: Passamos o valor puro para não quebrar o TypeScript do PDF
           totalQtd: summary.totalQtd,
-          margemPerda: summary.margemPerda,
+          margemPerda:
+            Number(summary.margemPerda).toLocaleString("pt-BR", {
+              maximumFractionDigits: 1,
+            }) + "%",
         },
         topItens: stats.topItens,
         topMotivos: stats.topMotivosPerdas,
-        periodoTexto: periodoTexto || "Período Geral",
+        periodoTexto,
       };
       generateReportPDF(reportData);
       toast.success("Relatório gerado com sucesso!");
@@ -339,61 +325,79 @@ export default function RelatoriosPage() {
     );
   }
 
+  const isDiario = stats.diffDias <= 35;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-8">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Relatórios</h1>
           <p className="text-muted-foreground">
-            Análise detalhada das perdas e tendências
+            Análise detalhada do período filtrado
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <Button
             onClick={handleDownloadPDF}
             variant="outline"
-            className="gap-2 border-primary/20 hover:bg-primary/5"
+            className="gap-2 border-primary/20 hover:bg-primary/5 w-full sm:w-auto"
           >
             <Download className="h-4 w-4" />
             Baixar PDF
           </Button>
-          <Select value={periodo} onValueChange={(v) => setPeriodo(v as any)}>
-            <SelectTrigger className="w-40">
-              <Calendar className="mr-2 h-4 w-4" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="semana">Última Semana</SelectItem>
-              <SelectItem value="mes">Último Mês</SelectItem>
-              <SelectItem value="trimestre">Último Trimestre</SelectItem>
-              <SelectItem value="ano">Último Ano</SelectItem>
-            </SelectContent>
-          </Select>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                id="date"
+                variant={"outline"}
+                className={cn(
+                  "w-full sm:w-65 justify-start text-left font-normal",
+                  !dateRange && "text-muted-foreground",
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {dateRange?.from ? (
+                  dateRange.to ? (
+                    <>
+                      {format(dateRange.from, "dd LLL, y", { locale: ptBR })} -{" "}
+                      {format(dateRange.to, "dd LLL, y", { locale: ptBR })}
+                    </>
+                  ) : (
+                    format(dateRange.from, "dd LLL, y", { locale: ptBR })
+                  )
+                ) : (
+                  <span>Selecione um período</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                initialFocus
+                mode="range"
+                defaultMonth={dateRange?.from}
+                selected={dateRange}
+                onSelect={setDateRange}
+                numberOfMonths={2}
+                locale={ptBR}
+              />
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
 
       <SummaryCards summary={summary} />
 
-      <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-        <TabsList>
-          <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
-          <TabsTrigger value="detalhes">Detalhes por Item</TabsTrigger>
-        </TabsList>
+      <ChartsOverview
+        monthlyData={stats.monthlyData}
+        perdasPorDiaSemana={stats.perdasPorDiaSemana}
+        isDiario={isDiario}
+      />
 
-        <TabsContent value="visao-geral" className="mt-6 space-y-6">
-          <ChartsOverview
-            monthlyData={stats.monthlyData}
-            perdasPorDiaSemana={stats.perdasPorDiaSemana}
-          />
-        </TabsContent>
-
-        <TabsContent value="detalhes" className="mt-6 space-y-6">
-          <DetailsTables
-            topItens={stats.topItens}
-            topMotivos={stats.topMotivosPerdas}
-          />
-        </TabsContent>
-      </Tabs>
+      <DetailsTables
+        topItens={stats.topItens}
+        topMotivos={stats.topMotivosPerdas}
+      />
     </div>
   );
 }
