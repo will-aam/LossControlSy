@@ -520,9 +520,6 @@ export default function NotasFiscaisPage() {
             ) : (
               currentNotas.map((nota) => (
                 <TableRow key={nota.id}>
-                  // Localize o bloco de código por volta da linha 520 no
-                  arquivo app/(dashboard)/notas/page.tsx // ... dentro do
-                  mapeamento da tabela de notas ...
                   <TableCell className="text-center">
                     <div className="flex justify-center gap-2">
                       {nota.xmlContent && (
