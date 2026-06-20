@@ -88,9 +88,8 @@ export function AppSidebar() {
           {/* Área da Logo (Some quando recolhido) */}
           <div className="flex items-center gap-2 overflow-hidden group-data-[collapsible=icon]:hidden">
             <div className="grid flex-1 text-left text-sm leading-tight">
-              <span className="truncate font-semibold">Loss Control</span>
-              <span className="truncate text-xs text-muted-foreground">
-                Controle de Perdas
+              <span className="truncate font-semibold">
+                Sistema de Controle de Perda
               </span>
             </div>
           </div>

@@ -1,6 +1,6 @@
 {
-  "name": "LossControlSy - Sistema de Perda de Estoque",
-  "short_name": "LossControlSy",
+  "name": "Sistema de Controle de Perda - Sistema de Perda de Estoque",
+  "short_name": "Sistema de Controle de Perda",
   "description": "Sistema web para controle de perda de estoque.",
   "start_url": "/",
   "display": "standalone",

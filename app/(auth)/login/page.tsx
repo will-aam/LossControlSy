@@ -52,7 +52,7 @@ export default function LoginPage() {
           <CardHeader className="space-y-2 text-center pb-8">
             <div className="flex items-center justify-center gap-3">
               <CardTitle className="text-4xl font-bold tracking-tight text-foreground">
-                LossControlSy
+                Sistema de Controle de Perda
               </CardTitle>
             </div>
           </CardHeader>

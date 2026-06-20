@@ -19,13 +19,13 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 export const metadata: Metadata = {
-  title: "LossControlSy - Controle de Perdas",
+  title: "Sistema de Controle de Perda - Controle de Perdas",
   description: "Sistema web para controle de perda de estoque.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "LossControlSy",
+    title: "Sistema de Controle de Perda",
   },
   formatDetection: {
     telephone: false,

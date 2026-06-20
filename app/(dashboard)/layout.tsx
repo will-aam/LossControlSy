@@ -27,7 +27,9 @@ export default function DashboardLayout({
           </div>
 
           {/* Centro: Título do App */}
-          <div className="font-semibold text-sm">Loss Control</div>
+          <div className="font-semibold text-sm">
+            Sistema de Controle de Perda
+          </div>
 
           {/* Lado Direito: Espaço vazio para manter o título centralizado ou avatar futuro */}
           <div className="w-8" />
