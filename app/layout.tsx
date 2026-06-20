@@ -19,7 +19,7 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 export const metadata: Metadata = {
-  title: "Sistema de Controle de Perda - Controle de Perdas",
+  title: "Sistema de Controle de Perda",
   description: "Sistema web para controle de perda de estoque.",
   manifest: "/manifest.json",
   appleWebApp: {

@@ -82,13 +82,11 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon">
-      {/* Header com Logo e Botão de Toggle Minimalista */}
       <SidebarHeader className="border-b border-sidebar-border/50">
         <div className="flex items-center justify-between p-2">
-          {/* Área da Logo (Some quando recolhido) */}
           <div className="flex items-center gap-2 overflow-hidden group-data-[collapsible=icon]:hidden">
             <div className="grid flex-1 text-left text-sm leading-tight">
-              <span className="truncate font-semibold">
+              <span className="font-semibold">
                 Sistema de Controle de Perda
               </span>
             </div>
