@@ -36,8 +36,8 @@ export function NavRail() {
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 z-40 h-screen transition-all duration-300 ease-in-out bg-background flex flex-col items-center py-4",
-        aberto ? "w-56 items-start px-4" : "w-14 md:w-16 hidden md:flex"
+        "fixed left-0 top-0 z-40 h-screen transition-all duration-300 ease-in-out bg-background flex-col items-center py-4 hidden md:flex",
+        aberto ? "w-56 items-start px-4" : "w-16"
       )}
     >
       <nav className="flex-1 w-full space-y-2 mt-4">

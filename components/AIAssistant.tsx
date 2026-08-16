@@ -10,16 +10,18 @@ import Image from "next/image";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 const floatStyles = `
-  @keyframes float {
-    0%   { transform: translateY(0px); }
-    50%  { transform: translateY(-8px); }
-    100% { transform: translateY(0px); }
-  }
-  .bot-float {
-    animation: float 3s ease-in-out infinite;
-  }
-  .bot-float:hover {
-    animation-play-state: paused;
+  @media (min-width: 768px) {
+    @keyframes float {
+      0%   { transform: translateY(0px); }
+      50%  { transform: translateY(-8px); }
+      100% { transform: translateY(0px); }
+    }
+    .bot-float {
+      animation: float 3s ease-in-out infinite;
+    }
+    .bot-float:hover {
+      animation-play-state: paused;
+    }
   }
 `;
 
@@ -132,12 +134,12 @@ export function AIAssistant() {
       {/* Floating Action Button trigger */}
       <SheetTrigger asChild>
         <button
-          className={`fixed bottom-8 right-8 p-0 h-16 w-16 rounded-full transition-all duration-300 ${
+          className={`fixed bottom-24 right-4 md:bottom-8 md:right-8 p-0 h-12 w-12 md:h-16 md:w-16 rounded-full transition-all duration-300 ${
             isOpen ? "scale-0 opacity-0" : "scale-100 opacity-100 bot-float"
-          } z-50 overflow-hidden ring-2 ring-white/70 shadow-[0_0_20px_rgba(255,255,255,0.3),0_8px_30px_rgba(0,0,0,0.4)] hover:shadow-[0_0_30px_rgba(255,255,255,0.45),0_12px_40px_rgba(0,0,0,0.5)] hover:scale-110`}
+          } z-50 overflow-hidden ring-1 ring-white/50 shadow-sm md:shadow-[0_0_20px_rgba(255,255,255,0.3),0_8px_30px_rgba(0,0,0,0.4)] hover:md:shadow-[0_0_30px_rgba(255,255,255,0.45),0_12px_40px_rgba(0,0,0,0.5)] md:hover:scale-110 md:ring-2 md:ring-white/70`}
           style={{ willChange: "transform" }}
         >
-          <Image src="/bot.png" alt="IA Assistant" width={64} height={64} className="object-cover w-full h-full" />
+          <Image src="/bot.png" alt="IA Assistant" fill sizes="(max-width: 768px) 48px, 64px" className="object-cover" />
         </button>
       </SheetTrigger>
 
