@@ -35,6 +35,7 @@ import { DateRange } from "react-day-picker";
 import { SummaryCards } from "@/components/relatorios/summary-cards";
 import { ChartsOverview } from "@/components/relatorios/charts-overview";
 import { DetailsTables } from "@/components/relatorios/details-tables";
+import { PageHeader } from "@/components/PageHeader";
 
 export default function RelatoriosPage() {
   const { hasPermission } = useAuth();
@@ -328,14 +329,11 @@ export default function RelatoriosPage() {
   const isDiario = stats.diffDias <= 35;
 
   return (
-    <div className="space-y-6 pb-8">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Relatórios</h1>
-          <p className="text-muted-foreground">
-            Análise detalhada do período filtrado
-          </p>
-        </div>
+    <>
+      <PageHeader
+        title="Relatórios"
+        description="Análise detalhada do período filtrado"
+      >
         <div className="flex flex-col sm:flex-row gap-2">
           <Button
             onClick={handleDownloadPDF}
@@ -384,7 +382,9 @@ export default function RelatoriosPage() {
             </PopoverContent>
           </Popover>
         </div>
-      </div>
+      </PageHeader>
+
+      <main className="flex-1 space-y-6 px-4 py-5 md:px-8 md:py-6 overflow-y-auto">
 
       <SummaryCards summary={summary} />
 
@@ -398,6 +398,7 @@ export default function RelatoriosPage() {
         topItens={stats.topItens}
         topMotivos={stats.topMotivosPerdas}
       />
-    </div>
+      </main>
+    </>
   );
 }

@@ -79,6 +79,7 @@ import {
 import { toast } from "sonner";
 import { UploadZone } from "@/components/notas/upload-zone";
 import { cn } from "@/lib/utils";
+import { PageHeader } from "@/components/PageHeader";
 
 export default function NotasFiscaisPage() {
   const { user, hasPermission } = useAuth();
@@ -366,24 +367,11 @@ export default function NotasFiscaisPage() {
   if (!hasPermission("notas:ver")) return null;
 
   return (
-    <div className="space-y-6 pb-20 md:pb-0">
-      <input
-        type="file"
-        ref={quickUploadInputRef}
-        className="hidden"
-        onChange={processQuickUpload}
-      />
-
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">
-              Notas Fiscais de Perda
-            </h1>
-            <p className="text-muted-foreground">
-              Gerencie seus documentos (XML e PDF)
-            </p>
-          </div>
+    <>
+      <PageHeader
+        title="Notas Fiscais de Perda"
+        description="Gerencie seus documentos (XML e PDF)"
+      >
 
           {hasPermission("notas:upload") && (
             <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
@@ -464,158 +452,164 @@ export default function NotasFiscaisPage() {
               </DialogContent>
             </Dialog>
           )}
+      </PageHeader>
+      
+      <main className="flex-1 flex flex-col space-y-6 px-4 py-5 md:px-8 md:py-6 overflow-hidden">
+        <input
+          type="file"
+          ref={quickUploadInputRef}
+          className="hidden"
+          onChange={processQuickUpload}
+        />
+        
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col sm:flex-row gap-3 items-center bg-muted/40 p-3 rounded-lg border">
+            <div className="relative w-full sm:w-auto sm:flex-1">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar por emitente, número..."
+                className="pl-9 bg-background"
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
+              />
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Filter className="h-4 w-4 text-muted-foreground hidden sm:block" />
+              <Select value={orderBy} onValueChange={setOrderBy}>
+                <SelectTrigger className="w-full sm:w-45 bg-background">
+                  <SelectValue placeholder="Ordenar por" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="date_desc">Mais recentes</SelectItem>
+                  <SelectItem value="date_asc">Mais antigas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
 
-        {/* Filtros */}
-        <div className="flex flex-col sm:flex-row gap-3 items-center bg-muted/40 p-3 rounded-lg border">
-          <div className="relative w-full sm:w-auto sm:flex-1">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por emitente, número..."
-              className="pl-9 bg-background"
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-            />
-          </div>
-          <div className="flex items-center gap-2 w-full sm:w-auto">
-            <Filter className="h-4 w-4 text-muted-foreground hidden sm:block" />
-            <Select value={orderBy} onValueChange={setOrderBy}>
-              <SelectTrigger className="w-full sm:w-45 bg-background">
-                <SelectValue placeholder="Ordenar por" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="date_desc">Mais recentes</SelectItem>
-                <SelectItem value="date_asc">Mais antigas</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
-
-      {/* Lista de Notas */}
-      <div className="border rounded-lg bg-card overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-32 text-center">Arquivos</TableHead>
-              <TableHead>Data de Referência</TableHead>
-              <TableHead>Emitente</TableHead>
-              <TableHead>Número</TableHead>
-              <TableHead className="text-right">Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {currentNotas.length === 0 ? (
+        <div className="border rounded-lg bg-card overflow-hidden">
+          <Table>
+            <TableHeader>
               <TableRow>
-                <TableCell
-                  colSpan={5}
-                  className="h-24 text-center text-muted-foreground"
-                >
-                  Nenhuma nota encontrada.
-                </TableCell>
+                <TableHead className="w-32 text-center">Arquivos</TableHead>
+                <TableHead>Data de Referência</TableHead>
+                <TableHead>Emitente</TableHead>
+                <TableHead>Número</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
-            ) : (
-              currentNotas.map((nota) => (
-                <TableRow key={nota.id}>
-                  <TableCell className="text-center">
-                    <div className="flex justify-center gap-2">
-                      {nota.xmlContent && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-blue-600 bg-blue-50"
-                          onClick={() =>
-                            downloadFile(
-                              (nota.xmlUrl || nota.xmlContent) ?? undefined, // CORREÇÃO: Converte null para undefined
-                              `nota-${nota.numero || "sem-numero"}.xml`,
-                            )
-                          }
-                        >
-                          <FileCode className="h-4 w-4" />
-                        </Button>
-                      )}
-                      {nota.pdfUrl && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-red-600 bg-red-50"
-                          onClick={() =>
-                            downloadFile(
-                              nota.pdfUrl ?? undefined, // CORREÇÃO: Converte null para undefined
-                              `nota-${nota.numero || "sem-numero"}.pdf`,
-                            )
-                          }
-                        >
-                          <FileIcon className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-                      {/* Mostra a data de referência (Lote) se existir, senão a de emissão */}
-                      {nota.dataReferencia
-                        ? formatDate(nota.dataReferencia.toString())
-                        : nota.dataEmissao
-                          ? formatDate(nota.dataEmissao.toString())
-                          : "-"}
-                      {nota.dataReferencia && (
-                        <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">
-                          Lote
-                        </span>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    {nota.emitente || "-"}
-                  </TableCell>
-                  <TableCell>{nota.numero || "-"}</TableCell>
-                  <TableCell className="text-right">
-                    {hasPermission("notas:excluir") && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setNotaToDelete(nota.id)}
-                        className="h-8 w-8 hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    )}
+            </TableHeader>
+            <TableBody>
+              {currentNotas.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={5}
+                    className="h-24 text-center text-muted-foreground"
+                  >
+                    Nenhuma nota encontrada.
                   </TableCell>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              ) : (
+                currentNotas.map((nota) => (
+                  <TableRow key={nota.id}>
+                    <TableCell className="text-center">
+                      <div className="flex justify-center gap-2">
+                        {nota.xmlContent && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-blue-600 bg-blue-50"
+                            onClick={() =>
+                              downloadFile(
+                                (nota.xmlUrl || nota.xmlContent) ?? undefined,
+                                `nota-${nota.numero || "sem-numero"}.xml`,
+                              )
+                            }
+                          >
+                            <FileCode className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {nota.pdfUrl && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-red-600 bg-red-50"
+                            onClick={() =>
+                              downloadFile(
+                                nota.pdfUrl ?? undefined,
+                                `nota-${nota.numero || "sem-numero"}.pdf`,
+                              )
+                            }
+                          >
+                            <FileIcon className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                        {nota.dataReferencia
+                          ? formatDate(nota.dataReferencia.toString())
+                          : nota.dataEmissao
+                            ? formatDate(nota.dataEmissao.toString())
+                            : "-"}
+                        {nota.dataReferencia && (
+                          <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">
+                            Lote
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {nota.emitente || "-"}
+                    </TableCell>
+                    <TableCell>{nota.numero || "-"}</TableCell>
+                    <TableCell className="text-right">
+                      {hasPermission("notas:excluir") && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setNotaToDelete(nota.id)}
+                          className="h-8 w-8 hover:text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
 
-      <AlertDialog
-        open={!!notaToDelete}
-        onOpenChange={() => setNotaToDelete(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir Nota Fiscal</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta ação é irreversível.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              Confirmar
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+        <AlertDialog
+          open={!!notaToDelete}
+          onOpenChange={() => setNotaToDelete(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir Nota Fiscal</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta ação é irreversível.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDelete}
+                className="bg-destructive hover:bg-destructive/90"
+              >
+                Confirmar
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </main>
+    </>
   );
 }

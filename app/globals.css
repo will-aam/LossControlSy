@@ -1,60 +1,28 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* Importa o plugin instalado via pnpm */
 @plugin "tailwind-scrollbar";
 
 @custom-variant dark (&:is(.dark *));
 
-/* Dark theme only - Sistema de Controle de Perdas */
-/* Background: #040916 | Buttons: #3b82f6 */
-:root {
-  --background: #040916;
-  --foreground: oklch(0.95 0 0);
-  --card: #0a1628;
-  --card-foreground: oklch(0.95 0 0);
-  --popover: #0a1628;
-  --popover-foreground: oklch(0.95 0 0);
-  --primary: #3b82f6;
-  --primary-foreground: #ffffff;
-  --secondary: #1e293b;
-  --secondary-foreground: oklch(0.95 0 0);
-  --muted: #1e293b;
-  --muted-foreground: oklch(0.65 0 0);
-  --accent: #1e293b;
-  --accent-foreground: oklch(0.95 0 0);
-  --destructive: oklch(0.55 0.2 25);
-  --destructive-foreground: oklch(0.95 0 0);
-  --border: #1e293b;
-  --input: #1e293b;
-  --ring: #3b82f6;
-  --chart-1: #3b82f6;
-  --chart-2: oklch(0.7 0.15 160);
-  --chart-3: oklch(0.75 0.18 70);
-  --chart-4: oklch(0.6 0.2 300);
-  --chart-5: oklch(0.65 0.22 20);
-  --radius: 0.5rem;
-  --sidebar: #030712;
-  --sidebar-foreground: oklch(0.95 0 0);
-  --sidebar-primary: #3b82f6;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #1e293b;
-  --sidebar-accent-foreground: oklch(0.95 0 0);
-  --sidebar-border: #1e293b;
-  --sidebar-ring: #3b82f6;
-
-  /* Custom tokens for status */
-  --success: oklch(0.65 0.18 145);
-  --success-foreground: oklch(0.95 0 0);
-  --warning: oklch(0.75 0.18 70);
-  --warning-foreground: #040916;
-  --info: #3b82f6;
-  --info-foreground: #ffffff;
-}
+/*
+ * Design system definition.
+ *
+ * The @theme inline block maps CSS custom properties to Tailwind utility
+ * classes (e.g. --color-primary -> bg-primary, text-primary).
+ *
+ * The :root and .dark blocks define the actual color values using oklch.
+ * All colors MUST use oklch format.
+ */
 
 @theme inline {
-  --font-sans: "Geist", "Geist Fallback";
-  --font-mono: "Geist Mono", "Geist Mono Fallback";
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -74,15 +42,12 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -91,64 +56,133 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-positive: var(--positive);
+  --color-warning: var(--warning);
+  --color-negative: var(--negative);
+  --font-sans: "Inter Tight", ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  --radius: 0.75rem;
+  --background: oklch(0.17 0.012 250);
+  --foreground: oklch(0.95 0.005 250);
+  --surface: oklch(0.215 0.013 250);
+  --surface-2: oklch(0.255 0.014 250);
+  --surface-3: oklch(0.3 0.015 250);
+  --card: oklch(0.215 0.013 250);
+  --card-foreground: oklch(0.95 0.005 250);
+  --popover: oklch(0.225 0.013 250);
+  --popover-foreground: oklch(0.95 0.005 250);
+  --primary: oklch(0.78 0.15 165);
+  --primary-foreground: oklch(0.18 0.02 165);
+  --secondary: oklch(0.255 0.014 250);
+  --secondary-foreground: oklch(0.95 0.005 250);
+  --muted: oklch(0.255 0.014 250);
+  --muted-foreground: oklch(0.68 0.012 250);
+  --accent: oklch(0.28 0.015 250);
+  --accent-foreground: oklch(0.95 0.005 250);
+  --destructive: oklch(0.65 0.19 25);
+  --destructive-foreground: oklch(0.98 0.005 250);
+  --positive: oklch(0.78 0.15 165);
+  --warning: oklch(0.83 0.14 85);
+  --negative: oklch(0.68 0.18 22);
+  --border: oklch(1 0 0 / 8%);
+  --input: oklch(0.255 0.014 250);
+  --ring: oklch(0.6 0.05 250);
+  --chart-1: oklch(0.78 0.15 165);
+  --chart-2: oklch(0.72 0.12 235);
+  --chart-3: oklch(0.83 0.14 85);
+  --chart-4: oklch(0.68 0.18 22);
+  --chart-5: oklch(0.7 0.1 300);
+  --sidebar: oklch(0.17 0.012 250);
+  --sidebar-foreground: oklch(0.9 0.005 250);
+  --sidebar-primary: oklch(0.78 0.15 165);
+  --sidebar-primary-foreground: oklch(0.18 0.02 165);
+  --sidebar-accent: oklch(0.26 0.014 250);
+  --sidebar-accent-foreground: oklch(0.95 0.005 250);
+  --sidebar-border: oklch(1 0 0 / 6%);
+  --sidebar-ring: oklch(0.6 0.05 250);
+}
+
+
+.dark {
+  --background: oklch(0.129 0.042 264.695);
+  --foreground: oklch(0.984 0.003 247.858);
+  --card: oklch(0.208 0.042 265.755);
+  --card-foreground: oklch(0.984 0.003 247.858);
+  --popover: oklch(0.208 0.042 265.755);
+  --popover-foreground: oklch(0.984 0.003 247.858);
+  --primary: oklch(0.929 0.013 255.508);
+  --primary-foreground: oklch(0.208 0.042 265.755);
+  --secondary: oklch(0.279 0.041 260.031);
+  --secondary-foreground: oklch(0.984 0.003 247.858);
+  --muted: oklch(0.279 0.041 260.031);
+  --muted-foreground: oklch(0.704 0.04 256.788);
+  --accent: oklch(0.279 0.041 260.031);
+  --accent-foreground: oklch(0.984 0.003 247.858);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.984 0.003 247.858);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.551 0.027 264.364);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.208 0.042 265.755);
+  --sidebar-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-accent: oklch(0.279 0.041 260.031);
+  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.551 0.027 264.364);
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    border-color: var(--color-border);
+    @apply outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    @apply font-sans;
   }
 
-  /* === 1. CONFIGURAÇÃO DA PÁGINA (OCULTAR SCROLLBAR DO BODY) === */
-  html,
-  body {
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE/Edge */
+  /* === SCROLLBARS INTERNAS (TABELAS, DIVS) === */
+  html, body {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
   }
-  html::-webkit-scrollbar,
-  body::-webkit-scrollbar {
+  html::-webkit-scrollbar, body::-webkit-scrollbar {
     display: none;
   }
 
-  /* === 2. SCROLLBARS INTERNAS (TABELAS, DIVS) === */
-
-  /* Firefox */
   *:not(html):not(body) {
     scrollbar-width: thin;
-    scrollbar-color: transparent transparent; /* Começa invisível */
+    scrollbar-color: transparent transparent;
     transition: scrollbar-color 0.3s ease;
   }
-
-  /* Firefox Hover: Mostra a barra */
   *:not(html):not(body):hover {
-    scrollbar-color: var(--muted) transparent;
+    scrollbar-color: var(--color-surface-3) transparent;
   }
-
-  /* Webkit (Chrome, Edge, Safari) */
   ::-webkit-scrollbar {
-    width: 6px; /* Fina Vertical */
-    height: 6px; /* Fina Horizontal */
+    width: 6px;
+    height: 6px;
   }
-
   ::-webkit-scrollbar-track {
     background: transparent;
   }
-
-  /* Estilo do polegar (Thumb) */
   ::-webkit-scrollbar-thumb {
-    background-color: transparent; /* Invisível por padrão */
-    border-radius: 0px; /* QUADRADA (Remove arredondamento) */
+    background-color: transparent;
+    border-radius: 4px;
   }
-
-  /* Quando o mouse entra no ELEMENTO, pinta a barra de cinza claro */
   *:hover::-webkit-scrollbar-thumb {
-    @apply bg-muted-foreground/30;
-  }
-
-  /* Quando o mouse está SOBRE A BARRA, pinta de cinza escuro */
-  ::-webkit-scrollbar-thumb:hover {
-    @apply bg-muted-foreground/60;
+    @apply bg-surface-3;
   }
 }

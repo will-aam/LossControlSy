@@ -49,6 +49,7 @@ import {
   Tag,
 } from "lucide-react";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/PageHeader";
 
 const hideScrollClass =
   "[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]";
@@ -166,27 +167,19 @@ export default function MotivosPage() {
   }
 
   return (
-    <div
-      className={`flex flex-col h-[calc(100vh-2rem)] space-y-6 overflow-hidden ${hideScrollClass}`}
-    >
-      {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between shrink-0">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Motivos de Perda
-          </h1>
-          <p className="text-muted-foreground">
-            Padronize as justificativas para os registros de perda.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          {hasPermission("motivos:criar") && (
-            <Button onClick={() => handleOpenDialog()}>
-              <Plus className="mr-2 h-4 w-4" /> Novo Motivo
-            </Button>
-          )}
-        </div>
-      </div>
+    <>
+      <PageHeader
+        title="Motivos de Perda"
+        description="Padronize as justificativas para os registros de perda."
+      >
+        {hasPermission("motivos:criar") && (
+          <Button onClick={() => handleOpenDialog()}>
+            <Plus className="mr-2 h-4 w-4" /> Novo Motivo
+          </Button>
+        )}
+      </PageHeader>
+      
+      <main className={`flex flex-col flex-1 space-y-6 px-4 py-5 md:px-8 md:py-6 overflow-hidden ${hideScrollClass}`}>
 
       {/* Filtros */}
       <div className="flex items-center shrink-0 bg-background/95 backdrop-blur z-10 py-1">
@@ -338,6 +331,7 @@ export default function MotivosPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </main>
+    </>
   );
 }

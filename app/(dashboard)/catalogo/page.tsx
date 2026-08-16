@@ -74,6 +74,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/PageHeader";
 
 const ITEMS_PER_PAGE = 15;
 
@@ -307,18 +308,11 @@ export default function CatalogoPage() {
   }
 
   return (
-    <div
-      className={`flex flex-col h-[calc(100vh-2rem)] space-y-4 overflow-hidden ${hideScrollClass}`}
-    >
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between shrink-0">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Catálogo de Itens
-          </h1>
-          <p className="text-muted-foreground">
-            Gerencie os produtos disponíveis
-          </p>
-        </div>
+    <>
+      <PageHeader
+        title="Catálogo de Itens"
+        description="Gerencie os produtos disponíveis"
+      >
         <div className="flex gap-2">
           {/* BOTÃO IMPORTAR */}
           {hasPermission("catalogo:importar") && (
@@ -352,9 +346,10 @@ export default function CatalogoPage() {
             </Button>
           )}
         </div>
-      </div>
-
-      <div className="grid gap-3 sm:grid-cols-4 shrink-0">
+      </PageHeader>
+      
+      <main className={`flex-1 flex flex-col space-y-4 px-4 py-5 md:px-8 md:py-6 overflow-hidden ${hideScrollClass}`}>
+        <div className="grid gap-3 sm:grid-cols-4 shrink-0">
         <div className="border rounded-lg p-3 bg-card shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xs text-muted-foreground uppercase font-bold">
@@ -653,6 +648,7 @@ export default function CatalogoPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+      </main>
+    </>
   );
 }

@@ -64,6 +64,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/PageHeader";
 
 // Interface ajustada para aceitar dados parciais do banco
 export interface EvidenciaDisplay {
@@ -97,6 +98,10 @@ export default function GaleriaPage() {
   // Filtros e Seleção
   const [selectedDate, setSelectedDate] = useState<string>("todas");
   const [searchQuery, setSearchQuery] = useState("");
+  
+  // Paginação
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 32;
 
   // Controle do Modal de Visualização
   const [selectedPhoto, setSelectedPhoto] = useState<EvidenciaDisplay | null>(
@@ -286,6 +291,16 @@ export default function GaleriaPage() {
     return filtered;
   }, [evidencias, selectedDate, searchQuery]);
 
+  const totalPages = Math.ceil(filteredEvidencias.length / ITEMS_PER_PAGE);
+  const paginatedEvidencias = useMemo(() => {
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredEvidencias.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  }, [filteredEvidencias, currentPage]);
+
+  useMemo(() => {
+    if (currentPage > totalPages && totalPages > 0) setCurrentPage(1);
+  }, [totalPages, currentPage]);
+
   // --- NAVEGAÇÃO DO VIEWER ---
   const handlePhotoClick = (photo: EvidenciaDisplay, index: number) => {
     setSelectedPhoto(photo);
@@ -324,15 +339,11 @@ export default function GaleriaPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header e Ações */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Galeria</h1>
-          <p className="text-muted-foreground">
-            Visualize evidências de eventos e fotos avulsas.
-          </p>
-        </div>
+    <>
+      <PageHeader
+        title="Galeria"
+        description="Visualize evidências de eventos e fotos avulsas."
+      >
 
         {/* BOTÕES DE UPLOAD */}
         {hasPermission("galeria:upload") && (
@@ -364,8 +375,9 @@ export default function GaleriaPage() {
             </Button>
           </div>
         )}
-      </div>
-
+      </PageHeader>
+      
+      <main className="flex-1 flex flex-col space-y-6 px-4 py-5 md:px-8 md:py-6 overflow-hidden">
       {/* Filtros */}
       <div className="flex flex-col gap-4 sm:flex-row bg-background/95 backdrop-blur z-10 py-1">
         <div className="relative flex-1 max-w-md">
@@ -373,11 +385,14 @@ export default function GaleriaPage() {
           <Input
             placeholder="Buscar por item ou motivo..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setCurrentPage(1);
+            }}
             className="pl-9"
           />
         </div>
-        <Select value={selectedDate} onValueChange={setSelectedDate}>
+        <Select value={selectedDate} onValueChange={(v) => { setSelectedDate(v); setCurrentPage(1); }}>
           <SelectTrigger className="w-full sm:w-48">
             <Calendar className="mr-2 h-4 w-4" />
             <SelectValue placeholder="Filtrar por data" />
@@ -398,30 +413,33 @@ export default function GaleriaPage() {
         <div className="flex justify-center py-12">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
-      ) : filteredEvidencias.length > 0 ? (
-        <div className="grid gap-2 grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 pb-10">
-          {filteredEvidencias.map((evidencia, index) => (
-            <button
-              key={evidencia.id}
-              type="button"
-              onClick={() => handlePhotoClick(evidencia, index)}
-              className="group relative aspect-square w-full overflow-hidden rounded-md ring-1 ring-border/50 shadow-sm"
-            >
-              <img
-                src={evidencia.url || "/placeholder.svg"}
-                alt={`Evidência ${index + 1}`}
-                className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-              />
+      ) : paginatedEvidencias.length > 0 ? (
+        <div className="flex-1 overflow-y-auto">
+          <div className="grid gap-2 grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 pb-10">
+            {paginatedEvidencias.map((evidencia, index) => (
+              <button
+                key={evidencia.id}
+                type="button"
+                onClick={() => handlePhotoClick(evidencia, index)}
+                className="group relative aspect-square w-full overflow-hidden rounded-md ring-1 ring-border/50 shadow-sm"
+              >
+                <img
+                  src={evidencia.url || "/placeholder.svg"}
+                  alt={`Evidência ${index + 1}`}
+                  className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                  loading="lazy"
+                />
 
-              <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100 flex items-center justify-center">
-                <ZoomIn className="h-6 w-6 text-white" />
-              </div>
+                <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100 flex items-center justify-center">
+                  <ZoomIn className="h-6 w-6 text-white" />
+                </div>
 
-              <span
-                className={`absolute bottom-1 right-1 h-2 w-2 rounded-full ${evidencia.evento ? "bg-green-500" : "bg-yellow-500"}`}
-              />
-            </button>
-          ))}
+                <span
+                  className={`absolute bottom-1 right-1 h-2 w-2 rounded-full ${evidencia.evento ? "bg-green-500" : "bg-yellow-500"}`}
+                />
+              </button>
+            ))}
+          </div>
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center py-16 text-center border-2 border-dashed rounded-lg bg-muted/5">
@@ -429,6 +447,38 @@ export default function GaleriaPage() {
             <Search className="h-8 w-8 text-muted-foreground" />
           </div>
           <h3 className="text-lg font-medium">Nenhuma foto encontrada</h3>
+        </div>
+      )}
+
+      {/* Paginação */}
+      {!isLoading && filteredEvidencias.length > 0 && (
+        <div className="flex items-center justify-between shrink-0 pt-2 border-t mt-auto">
+          <p className="text-xs text-muted-foreground">
+            {paginatedEvidencias.length} de {filteredEvidencias.length} fotos
+          </p>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div className="text-xs font-medium px-2">
+              Pág {currentPage} de {Math.max(1, totalPages)}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages || totalPages === 0}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       )}
 
@@ -605,6 +655,7 @@ export default function GaleriaPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+      </main>
+    </>
   );
 }

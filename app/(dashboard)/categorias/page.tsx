@@ -1,28 +1,17 @@
 "use client";
 
 import { CategoriesManager } from "@/components/cadastros/categories-manager";
-import { Separator } from "@/components/ui/separator";
 import { FolderTree } from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
 
 export default function CategoriasPage() {
   return (
-    <div className="min-h-screen pb-20 md:pb-0 bg-background">
-      <main className="container mx-auto max-w-5xl space-y-6 p-4 md:py-8">
-        {/* Cabeçalho Bonito */}
-        {/* <div className="space-y-1">
-          <div className="flex items-center gap-2 text-primary/80">
-            <FolderTree className="h-6 w-6" />
-            <h2 className="text-2xl font-bold tracking-tight text-foreground">
-              Classificação & Atributos
-            </h2>
-          </div>
-          <p className="text-sm text-muted-foreground ml-8">
-            Gerencie as categorias para organizar seu catálogo de produtos de
-            forma eficiente.
-          </p>
-        </div> */}
-
-        {/* <Separator /> */}
+    <>
+      <PageHeader
+        title="Classificação & Atributos"
+        description="Gerencie as categorias para organizar seu catálogo de produtos de forma eficiente."
+      />
+      <main className="flex-1 space-y-6 px-4 py-5 md:px-8 md:py-6 overflow-y-auto">
 
         {/* Área de Conteúdo */}
         <div className="space-y-6">
@@ -41,6 +30,6 @@ export default function CategoriasPage() {
           <CategoriesManager />
         </div>
       </main>
-    </div>
+    </>
   );
 }

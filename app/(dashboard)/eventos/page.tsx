@@ -41,6 +41,7 @@ import {
   BatchStatus,
 } from "@/components/eventos/eventos-grid";
 import { EventosTable } from "@/components/eventos/eventos-table";
+import { PageHeader } from "@/components/PageHeader";
 
 type ViewMode = "pastas" | "lista-completa";
 
@@ -296,37 +297,29 @@ export default function EventosPage() {
       eventosDoLote.every((e) => ["aprovado", "exportado"].includes(e.status));
 
     return (
-      <div
-        // Adicionado "overflow-hidden" aqui na raiz para segurar o layout na tela
-        className={`flex flex-col h-[calc(100vh-2rem)] space-y-4 overflow-hidden ${hideScrollClass}`}
-      >
-        <div className="flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-4">
+      <>
+        <PageHeader 
+          title={loteSelecionado.data} 
+          description={`Autor: ${loteSelecionado.autor}`}
+        >
             <Button
-              variant="ghost"
-              size="icon"
+              variant="outline"
+              size="sm"
               onClick={() => setLoteSelecionado(null)}
             >
-              <ChevronLeft className="h-5 w-5" />
+              <ChevronLeft className="h-4 w-4 mr-1" /> Voltar
             </Button>
-            <div>
-              <h1 className="text-xl font-semibold">{loteSelecionado.data}</h1>
-              <p className="text-sm text-muted-foreground">
-                Autor: {loteSelecionado.autor}
-              </p>
-            </div>
-          </div>
-          <div className="flex gap-2">
             {!todosOk && hasPermission("eventos:aprovar") && (
               <Button
+                size="sm"
                 onClick={handleAprovarLoteInteiro}
                 className="bg-green-600 hover:bg-green-700 text-white"
               >
                 Aprovar Tudo
               </Button>
             )}
-          </div>
-        </div>
+        </PageHeader>
+        <main className={`flex-1 flex flex-col space-y-4 px-4 py-5 md:px-8 md:py-6 overflow-hidden ${hideScrollClass}`}>
 
         {/* --- CORREÇÃO AQUI: Wrapper flexível com rolagem (Scroll) --- */}
         <div className="flex-1 min-h-0 border rounded-md bg-card relative overflow-hidden shadow-sm">
@@ -355,14 +348,18 @@ export default function EventosPage() {
           onOpenChange={(open: boolean) => !open && setEventoToDelete(null)}
           onConfirm={confirmDelete}
         />
-      </div>
+      </main>
+      </>
     );
   }
 
   return (
-    <div
-      className={`flex flex-col h-[calc(100vh-2rem)] space-y-4 overflow-hidden ${hideScrollClass}`}
-    >
+    <>
+      <PageHeader 
+        title="Eventos e Lotes" 
+        description="Gestão de aprovação e conferência."
+      />
+      <main className={`flex-1 flex flex-col space-y-4 px-4 py-5 md:px-8 md:py-6 overflow-hidden ${hideScrollClass}`}>
       <EventosToolbar
         viewMode={viewMode}
         setViewMode={setViewMode}
@@ -411,7 +408,8 @@ export default function EventosPage() {
         onOpenChange={(open: boolean) => !open && setEventoToDelete(null)}
         onConfirm={confirmDelete}
       />
-    </div>
+      </main>
+    </>
   );
 }
 
