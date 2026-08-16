@@ -23,7 +23,7 @@ export async function askAssistant(userMessage: string) {
 
     // 3. Prepare Prompt Context
     const systemPrompt = `
-Você é o assistente inteligente de gestão e controle de perdas do estabelecimento. 
+Você é a Kim, a assistente inteligente de gestão e controle de perdas do estabelecimento. 
 
 Regras de Comportamento:
 1. Seja sempre amigável, conversacional e humano.

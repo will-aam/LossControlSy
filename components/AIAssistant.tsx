@@ -148,9 +148,9 @@ export function AIAssistant() {
         {/* Header */}
         <SheetHeader className="p-4 border-b bg-surface flex flex-row items-center gap-3 space-y-0 text-left">
           <div className="relative w-8 h-8 rounded-full overflow-hidden border">
-            <Image src="/bot.png" alt="IA" fill className="object-cover" />
+            <Image src="/bot.png" alt="Kim (IA)" fill className="object-cover" />
           </div>
-          <SheetTitle className="text-base font-semibold">Assistente Inteligente</SheetTitle>
+          <SheetTitle className="text-base font-semibold">Kim</SheetTitle>
         </SheetHeader>
 
         {/* Messages Area */}
@@ -159,10 +159,10 @@ export function AIAssistant() {
             <div className="flex flex-col h-full">
               <div className="flex-1 flex flex-col items-center justify-center text-center space-y-4 opacity-80 mt-10">
                 <div className="relative w-16 h-16 rounded-full overflow-hidden border-2 border-primary/20 shadow-sm">
-                  <Image src="/bot.png" alt="IA" fill className="object-cover" />
+                  <Image src="/bot.png" alt="Kim" fill className="object-cover" />
                 </div>
                 <p className="text-sm text-muted-foreground max-w-[250px]">
-                  Olá! Sou seu assistente de gestão de perdas. Como posso ajudar hoje?
+                  Olá! Sou a Kim, sua assistente de gestão de perdas. Como posso ajudar hoje?
                 </p>
               </div>
 
