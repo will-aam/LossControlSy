@@ -206,7 +206,8 @@ export default function NovoEventoPage() {
     toast.loading("Enviando dados...", { id: "submit-toast" });
 
     try {
-      const promises = itemsList.map(async (entry) => {
+      const results = [];
+      for (const entry of itemsList) {
         const payload: CreateEventoData = {
           itemId: entry.item.id,
           quantidade: entry.quantidade,
@@ -214,10 +215,10 @@ export default function NovoEventoPage() {
           fotos: entry.fotoUrl ? [entry.fotoUrl] : [],
           dataPersonalizada: date,
         };
-        return createEvento(payload);
-      });
+        const result = await createEvento(payload);
+        results.push(result);
+      }
 
-      const results = await Promise.all(promises);
       const errors = results.filter((r) => !r.success);
 
       toast.dismiss("submit-toast");
@@ -255,7 +256,7 @@ export default function NovoEventoPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] space-y-4 max-w-6xl mx-auto w-full overflow-hidden">
+    <div className="flex flex-col h-[calc(100vh-4rem)] md:h-[calc(100vh-8rem)] space-y-4 max-w-6xl mx-auto w-full pb-20 md:pb-0 overflow-hidden"> 
       {/* INPUT DE ARQUIVO AJUSTADO 
           accept="image/*" -> Padrão universal para "Quero uma imagem". 
           No Android/iOS isso abre o menu "Câmera ou Galeria".
@@ -318,7 +319,7 @@ export default function NovoEventoPage() {
       </div>
 
       {/* Área de Input */}
-      <div className="flex flex-col xl:flex-row gap-3 items-end shrink-0 pb-2">
+      <div className="flex flex-col xl:flex-row gap-3 xl:items-end items-stretch shrink-0 pb-2">
         {/* Produto */}
         <div className="flex-1 w-full relative min-w-50">
           <label className="text-xs font-medium text-muted-foreground mb-1.5 ml-1 block">

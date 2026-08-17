@@ -11,7 +11,8 @@ import {
   Grid,
   AlertCircle,
   Store,
-  Image as ImageIcon
+  Image as ImageIcon,
+  PlusCircle
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -24,6 +25,7 @@ export function NavRail() {
 
   const navItems = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
+    { icon: PlusCircle, label: "Registrar Perda", href: "/eventos/novo" },
     { icon: FileText, label: "Notas", href: "/notas" },
     { icon: Store, label: "Catálogo", href: "/catalogo" },
     { icon: Grid, label: "Categorias", href: "/categorias" },

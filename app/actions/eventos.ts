@@ -101,7 +101,11 @@ export async function createEvento(data: CreateEventoData) {
     if (data.fotos) {
       for (const foto of data.fotos) {
         const url = foto.startsWith("http") ? foto : await uploadToR2(foto);
-        if (url) uploadedUrls.push(url);
+        if (url) {
+          uploadedUrls.push(url);
+        } else {
+          return { success: false, message: "Falha ao enviar a imagem para o servidor. Verifique a conexão ou tente novamente." };
+        }
       }
     }
 

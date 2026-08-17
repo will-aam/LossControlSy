@@ -92,6 +92,7 @@ const rolePermissions: Record<UserRole, Permission[]> = {
     "motivos:excluir",
   ],
   fiscal: [
+    "eventos:criar",
     "eventos:ver_todos",
     "eventos:exportar",
     "catalogo:ver",

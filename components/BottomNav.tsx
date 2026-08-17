@@ -15,6 +15,7 @@ import {
   AlertCircle,
   Settings,
   User,
+  Calendar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -33,6 +34,7 @@ export function BottomNav() {
   ];
 
   const moreMenuOptions = [
+    { icon: Calendar, label: "Eventos", href: "/eventos" },
     { icon: FileText, label: "Notas Fiscais", href: "/notas" },
     { icon: Store, label: "Catálogo", href: "/catalogo" },
     { icon: Grid, label: "Categorias", href: "/categorias" },
@@ -68,10 +70,10 @@ export function BottomNav() {
           {/* Botão Centralizado de Ação (Eventos) */}
           <div className="relative -top-5 flex justify-center w-full">
             <Link
-              href="/eventos"
+              href="/eventos/novo"
               className={cn(
                 "flex items-center justify-center w-14 h-14 rounded-full shadow-lg text-primary-foreground transition-transform hover:scale-105 active:scale-95",
-                pathname === "/eventos" ? "bg-primary/90 shadow-primary/40" : "bg-primary shadow-primary/30"
+                pathname === "/eventos/novo" ? "bg-primary/90 shadow-primary/40" : "bg-primary shadow-primary/30"
               )}
             >
               <Plus size={28} />

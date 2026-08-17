@@ -147,7 +147,7 @@ export function EventosToolbar({
               className={cn(
                 "h-8 gap-2 text-xs hover:bg-background/60",
                 viewMode === "pastas" &&
-                  "bg-background shadow-sm text-foreground hover:bg-background",
+                "bg-background shadow-sm text-foreground hover:bg-background",
               )}
               onClick={() => {
                 setViewMode("pastas");
@@ -164,7 +164,7 @@ export function EventosToolbar({
               className={cn(
                 "h-8 gap-2 text-xs hover:bg-background/60",
                 viewMode === "lista-completa" &&
-                  "bg-background shadow-sm text-foreground hover:bg-background",
+                "bg-background shadow-sm text-foreground hover:bg-background",
               )}
               onClick={() => setViewMode("lista-completa")}
             >
