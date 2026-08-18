@@ -46,8 +46,8 @@ export async function importVendasCSV(formData: FormData) {
     let processedCount = 0;
 
     // A VendaDiaria for the selected date
-    const dateObj = new Date(data);
-    dateObj.setUTCHours(0, 0, 0, 0); // Normalize time
+    const [year, month, day] = data.split("-").map(Number);
+    const dateObj = new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0)); // Normalize time to noon UTC to avoid timezone shift
 
     // Find or create VendaDiaria for this date and owner
     let vendaDiaria = await prisma.vendaDiaria.findUnique({
