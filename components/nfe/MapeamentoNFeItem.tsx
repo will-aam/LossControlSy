@@ -40,7 +40,7 @@ export function MapeamentoNFeItem({
   const handleMap = async (catalogoItemId: string) => {
     setOpen(false);
     setIsMapping(true);
-    
+
     try {
       const res = await mapItemToCatalog(nfeItem.id, catalogoItemId, nfeItem.codigoFornecedor);
       if (res.success) {
@@ -58,7 +58,7 @@ export function MapeamentoNFeItem({
   const handleUnmap = async () => {
     if (!nfeItem.item) return;
     setIsMapping(true);
-    
+
     try {
       const res = await unmapItemFromCatalog(nfeItem.id, nfeItem.item.id, nfeItem.codigoFornecedor);
       if (res.success) {
@@ -83,10 +83,8 @@ export function MapeamentoNFeItem({
       {/* Dados do Fornecedor */}
       <div className="flex-1">
         <div className="flex items-center gap-2 mb-1">
-          {isPendente ? (
+          {isPendente && (
             <AlertCircle size={16} className="text-orange-500" />
-          ) : (
-            <Check size={16} className="text-emerald-500" />
           )}
           <span className="font-semibold text-foreground text-sm">
             {nfeItem.descricaoFornecedor}
@@ -152,10 +150,10 @@ export function MapeamentoNFeItem({
               <p className="font-medium truncate line-clamp-1">{nfeItem.item?.nome}</p>
               <p className="text-xs text-muted-foreground">Código Interno: {nfeItem.item?.codigoInterno}</p>
             </div>
-            
-            <button 
+
+            <button
               onClick={handleUnmap}
-              className="absolute right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-destructive/10 text-destructive rounded-md"
+              className="absolute right-2 opacity-0 group-hover:opacity-100 transition-all p-1.5 hover:bg-red-500 hover:text-white rounded-md"
               title="Desvincular item"
             >
               <Link2 size={16} className="rotate-45" />

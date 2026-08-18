@@ -17,21 +17,28 @@ export default async function NFeImportacaoPage() {
     redirect("/login");
   }
 
-  // Buscar histórico de NFe
+  // Buscar histórico de NFe com os itens para calcular o progresso de mapeamento
   const historicoRaw = await prisma.nFeCompra.findMany({
     where: { ownerId: user.ownerId },
     orderBy: { dataImportacao: "desc" },
     include: {
-      _count: {
-        select: { itens: true }
+      itens: {
+        select: { itemId: true }
       }
     }
   });
 
-  const historico = historicoRaw.map(nfe => ({
-    ...nfe,
-    valorTotal: nfe.valorTotal ? Number(nfe.valorTotal) : null
-  }));
+  const historico = historicoRaw.map(nfe => {
+    const totalItens = nfe.itens.length;
+    const mapeados = nfe.itens.filter(i => i.itemId !== null).length;
+    
+    return {
+      ...nfe,
+      valorTotal: nfe.valorTotal ? Number(nfe.valorTotal) : null,
+      mappedCount: mapeados,
+      totalCount: totalItens
+    };
+  });
 
   return (
     <>
