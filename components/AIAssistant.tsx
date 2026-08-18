@@ -129,7 +129,7 @@ export function AIAssistant() {
             } z-50 overflow-hidden ring-1 ring-white/50 shadow-sm`}
           style={{ willChange: "transform" }}
         >
-          <Image src="/bot.png" alt="IA Assistant" fill sizes="(max-width: 768px) 48px, 64px" className="object-cover" />
+          <Image src="/bot1.png" alt="IA Assistant" fill sizes="(max-width: 768px) 48px, 64px" className="object-cover" />
         </button>
       </SheetTrigger>
 
@@ -138,7 +138,7 @@ export function AIAssistant() {
         {/* Header */}
         <SheetHeader className="p-4 border-b bg-surface flex flex-row items-center gap-3 space-y-0 text-left">
           <div className="relative w-8 h-8 rounded-full overflow-hidden border">
-            <Image src="/bot.png" alt="Iris (IA)" fill className="object-cover" />
+            <Image src="/bot1.png" alt="Iris (IA)" fill className="object-cover" />
           </div>
           <SheetTitle className="text-base font-semibold">Iris</SheetTitle>
         </SheetHeader>
@@ -149,7 +149,7 @@ export function AIAssistant() {
             <div className="flex flex-col h-full">
               <div className="flex-1 flex flex-col items-center justify-center text-center space-y-4 opacity-80 mt-10">
                 <div className="relative w-16 h-16 rounded-full overflow-hidden border-2 border-primary/20 shadow-sm">
-                  <Image src="/bot.png" alt="Iris" fill className="object-cover" />
+                  <Image src="/bot1.png" alt="Iris" fill className="object-cover" />
                 </div>
                 <p className="text-sm text-muted-foreground max-w-[250px]">
                   Olá! Sou a Iris, sua assistente de gestão de perdas. Como posso ajudar hoje?
@@ -188,7 +188,7 @@ export function AIAssistant() {
                   {msg.role === "user" ? (
                     <User className="h-4 w-4" />
                   ) : (
-                    <Image src="/bot.png" alt="IA" width={32} height={32} className="object-cover w-full h-full" />
+                    <Image src="/bot1.png" alt="IA" width={32} height={32} className="object-cover w-full h-full" />
                   )}
                 </div>
 
@@ -234,7 +234,7 @@ export function AIAssistant() {
           {isLoading && (
             <div className="flex items-start gap-3">
               <div className="flex items-center justify-center h-8 w-8 rounded-full shrink-0 overflow-hidden border">
-                <Image src="/bot.png" alt="IA" width={32} height={32} className="object-cover w-full h-full" />
+                <Image src="/bot1.png" alt="IA" width={32} height={32} className="object-cover w-full h-full" />
               </div>
               <div className="bg-surface text-foreground rounded-xl rounded-tl-none border px-4 py-3 flex items-center justify-center">
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />

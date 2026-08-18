@@ -180,7 +180,7 @@ export function ItemFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[95vh] h-[95vh] sm:h-auto overflow-y-auto w-[95vw] sm:w-full p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>{isEditing ? "Editar Item" : "Novo Item"}</DialogTitle>
           <DialogDescription>
@@ -194,9 +194,9 @@ export function ItemFormDialog({
           {/* Seção Imagem */}
           <div className="space-y-4 border rounded-lg p-4 bg-muted/10">
             <Label>Imagem do Produto</Label>
-            <div className="flex gap-4 items-start">
+            <div className="flex flex-col sm:flex-row gap-4 items-start">
               {/* Preview Area */}
-              <div className="h-32 w-32 shrink-0 rounded-md border border-dashed bg-muted flex items-center justify-center overflow-hidden relative group">
+              <div className="h-32 w-32 shrink-0 rounded-md border border-dashed bg-muted flex items-center justify-center overflow-hidden relative group self-center sm:self-start">
                 {previewUrl ? (
                   <>
                     <img
@@ -220,7 +220,7 @@ export function ItemFormDialog({
               </div>
 
               {/* Controles de Upload */}
-              <div className="flex-1">
+              <div className="flex-1 w-full">
                 <Tabs
                   value={imageTab}
                   onValueChange={(v) => setImageTab(v as any)}
@@ -239,7 +239,7 @@ export function ItemFormDialog({
                         className="w-full"
                         onClick={() => fileInputRef.current?.click()}
                       >
-                        <Upload className="mr-2 h-4 w-4" /> Selecionar Arquivo
+                        <Upload className="mr-2 h-4 w-4" /> Selecionar
                       </Button>
                       <input
                         type="file"
@@ -275,7 +275,7 @@ export function ItemFormDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="codigoInterno">Código Interno *</Label>
               <Input
@@ -312,7 +312,7 @@ export function ItemFormDialog({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="categoria">Categoria *</Label>
               <Select
@@ -355,7 +355,7 @@ export function ItemFormDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="custo">Custo Unitário (R$) *</Label>
               <Input
@@ -366,17 +366,6 @@ export function ItemFormDialog({
                 onChange={(e) =>
                   handleInputChange("custo", parseFloat(e.target.value))
                 }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="custoMedio">Custo Médio (R$)</Label>
-              <Input
-                id="custoMedio"
-                type="number"
-                step="0.01"
-                value={formData.custoMedio || "0.00"}
-                disabled
-                className="bg-muted text-muted-foreground"
               />
             </div>
             <div className="space-y-2">
@@ -391,6 +380,18 @@ export function ItemFormDialog({
                 }
               />
             </div>
+          </div>
+          
+          <div className="space-y-2 -mt-2">
+            <Label htmlFor="custoMedio">Custo Médio Ponderado (R$)</Label>
+            <Input
+              id="custoMedio"
+              type="number"
+              step="0.01"
+              value={formData.custoMedio || "0.00"}
+              disabled
+              className="bg-muted text-muted-foreground font-medium"
+            />
           </div>
 
           {/* Vínculos de Fornecedores */}

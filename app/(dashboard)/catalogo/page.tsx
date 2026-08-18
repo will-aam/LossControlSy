@@ -328,6 +328,7 @@ export default function CatalogoPage() {
                 variant="outline"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isImporting}
+                className="hidden md:inline-flex"
               >
                 {isImporting ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -348,8 +349,8 @@ export default function CatalogoPage() {
         </div>
       </PageHeader>
       
-      <main className={`flex-1 flex flex-col space-y-4 px-4 py-5 md:px-8 md:py-6 overflow-hidden ${hideScrollClass}`}>
-        <div className="grid gap-3 sm:grid-cols-4 shrink-0">
+      <main className={`flex-1 flex flex-col space-y-4 px-4 py-5 md:px-8 md:py-6 overflow-hidden pb-20 md:pb-6 ${hideScrollClass}`}>
+        <div className="hidden md:grid gap-3 sm:grid-cols-4 shrink-0">
         <div className="border rounded-lg p-3 bg-card shadow-sm flex items-center justify-between">
           <div>
             <p className="text-xs text-muted-foreground uppercase font-bold">
@@ -445,17 +446,17 @@ export default function CatalogoPage() {
       <div className="flex-1 overflow-hidden border rounded-md relative bg-card shadow-sm">
         <div className="absolute inset-0 overflow-y-auto">
           <table className="w-full caption-bottom text-sm">
-            <TableHeader className="sticky top-0 z-20 bg-card shadow-sm">
+            <TableHeader className="sticky top-0 z-20 bg-background shadow-sm">
               <TableRow>
-                <TableHead className="w-[40%] bg-card">Item</TableHead>
-                <TableHead className="bg-card">Código</TableHead>
-                <TableHead className="bg-card">Categoria</TableHead>
-                <TableHead className="bg-card">Unidade</TableHead>
-                <TableHead className="text-right bg-card">Preço</TableHead>
-                <TableHead className="w-25 text-center bg-card">
+                <TableHead className="w-[40%] bg-background">Item</TableHead>
+                <TableHead className="bg-background">Código</TableHead>
+                <TableHead className="bg-background">Categoria</TableHead>
+                <TableHead className="bg-background">Unidade</TableHead>
+                <TableHead className="text-right bg-background">Preço</TableHead>
+                <TableHead className="w-25 text-center bg-background">
                   Status
                 </TableHead>
-                <TableHead className="w-12.5 bg-card"></TableHead>
+                <TableHead className="w-12.5 bg-background"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

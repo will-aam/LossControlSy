@@ -54,8 +54,8 @@ export async function recalcularCustosItem(itemId: string, ownerId: string) {
     let somaQuantidades = 0;
 
     for (const item of nfeItens) {
-      const v = Number(item.valorTotal || 0);
-      const q = Number(item.quantidade || 0);
+      const v = Number(item.valorTotal?.toString() || 0);
+      const q = Number(item.quantidade?.toString() || 0);
       if (v > 0 && q > 0) {
         somaValores += v;
         somaQuantidades += q;
