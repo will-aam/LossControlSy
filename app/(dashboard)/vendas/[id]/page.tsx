@@ -1,5 +1,5 @@
 import React from "react";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
 import { PageHeader } from "@/components/PageHeader";
@@ -12,11 +12,11 @@ import { Button } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
 
-export default async function VendaDetalhePage({ params }: { params: { id: string } }) {
+export default async function VendaDetalhePage({ params }: { params: Promise<{ id: string }> }) {
   const session = await getSession();
+  if (!session) redirect("/login");
   const ownerId = session?.ownerId || session?.id || "";
 
-  // Await the params object itself since it might be a Promise in Next.js 15
   const unwrappedParams = await params;
   const vendaId = unwrappedParams.id;
 

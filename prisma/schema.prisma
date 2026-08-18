@@ -71,6 +71,7 @@ model User {
   motivosLoja      Motivo[]     @relation("MotivoDono")
   subgruposLoja    Subgrupo[]   @relation("SubgrupoDono")
   vendasLoja       VendaDiaria[] @relation("VendaDono")
+  nfeComprasLoja   NFeCompra[]  @relation("NFeCompraDono")
 
   @@map("users")
 }
@@ -119,6 +120,8 @@ model Item {
 
   eventos    Evento[]
   vendaItens VendaItem[]
+  fornecedores ItemFornecedor[]
+  nfeCompraItens NFeCompraItem[]
 
   @@unique([codigoInterno, ownerId]) // Código é único apenas DENTRO da mesma loja
   @@map("items")
@@ -276,4 +279,57 @@ model VendaItem {
   precoMedio     Decimal  @db.Decimal(10, 2)
 
   @@map("venda_itens")
+}
+
+// ----------------------------------------------------
+// Importação de NFe (Custos)
+// ----------------------------------------------------
+
+model ItemFornecedor {
+  id               String @id @default(uuid())
+  codigoFornecedor String // cProd
+
+  itemId           String
+  item             Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  createdAt        DateTime @default(now())
+
+  @@unique([itemId, codigoFornecedor])
+  @@map("item_fornecedores")
+}
+
+model NFeCompra {
+  id             String   @id @default(uuid())
+  dataImportacao DateTime @default(now())
+  
+  numero         String?
+  emitente       String?
+  dataEmissao    DateTime?
+  valorTotal     Decimal? @db.Decimal(12, 2)
+  xmlContent     String?  @db.Text
+
+  ownerId        String
+  owner          User     @relation("NFeCompraDono", fields: [ownerId], references: [id])
+
+  itens          NFeCompraItem[]
+
+  @@map("nfe_compras")
+}
+
+model NFeCompraItem {
+  id                  String   @id @default(uuid())
+  nfeCompraId         String
+  nfeCompra           NFeCompra @relation(fields: [nfeCompraId], references: [id], onDelete: Cascade)
+  
+  codigoFornecedor    String?  // cProd
+  descricaoFornecedor String?  // xProd
+  unidade             String?  // uCom
+  quantidade          Decimal? @db.Decimal(10, 4) // qCom
+  valorUnitario       Decimal? @db.Decimal(12, 4) // vUnCom
+  valorTotal          Decimal? @db.Decimal(12, 2) // vProd
+
+  itemId              String?
+  item                Item?    @relation(fields: [itemId], references: [id], onDelete: SetNull)
+
+  @@map("nfe_compra_itens")
 }

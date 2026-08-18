@@ -12,7 +12,8 @@ import {
   AlertCircle,
   Store,
   Image as ImageIcon,
-  PlusCircle
+  PlusCircle,
+  Receipt
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -33,7 +34,8 @@ export function NavRail() {
     { icon: BarChart2, label: "Relatórios", href: "/relatorios" },
     { icon: Calendar, label: "Eventos", href: "/eventos" },
     { icon: ImageIcon, label: "Galeria", href: "/galeria" },
-    { icon: BarChart2, label: "Vendas", href: "/vendas" }, // Usando BarChart2 ou outro ícone
+    { icon: BarChart2, label: "Vendas", href: "/vendas" },
+    { icon: Receipt, label: "Importação NFe", href: "/nfe-importacao" },
   ];
 
   return (

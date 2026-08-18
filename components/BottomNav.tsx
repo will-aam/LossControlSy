@@ -16,6 +16,7 @@ import {
   Settings,
   User,
   Calendar,
+  Receipt,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -40,6 +41,7 @@ export function BottomNav() {
     { icon: Grid, label: "Categorias", href: "/categorias" },
     { icon: AlertCircle, label: "Motivos", href: "/motivos" },
     { icon: BarChart2, label: "Vendas", href: "/vendas" },
+    { icon: Receipt, label: "NFe (Custos)", href: "/nfe-importacao" },
   ];
 
   const systemOptions = [
