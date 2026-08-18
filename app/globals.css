@@ -150,3 +150,20 @@
     @apply bg-surface-3;
   }
 }
+
+/* 
+  Estilos de animação para a AIAssistant 
+*/
+@media (min-width: 768px) {
+  @keyframes float {
+    0%   { transform: translateY(0px); }
+    50%  { transform: translateY(-8px); }
+    100% { transform: translateY(0px); }
+  }
+  .bot-float {
+    animation: float 3s ease-in-out infinite;
+  }
+  .bot-float:hover {
+    animation-play-state: paused;
+  }
+}

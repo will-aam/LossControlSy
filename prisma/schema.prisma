@@ -69,6 +69,8 @@ model User {
   evidenciasLoja   Evidencia[]  @relation("EvidenciaDono")
   notasLoja        NotaFiscal[] @relation("NotaDono")
   motivosLoja      Motivo[]     @relation("MotivoDono")
+  subgruposLoja    Subgrupo[]   @relation("SubgrupoDono")
+  vendasLoja       VendaDiaria[] @relation("VendaDono")
 
   @@map("users")
 }
@@ -86,6 +88,7 @@ model Categoria {
   owner     User     @relation("CategoriaDono", fields: [ownerId], references: [id])
 
   items Item[]
+  subgrupos Subgrupo[]
 
   @@unique([nome, ownerId]) // O nome agora é único apenas DENTRO da mesma loja
   @@map("categorias")
@@ -105,13 +108,17 @@ model Item {
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
-  categoriaId String
-  categoria   Categoria @relation(fields: [categoriaId], references: [id])
+  categoriaId String?
+  categoria   Categoria? @relation(fields: [categoriaId], references: [id])
+
+  subgrupoId  String?
+  subgrupo    Subgrupo?  @relation(fields: [subgrupoId], references: [id])
 
   ownerId     String
   owner       User   @relation("ItemDono", fields: [ownerId], references: [id])
 
-  eventos Evento[]
+  eventos    Evento[]
+  vendaItens VendaItem[]
 
   @@unique([codigoInterno, ownerId]) // Código é único apenas DENTRO da mesma loja
   @@map("items")
@@ -224,4 +231,49 @@ model Configuracao {
   dono   User   @relation(fields: [donoId], references: [id])
 
   @@map("configuracoes")
+}
+
+model Subgrupo {
+  id          String   @id @default(uuid())
+  codigo      String
+
+  categoriaId String?
+  categoria   Categoria? @relation(fields: [categoriaId], references: [id])
+
+  ownerId     String
+  owner       User     @relation("SubgrupoDono", fields: [ownerId], references: [id])
+
+  items       Item[]
+
+  @@unique([codigo, ownerId])
+  @@map("subgrupos")
+}
+
+model VendaDiaria {
+  id             String   @id @default(uuid())
+  data           DateTime 
+  dataImportacao DateTime @default(now())
+  
+  ownerId        String
+  owner          User     @relation("VendaDono", fields: [ownerId], references: [id])
+
+  itens          VendaItem[]
+
+  @@unique([data, ownerId])
+  @@map("vendas_diarias")
+}
+
+model VendaItem {
+  id             String   @id @default(uuid())
+  vendaDiariaId  String
+  vendaDiaria    VendaDiaria @relation(fields: [vendaDiariaId], references: [id], onDelete: Cascade)
+  
+  itemId         String
+  item           Item     @relation(fields: [itemId], references: [id])
+  
+  quantidade     Decimal  @db.Decimal(10, 3)
+  valorLiquido   Decimal  @db.Decimal(10, 2)
+  precoMedio     Decimal  @db.Decimal(10, 2)
+
+  @@map("venda_itens")
 }

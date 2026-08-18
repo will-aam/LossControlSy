@@ -9,21 +9,7 @@ import remarkBreaks from "remark-breaks";
 import Image from "next/image";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
-const floatStyles = `
-  @media (min-width: 768px) {
-    @keyframes float {
-      0%   { transform: translateY(0px); }
-      50%  { transform: translateY(-8px); }
-      100% { transform: translateY(0px); }
-    }
-    .bot-float {
-      animation: float 3s ease-in-out infinite;
-    }
-    .bot-float:hover {
-      animation-play-state: paused;
-    }
-  }
-`;
+
 
 interface Message {
   role: "user" | "assistant";
@@ -52,6 +38,12 @@ export function AIAssistant() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, isLoading]);
+
+  useEffect(() => {
+    const handleOpen = () => setIsOpen(true);
+    window.addEventListener("open-ai-assistant", handleOpen);
+    return () => window.removeEventListener("open-ai-assistant", handleOpen);
+  }, []);
 
   const handleSendMessage = async (text: string) => {
     if (!text.trim() || isLoading) return;
@@ -130,13 +122,12 @@ export function AIAssistant() {
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
-      <style>{floatStyles}</style>
-      {/* Floating Action Button trigger */}
+      {/* Floating Action Button trigger - Oculto no desktop (agora fica no NavRail) */}
       <SheetTrigger asChild>
         <button
-          className={`fixed bottom-24 right-4 md:bottom-8 md:right-8 p-0 h-12 w-12 md:h-16 md:w-16 rounded-full transition-all duration-300 ${
+          className={`fixed bottom-24 right-4 md:hidden p-0 h-12 w-12 rounded-full transition-all duration-300 ${
             isOpen ? "scale-0 opacity-0" : "scale-100 opacity-100 bot-float"
-          } z-50 overflow-hidden ring-1 ring-white/50 shadow-sm md:shadow-[0_0_20px_rgba(255,255,255,0.3),0_8px_30px_rgba(0,0,0,0.4)] hover:md:shadow-[0_0_30px_rgba(255,255,255,0.45),0_12px_40px_rgba(0,0,0,0.5)] md:hover:scale-110 md:ring-2 md:ring-white/70`}
+          } z-50 overflow-hidden ring-1 ring-white/50 shadow-sm`}
           style={{ willChange: "transform" }}
         >
           <Image src="/bot.png" alt="IA Assistant" fill sizes="(max-width: 768px) 48px, 64px" className="object-cover" />
@@ -144,7 +135,7 @@ export function AIAssistant() {
       </SheetTrigger>
 
       {/* Sidebar Content */}
-      <SheetContent side="right" className="w-[90vw] sm:max-w-[700px] flex flex-col p-0 h-full border-l bg-background">
+      <SheetContent side="left" className="w-[90vw] sm:max-w-[700px] flex flex-col p-0 h-full border-r bg-background">
         {/* Header */}
         <SheetHeader className="p-4 border-b bg-surface flex flex-row items-center gap-3 space-y-0 text-left">
           <div className="relative w-8 h-8 rounded-full overflow-hidden border">

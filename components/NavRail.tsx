@@ -33,6 +33,7 @@ export function NavRail() {
     { icon: BarChart2, label: "Relatórios", href: "/relatorios" },
     { icon: Calendar, label: "Eventos", href: "/eventos" },
     { icon: ImageIcon, label: "Galeria", href: "/galeria" },
+    { icon: BarChart2, label: "Vendas", href: "/vendas" }, // Usando BarChart2 ou outro ícone
   ];
 
   return (
@@ -65,6 +66,18 @@ export function NavRail() {
       </nav>
 
       <div className="mt-auto w-full space-y-2 flex flex-col items-center">
+        <button 
+          onClick={() => window.dispatchEvent(new Event("open-ai-assistant"))}
+          className={cn(
+            "p-3 rounded-xl text-muted-foreground hover:bg-surface-2 hover:text-foreground transition-colors flex items-center",
+            aberto ? "justify-start gap-3 w-full" : "justify-center"
+          )}
+        >
+          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary overflow-hidden border">
+            <img src="/bot.png" alt="IA" className="object-cover w-full h-full" />
+          </div>
+          {aberto && <span className="font-medium text-foreground">Kim (IA)</span>}
+        </button>
         <button className={cn(
           "p-3 rounded-xl text-muted-foreground hover:bg-surface-2 hover:text-foreground transition-colors flex items-center",
           aberto ? "justify-start gap-3 w-full" : "justify-center"

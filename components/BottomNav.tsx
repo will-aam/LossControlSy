@@ -39,6 +39,7 @@ export function BottomNav() {
     { icon: Store, label: "Catálogo", href: "/catalogo" },
     { icon: Grid, label: "Categorias", href: "/categorias" },
     { icon: AlertCircle, label: "Motivos", href: "/motivos" },
+    { icon: BarChart2, label: "Vendas", href: "/vendas" },
   ];
 
   const systemOptions = [
