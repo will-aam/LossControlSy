@@ -173,3 +173,23 @@ export async function mapItemToCatalog(nfeItemId: string, catalogItemId: string,
     return { success: false, error: error.message || "Erro interno ao mapear item." };
   }
 }
+
+export async function deleteNFeImport(id: string) {
+  try {
+    const user = await getSession();
+    if (!user || !user.ownerId) return { success: false, error: "Não autorizado." };
+
+    await prisma.nFeCompra.delete({
+      where: {
+        id,
+        ownerId: user.ownerId
+      }
+    });
+
+    revalidatePath("/nfe-importacao");
+    return { success: true };
+  } catch (error: any) {
+    console.error("Erro ao excluir NFe:", error);
+    return { success: false, error: "Falha ao excluir a importação da Nota." };
+  }
+}

@@ -7,6 +7,9 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ArrowLeft, CheckCircle2, AlertCircle, Search, Store } from "lucide-react";
 import { MapeamentoNFeItem } from "@/components/nfe/MapeamentoNFeItem";
+import { ExcluirNFeButton } from "@/components/nfe/ExcluirNFeButton";
+import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/PageHeader";
 
 export default async function NFeDetalhesPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await getSession();
@@ -18,7 +21,13 @@ export default async function NFeDetalhesPage({ params }: { params: Promise<{ id
     include: {
       itens: {
         include: {
-          item: true // Catálogo
+          item: {
+            select: {
+              id: true,
+              nome: true,
+              codigoInterno: true
+            }
+          }
         }
       }
     }
@@ -32,20 +41,36 @@ export default async function NFeDetalhesPage({ params }: { params: Promise<{ id
     select: { id: true, nome: true, codigoInterno: true }
   });
 
-  const pendentes = nfe.itens.filter((i: any) => !i.itemId);
-  const mapeados = nfe.itens.filter((i: any) => i.itemId);
+  // Ensure Decimal values are converted to numbers for Client Components
+  const itens = nfe.itens.map((item: any) => ({
+    ...item,
+    quantidade: item.quantidade ? Number(item.quantidade) : null,
+    valorUnitario: item.valorUnitario ? Number(item.valorUnitario) : null,
+    valorTotal: item.valorTotal ? Number(item.valorTotal) : null
+  }));
+
+  const pendentes = itens.filter((i: any) => !i.itemId);
+  const mapeados = itens.filter((i: any) => i.itemId);
 
   return (
-    <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/nfe-importacao" className="p-2 bg-surface rounded-xl hover:bg-surface-2 transition-colors">
-          <ArrowLeft size={20} className="text-foreground" />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Detalhes da NFe</h1>
-          <p className="text-muted-foreground text-sm">Nº {nfe.numero} • {nfe.emitente}</p>
+    <>
+      <main className="flex-1 space-y-6 px-4 py-5 md:px-8 md:py-6 overflow-y-auto">
+        <div className="flex items-start sm:items-center justify-between gap-4 mb-2 border-b pb-6">
+          <div className="flex items-center gap-4">
+            <Button variant="outline" size="icon" asChild className="rounded-full shrink-0">
+              <Link href="/nfe-importacao">
+                <ArrowLeft className="w-5 h-5" />
+              </Link>
+            </Button>
+            <PageHeader 
+              title="Detalhes da Importação NFe"
+              description={`Importado em ${format(new Date(nfe.dataImportacao), "dd/MM/yyyy 'às' HH:mm")}`}
+            />
+          </div>
+          <div className="flex-shrink-0">
+            <ExcluirNFeButton id={nfe.id} />
+          </div>
         </div>
-      </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-surface p-4 rounded-2xl border">
@@ -112,6 +137,7 @@ export default async function NFeDetalhesPage({ params }: { params: Promise<{ id
           ))}
         </div>
       </div>
-    </div>
+      </main>
+    </>
   );
 }

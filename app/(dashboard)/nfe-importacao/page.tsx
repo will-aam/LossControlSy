@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { ImportNFeForm } from "@/components/nfe/ImportNFeForm";
 import { HistoricoNFeList } from "@/components/nfe/HistoricoNFeList";
 import { Receipt } from "lucide-react";
+import { PageHeader } from "@/components/PageHeader";
 
 export const metadata = {
   title: "Importação de NFe | Controle",
@@ -17,7 +18,7 @@ export default async function NFeImportacaoPage() {
   }
 
   // Buscar histórico de NFe
-  const historico = await prisma.nFeCompra.findMany({
+  const historicoRaw = await prisma.nFeCompra.findMany({
     where: { ownerId: user.ownerId },
     orderBy: { dataImportacao: "desc" },
     include: {
@@ -27,26 +28,32 @@ export default async function NFeImportacaoPage() {
     }
   });
 
-  return (
-    <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Receipt className="text-primary" />
-            Importação de NFe (XML)
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Importe arquivos XML de Notas Fiscais para registrar custos e vincular produtos ao catálogo.
-          </p>
-        </div>
-        
-        <ImportNFeForm />
-      </div>
+  const historico = historicoRaw.map(nfe => ({
+    ...nfe,
+    valorTotal: nfe.valorTotal ? Number(nfe.valorTotal) : null
+  }));
 
-      <div className="pt-4">
-        <h2 className="text-lg font-semibold mb-4 text-foreground">Histórico de Importações</h2>
-        <HistoricoNFeList historico={historico} />
-      </div>
-    </div>
+  return (
+    <>
+      <PageHeader
+        title="Importação de NFe"
+        description="Importe arquivos XML das notas fiscais e mapeie os produtos."
+      />
+      <main className="flex-1 space-y-6 px-4 py-5 md:px-8 md:py-6 overflow-y-auto">
+        {/* Formulário de Importação (oculto no mobile) */}
+        <div className="hidden md:block">
+          <ImportNFeForm />
+        </div>
+
+        {/* Aviso para mobile */}
+        <div className="md:hidden bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 p-4 rounded-xl text-sm font-medium text-center">
+          A importação de XML só está disponível pelo computador.
+        </div>
+
+        <div>
+          <HistoricoNFeList historico={historico} />
+        </div>
+      </main>
+    </>
   );
 }
