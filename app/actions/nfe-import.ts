@@ -20,6 +20,64 @@ function extractTagValue(xml: string, tag: string): string | null {
   return match ? match[1].trim() : null;
 }
 
+export async function recalcularCustosItem(itemId: string, ownerId: string) {
+  try {
+    // Buscar todos os itens de nota fiscal vinculados a este produto
+    const nfeItens = await prisma.nFeCompraItem.findMany({
+      where: {
+        itemId: itemId,
+        nfeCompra: { ownerId: ownerId }
+      },
+      include: {
+        nfeCompra: true
+      },
+      orderBy: {
+        nfeCompra: { dataEmissao: 'desc' }
+      }
+    });
+
+    if (nfeItens.length === 0) {
+      // Se não tiver notas, não mexe no custo unitário atual,
+      // ou zera o custo médio (ou não mexe). Por segurança, vamos apenas zerar o custo médio
+      await prisma.item.update({
+        where: { id: itemId },
+        data: { custoMedio: 0 }
+      });
+      return;
+    }
+
+    // O último custo é o da nota mais recente
+    const ultimoCusto = nfeItens[0].valorUnitario || 0;
+
+    // Calcular o custo médio ponderado
+    let somaValores = 0;
+    let somaQuantidades = 0;
+
+    for (const item of nfeItens) {
+      const v = Number(item.valorTotal || 0);
+      const q = Number(item.quantidade || 0);
+      if (v > 0 && q > 0) {
+        somaValores += v;
+        somaQuantidades += q;
+      }
+    }
+
+    const custoMedio = somaQuantidades > 0 ? (somaValores / somaQuantidades) : 0;
+
+    // Atualiza o item
+    await prisma.item.update({
+      where: { id: itemId },
+      data: {
+        custo: ultimoCusto,
+        custoMedio: custoMedio
+      }
+    });
+
+  } catch (error) {
+    console.error("Erro ao recalcular custos do item:", error);
+  }
+}
+
 export async function importNFeXML(formData: FormData) {
   try {
     const user = await getSession();
@@ -117,6 +175,15 @@ export async function importNFeXML(formData: FormData) {
       }
     });
 
+    // Recalcular custos para os itens que foram mapeados automaticamente
+    const mappedIds = new Set<string>();
+    for (const m of mappedItemsToSave) {
+      if (m.itemId) mappedIds.add(m.itemId);
+    }
+    for (const id of Array.from(mappedIds)) {
+      await recalcularCustosItem(id, user.ownerId);
+    }
+
     revalidatePath("/nfe-importacao");
     return { success: true, count: itensNFe.length, nfeId: nfe.id };
   } catch (error: any) {
@@ -165,6 +232,9 @@ export async function mapItemToCatalog(nfeItemId: string, catalogItemId: string,
       }
     });
 
+    // 4. Recalcular Custos
+    await recalcularCustosItem(catalogItemId, user.ownerId);
+
     revalidatePath("/nfe-importacao");
     revalidatePath(`/nfe-importacao/${updatedItem.nfeCompraId}`);
     return { success: true };
@@ -204,6 +274,9 @@ export async function unmapItemFromCatalog(nfeItemId: string, catalogItemId: str
       }
     });
 
+    // 4. Recalcular Custos
+    await recalcularCustosItem(catalogItemId, user.ownerId);
+
     revalidatePath("/nfe-importacao");
     revalidatePath(`/nfe-importacao/${updatedItem.nfeCompraId}`);
     return { success: true };
@@ -218,12 +291,30 @@ export async function deleteNFeImport(id: string) {
     const user = await getSession();
     if (!user || !user.ownerId) return { success: false, error: "Não autorizado." };
 
+    // Buscar os itens mapeados antes de deletar a nota, para poder recalcular o custo deles
+    const nfe = await prisma.nFeCompra.findUnique({
+      where: { id: id, ownerId: user.ownerId },
+      include: { itens: true }
+    });
+
+    if (!nfe) return { success: false, error: "NFe não encontrada." };
+
+    const mappedItemIds = new Set<string>();
+    nfe.itens.forEach(item => {
+      if (item.itemId) mappedItemIds.add(item.itemId);
+    });
+
     await prisma.nFeCompra.delete({
       where: {
         id,
         ownerId: user.ownerId
       }
     });
+
+    // Recalcular custos dos itens afetados
+    for (const itemId of Array.from(mappedItemIds)) {
+      await recalcularCustosItem(itemId, user.ownerId);
+    }
 
     revalidatePath("/nfe-importacao");
     return { success: true };

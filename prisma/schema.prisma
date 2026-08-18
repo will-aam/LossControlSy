@@ -103,6 +103,7 @@ model Item {
   nome          String
   unidade       ItemUnidade @default(UN)
   custo         Decimal     @db.Decimal(10, 2)
+  custoMedio    Decimal     @default(0) @db.Decimal(10, 2)
   precoVenda    Decimal     @db.Decimal(10, 2)
   imagemUrl     String?
   status        String      @default("ativo") // ativo, inativo

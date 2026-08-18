@@ -30,6 +30,7 @@ export interface Item {
   subcategoria?: string;
   unidade: "UN" | "KG" | "CX" | "L";
   custo: number;
+  custoMedio?: number;
   precoVenda: number;
   imagemUrl?: string;
   status: "ativo" | "inativo";

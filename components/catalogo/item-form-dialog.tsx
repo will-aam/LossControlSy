@@ -22,8 +22,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Item } from "@/lib/types";
 import { getCategorias } from "@/app/actions/categorias";
-import { Upload, Image as ImageIcon, X, Barcode, Loader2, Link2, Trash2 } from "lucide-react";
-import { getItemFornecedores, deleteItemFornecedor } from "@/app/actions/catalogo";
+import { Upload, Image as ImageIcon, X, Barcode, Loader2, Link2, Trash2, Plus } from "lucide-react";
+import { getItemFornecedores, deleteItemFornecedor, createItemFornecedor } from "@/app/actions/catalogo";
 import { toast } from "sonner";
 
 interface ItemFormDialogProps {
@@ -59,6 +59,8 @@ export function ItemFormDialog({
   // Estados de Fornecedores Vinculados
   const [fornecedores, setFornecedores] = useState<any[]>([]);
   const [loadingFornecedores, setLoadingFornecedores] = useState(false);
+  const [novoCodigo, setNovoCodigo] = useState("");
+  const [addingFornecedor, setAddingFornecedor] = useState(false);
 
   // Carregar categorias ao montar
   useEffect(() => {
@@ -119,6 +121,20 @@ export function ItemFormDialog({
     } else {
       toast.error(res.message || "Erro ao desvincular.");
     }
+  };
+
+  const handleAddFornecedor = async () => {
+    if (!novoCodigo.trim() || !item?.id) return;
+    setAddingFornecedor(true);
+    const res = await createItemFornecedor(item.id, novoCodigo);
+    if (res.success) {
+      toast.success("Código adicionado com sucesso!");
+      setNovoCodigo("");
+      loadFornecedores(item.id);
+    } else {
+      toast.error(res.message || "Erro ao adicionar código.");
+    }
+    setAddingFornecedor(false);
   };
 
   const handleInputChange = (field: keyof Item, value: any) => {
@@ -339,7 +355,7 @@ export function ItemFormDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="custo">Custo Unitário (R$) *</Label>
               <Input
@@ -350,6 +366,17 @@ export function ItemFormDialog({
                 onChange={(e) =>
                   handleInputChange("custo", parseFloat(e.target.value))
                 }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="custoMedio">Custo Médio (R$)</Label>
+              <Input
+                id="custoMedio"
+                type="number"
+                step="0.01"
+                value={formData.custoMedio || "0.00"}
+                disabled
+                className="bg-muted text-muted-foreground"
               />
             </div>
             <div className="space-y-2">
@@ -395,9 +422,33 @@ export function ItemFormDialog({
                   ))}
                 </div>
               )}
-              <p className="text-xs text-muted-foreground mt-2">
+              <p className="text-xs text-muted-foreground mt-2 mb-3">
                 Esses códigos são utilizados para reconhecer os itens automaticamente na importação de notas fiscais.
               </p>
+              
+              <div className="flex gap-2 items-center">
+                <Input
+                  placeholder="Novo código"
+                  value={novoCodigo}
+                  onChange={(e) => setNovoCodigo(e.target.value)}
+                  className="h-8 text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddFornecedor();
+                    }
+                  }}
+                />
+                <Button 
+                  type="button" 
+                  onClick={handleAddFornecedor} 
+                  disabled={!novoCodigo.trim() || addingFornecedor}
+                  size="sm"
+                  className="h-8"
+                >
+                  {addingFornecedor ? <Loader2 className="h-4 w-4 animate-spin" /> : <><Plus className="h-4 w-4 mr-1" /> Adicionar</>}
+                </Button>
+              </div>
             </div>
           )}
         </div>

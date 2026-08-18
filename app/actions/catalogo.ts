@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { ItemUnidade } from "@prisma/client";
 import { Item } from "@/lib/types";
 import { getSession } from "@/lib/session"; // NOVO
+import { recalcularCustosItem } from "./nfe-import";
 
 // Tipo para criação de item
 export type CreateItemData = {
@@ -52,6 +53,7 @@ export async function getItens() {
     const formattedItens = itens.map((item) => ({
       ...item,
       custo: Number(item.custo),
+      custoMedio: Number((item as any).custoMedio || 0),
       precoVenda: Number(item.precoVenda),
       preco: Number(item.precoVenda),
     }));
@@ -363,11 +365,68 @@ export async function deleteItemFornecedor(fornecedorId: string) {
       data: { itemId: null }
     });
 
+    await recalcularCustosItem(fornecedor.itemId, session.ownerId);
+
     revalidatePath("/catalogo");
     return { success: true };
   } catch (error) {
     console.error("Erro ao remover vínculo de fornecedor:", error);
     return { success: false, message: "Erro ao desvincular fornecedor." };
+  }
+}
+
+// 9. Adicionar Fornecedor (XML) Manualmente ao Item
+export async function createItemFornecedor(itemId: string, codigoFornecedor: string) {
+  const session = await getSession();
+  if (!session) return { success: false, message: "Não autorizado" };
+
+  if (!codigoFornecedor.trim()) {
+    return { success: false, message: "O código do fornecedor não pode ser vazio." };
+  }
+
+  try {
+    const item = await prisma.item.findUnique({
+      where: { id: itemId }
+    });
+
+    if (!item || item.ownerId !== session.ownerId) {
+      return { success: false, message: "Item não encontrado ou sem permissão." };
+    }
+
+    // Usa upsert para não dar erro se já existir
+    await prisma.itemFornecedor.upsert({
+      where: {
+        itemId_codigoFornecedor: {
+          itemId: itemId,
+          codigoFornecedor: codigoFornecedor
+        }
+      },
+      update: {},
+      create: {
+        itemId: itemId,
+        codigoFornecedor: codigoFornecedor
+      }
+    });
+
+    // Atualizar TODOS os itens de notas passadas que tinham esse código
+    await prisma.nFeCompraItem.updateMany({
+      where: {
+        codigoFornecedor: codigoFornecedor,
+        nfeCompra: { ownerId: session.ownerId }, // apenas notas da loja
+        itemId: null // que ainda não estão mapeados
+      },
+      data: {
+        itemId: itemId
+      }
+    });
+
+    await recalcularCustosItem(itemId, session.ownerId);
+
+    revalidatePath("/catalogo");
+    return { success: true };
+  } catch (error) {
+    console.error("Erro ao adicionar vínculo de fornecedor:", error);
+    return { success: false, message: "Erro ao adicionar código do fornecedor." };
   }
 }
 
