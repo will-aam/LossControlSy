@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { Check, ChevronsUpDown, PackageSearch, AlertCircle, Link2, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { mapItemToCatalog } from "@/app/actions/nfe-import";
+import { mapItemToCatalog, unmapItemFromCatalog } from "@/app/actions/nfe-import";
 import { toast } from "sonner";
 import {
   Popover,
@@ -50,6 +50,24 @@ export function MapeamentoNFeItem({
       }
     } catch (err) {
       toast.error("Erro inesperado ao vincular item.");
+    } finally {
+      setIsMapping(false);
+    }
+  };
+
+  const handleUnmap = async () => {
+    if (!nfeItem.item) return;
+    setIsMapping(true);
+    
+    try {
+      const res = await unmapItemFromCatalog(nfeItem.id, nfeItem.item.id, nfeItem.codigoFornecedor);
+      if (res.success) {
+        toast.success(`Vínculo removido com sucesso!`);
+      } else {
+        toast.error(res.error || "Erro ao desvincular item.");
+      }
+    } catch (err) {
+      toast.error("Erro inesperado ao desvincular item.");
     } finally {
       setIsMapping(false);
     }
@@ -128,12 +146,20 @@ export function MapeamentoNFeItem({
             </PopoverContent>
           </Popover>
         ) : (
-          <div className="w-full flex items-center gap-3 p-2.5 px-4 text-sm text-left border rounded-xl bg-surface-2 text-foreground">
+          <div className="w-full flex items-center gap-3 p-2 px-4 text-sm text-left border rounded-xl bg-surface-2 text-foreground relative group">
             <PackageSearch size={18} className="text-emerald-500 shrink-0" />
             <div className="truncate flex-1">
               <p className="font-medium truncate line-clamp-1">{nfeItem.item?.nome}</p>
               <p className="text-xs text-muted-foreground">Código Interno: {nfeItem.item?.codigoInterno}</p>
             </div>
+            
+            <button 
+              onClick={handleUnmap}
+              className="absolute right-2 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 hover:bg-destructive/10 text-destructive rounded-md"
+              title="Desvincular item"
+            >
+              <Link2 size={16} className="rotate-45" />
+            </button>
           </div>
         )}
       </div>

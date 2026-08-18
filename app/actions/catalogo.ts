@@ -315,3 +315,59 @@ export async function importarItens(itensImportados: Item[]) {
     return { success: false, message: "Falha ao processar importação." };
   }
 }
+
+// 7. Obter Fornecedores (XML) vinculados ao Item
+export async function getItemFornecedores(itemId: string) {
+  const session = await getSession();
+  if (!session) return { success: false, data: [] };
+
+  try {
+    const fornecedores = await prisma.itemFornecedor.findMany({
+      where: {
+        itemId: itemId,
+        item: { ownerId: session.ownerId } // Garantir posse
+      }
+    });
+
+    return { success: true, data: fornecedores };
+  } catch (error) {
+    console.error("Erro ao buscar fornecedores:", error);
+    return { success: false, data: [] };
+  }
+}
+
+// 8. Desvincular Fornecedor (XML) do Item
+export async function deleteItemFornecedor(fornecedorId: string) {
+  const session = await getSession();
+  if (!session) return { success: false, message: "Não autorizado" };
+
+  try {
+    const fornecedor = await prisma.itemFornecedor.findUnique({
+      where: { id: fornecedorId },
+      include: { item: true }
+    });
+
+    if (!fornecedor || fornecedor.item.ownerId !== session.ownerId) {
+      return { success: false, message: "Vínculo não encontrado ou sem permissão." };
+    }
+
+    await prisma.itemFornecedor.delete({ where: { id: fornecedorId } });
+
+    // Atualiza NFeCompraItem relacionados
+    await prisma.nFeCompraItem.updateMany({
+      where: {
+        codigoFornecedor: fornecedor.codigoFornecedor,
+        itemId: fornecedor.itemId,
+        nfeCompra: { ownerId: session.ownerId }
+      },
+      data: { itemId: null }
+    });
+
+    revalidatePath("/catalogo");
+    return { success: true };
+  } catch (error) {
+    console.error("Erro ao remover vínculo de fornecedor:", error);
+    return { success: false, message: "Erro ao desvincular fornecedor." };
+  }
+}
+

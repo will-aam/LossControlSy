@@ -22,7 +22,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Item } from "@/lib/types";
 import { getCategorias } from "@/app/actions/categorias";
-import { Upload, Image as ImageIcon, X, Barcode, Loader2 } from "lucide-react";
+import { Upload, Image as ImageIcon, X, Barcode, Loader2, Link2, Trash2 } from "lucide-react";
+import { getItemFornecedores, deleteItemFornecedor } from "@/app/actions/catalogo";
+import { toast } from "sonner";
 
 interface ItemFormDialogProps {
   open: boolean;
@@ -53,6 +55,10 @@ export function ItemFormDialog({
   // Estados da Imagem
   const [imageTab, setImageTab] = useState<"url" | "upload">("upload");
   const [previewUrl, setPreviewUrl] = useState<string>("");
+
+  // Estados de Fornecedores Vinculados
+  const [fornecedores, setFornecedores] = useState<any[]>([]);
+  const [loadingFornecedores, setLoadingFornecedores] = useState(false);
 
   // Carregar categorias ao montar
   useEffect(() => {
@@ -86,13 +92,34 @@ export function ItemFormDialog({
         setFormData(item);
         setPreviewUrl(item.imagemUrl || "");
         setImageTab(item.imagemUrl?.startsWith("blob:") ? "upload" : "url");
+        loadFornecedores(item.id);
       } else {
         setFormData({ unidade: "UN", status: "ativo" });
         setPreviewUrl("");
         setImageTab("upload");
+        setFornecedores([]);
       }
     }
   }, [open, item]);
+
+  const loadFornecedores = async (itemId: string) => {
+    setLoadingFornecedores(true);
+    const res = await getItemFornecedores(itemId);
+    if (res.success && res.data) {
+      setFornecedores(res.data);
+    }
+    setLoadingFornecedores(false);
+  };
+
+  const handleUnlink = async (fornecedorId: string) => {
+    const res = await deleteItemFornecedor(fornecedorId);
+    if (res.success) {
+      toast.success("Vínculo removido com sucesso!");
+      setFornecedores(prev => prev.filter(f => f.id !== fornecedorId));
+    } else {
+      toast.error(res.message || "Erro ao desvincular.");
+    }
+  };
 
   const handleInputChange = (field: keyof Item, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -338,6 +365,41 @@ export function ItemFormDialog({
               />
             </div>
           </div>
+
+          {/* Vínculos de Fornecedores */}
+          {isEditing && (
+            <div className="border-t pt-4 mt-2">
+              <Label className="mb-2 block flex items-center gap-2 text-muted-foreground"><Link2 size={16} /> Códigos de Fornecedor (XML)</Label>
+              {loadingFornecedores ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 size={14} className="animate-spin" /> Carregando vínculos...</div>
+              ) : fornecedores.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic bg-surface-2 p-3 rounded-lg border border-dashed">Nenhum código de fornecedor vinculado a este produto.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto pr-2 mt-2">
+                  {fornecedores.map(f => (
+                    <div key={f.id} className="inline-flex items-center gap-1.5 bg-secondary text-secondary-foreground text-xs font-mono font-medium px-2.5 py-1 rounded-full border">
+                      {f.codigoFornecedor}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleUnlink(f.id);
+                        }}
+                        className="hover:bg-destructive hover:text-destructive-foreground rounded-full p-0.5 transition-colors focus:outline-none"
+                        title="Remover vínculo"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground mt-2">
+                Esses códigos são utilizados para reconhecer os itens automaticamente na importação de notas fiscais.
+              </p>
+            </div>
+          )}
         </div>
 
         <DialogFooter>

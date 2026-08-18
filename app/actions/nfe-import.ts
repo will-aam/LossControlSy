@@ -173,6 +173,45 @@ export async function mapItemToCatalog(nfeItemId: string, catalogItemId: string,
     return { success: false, error: error.message || "Erro interno ao mapear item." };
   }
 }
+export async function unmapItemFromCatalog(nfeItemId: string, catalogItemId: string, codigoFornecedor: string) {
+  try {
+    const user = await getSession();
+    if (!user || !user.ownerId) return { success: false, error: "Não autorizado." };
+
+    // 1. Remover a associação da tabela ItemFornecedor
+    await prisma.itemFornecedor.deleteMany({
+      where: {
+        itemId: catalogItemId,
+        codigoFornecedor: codigoFornecedor
+      }
+    });
+
+    // 2. Atualizar NFeCompraItem atual e remover o mapeamento
+    const updatedItem = await prisma.nFeCompraItem.update({
+      where: { id: nfeItemId },
+      data: { itemId: null }
+    });
+
+    // 3. (Opcional mas útil) Remover também das outras notas com o mesmo mapeamento errado
+    await prisma.nFeCompraItem.updateMany({
+      where: {
+        codigoFornecedor: codigoFornecedor,
+        itemId: catalogItemId,
+        nfeCompra: { ownerId: user.ownerId }
+      },
+      data: {
+        itemId: null
+      }
+    });
+
+    revalidatePath("/nfe-importacao");
+    revalidatePath(`/nfe-importacao/${updatedItem.nfeCompraId}`);
+    return { success: true };
+  } catch (error: any) {
+    console.error("Erro unmapItemFromCatalog:", error);
+    return { success: false, error: error.message || "Erro interno ao desvincular item." };
+  }
+}
 
 export async function deleteNFeImport(id: string) {
   try {
