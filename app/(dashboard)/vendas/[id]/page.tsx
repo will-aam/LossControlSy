@@ -21,9 +21,9 @@ export default async function VendaDetalhePage({ params }: { params: Promise<{ i
   const vendaId = unwrappedParams.id;
 
   const venda = await prisma.vendaDiaria.findUnique({
-    where: { 
+    where: {
       id: vendaId,
-      ownerId 
+      ownerId
     },
     include: {
       itens: {
@@ -51,7 +51,7 @@ export default async function VendaDetalhePage({ params }: { params: Promise<{ i
   const itensMapped = venda.itens.map((vi: any) => {
     const vLiquido = Number(vi.valorLiquido);
     const qtd = Number(vi.quantidade);
-    
+
     valorTotal += vLiquido;
     totalItensVendidos += qtd;
 
@@ -74,59 +74,59 @@ export default async function VendaDetalhePage({ params }: { params: Promise<{ i
   return (
     <>
       <main className="flex-1 space-y-6 px-4 py-5 md:px-8 md:py-6 overflow-y-auto">
-      <div className="flex items-center gap-4 mb-2">
-        <Button variant="outline" size="icon" asChild className="rounded-full shrink-0">
-          <Link href="/vendas">
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-        </Button>
-        <PageHeader 
-          title={`Vendas: ${format(new Date(venda.data), "dd 'de' MMMM, yyyy", { locale: ptBR })}`}
-          description={`Importado em ${format(new Date(venda.dataImportacao), "dd/MM/yyyy 'às' HH:mm")}`}
-        />
-      </div>
+        <div className="flex items-center gap-4 mb-2">
+          <Button variant="outline" size="icon" asChild className="rounded-full shrink-0">
+            <Link href="/vendas">
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+          </Button>
+          <PageHeader
+            title={`Vendas: ${format(new Date(venda.data), "dd 'de' MMMM, yyyy", { locale: ptBR })}`}
+            description={`Importado em ${format(new Date(venda.dataImportacao), "dd/MM/yyyy 'às' HH:mm")}`}
+          />
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Insight 1: Faturamento */}
-        <div className="bg-surface border rounded-2xl p-6 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center text-green-600 dark:text-green-400 shrink-0">
-            <TrendingUp className="w-6 h-6" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Insight 1: Faturamento */}
+          <div className="bg-surface border rounded-2xl p-6 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center text-green-600 dark:text-green-400 shrink-0">
+              <TrendingUp className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground font-medium">Faturamento do Dia</p>
+              <h3 className="text-2xl font-bold">{formatCurrency(valorTotal)}</h3>
+            </div>
           </div>
-          <div>
-            <p className="text-sm text-muted-foreground font-medium">Faturamento do Dia</p>
-            <h3 className="text-2xl font-bold">{formatCurrency(valorTotal)}</h3>
+
+          {/* Insight 2: Total de Itens (Volume) */}
+          <div className="bg-surface border rounded-2xl p-6 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
+              <Package className="w-6 h-6" />
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground font-medium">Volume (Unid/KG)</p>
+              <h3 className="text-2xl font-bold">
+                {new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 }).format(totalItensVendidos)}
+              </h3>
+            </div>
+          </div>
+
+          {/* Insight 3: Produto Mais Vendido */}
+          <div className="bg-surface border rounded-2xl p-6 shadow-sm flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
+              <Tag className="w-6 h-6" />
+            </div>
+            <div className="overflow-hidden">
+              <p className="text-sm text-muted-foreground font-medium">Produto Mais Vendido</p>
+              <h3 className="text-lg font-bold truncate" title={produtoMaisVendido.nome}>
+                {produtoMaisVendido.nome}
+              </h3>
+              <p className="text-xs text-muted-foreground">{produtoMaisVendido.qtd} unidades</p>
+            </div>
           </div>
         </div>
 
-        {/* Insight 2: Total de Itens (Volume) */}
-        <div className="bg-surface border rounded-2xl p-6 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
-            <Package className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-sm text-muted-foreground font-medium">Volume (Unid/KG)</p>
-            <h3 className="text-2xl font-bold">
-              {new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 3 }).format(totalItensVendidos)}
-            </h3>
-          </div>
-        </div>
-
-        {/* Insight 3: Produto Mais Vendido */}
-        <div className="bg-surface border rounded-2xl p-6 shadow-sm flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
-            <Tag className="w-6 h-6" />
-          </div>
-          <div className="overflow-hidden">
-            <p className="text-sm text-muted-foreground font-medium">Produto Mais Vendido</p>
-            <h3 className="text-lg font-bold truncate" title={produtoMaisVendido.nome}>
-              {produtoMaisVendido.nome}
-            </h3>
-            <p className="text-xs text-muted-foreground">{produtoMaisVendido.qtd} unidades</p>
-          </div>
-        </div>
-      </div>
-
-      <VendaDetalheItens itens={itensMapped} />
+        <VendaDetalheItens itens={itensMapped} />
 
       </main>
     </>

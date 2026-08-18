@@ -39,9 +39,9 @@ export function VendaDetalheItens({ itens }: { itens: VendaItemDetalhe[] }) {
         <h3 className="font-semibold">Produtos Vendidos</h3>
         <div className="relative w-full sm:w-64">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <input 
-            type="text" 
-            placeholder="Buscar produto ou código..." 
+          <input
+            type="text"
+            placeholder="Buscar produto ou código..."
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);
@@ -92,14 +92,14 @@ export function VendaDetalheItens({ itens }: { itens: VendaItemDetalhe[] }) {
             Página {currentPage} de {totalPages}
           </div>
           <div className="flex gap-2">
-            <button 
+            <button
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
               disabled={currentPage === 1}
               className="p-2 border rounded-lg hover:bg-surface disabled:opacity-50"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <button 
+            <button
               onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
               disabled={currentPage === totalPages}
               className="p-2 border rounded-lg hover:bg-surface disabled:opacity-50"

@@ -33,7 +33,7 @@ export function ImportVendasForm() {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      formData.append("data", date.toISOString());
+      formData.append("data", format(date, "yyyy-MM-dd"));
 
       const result = await importVendasCSV(formData);
 

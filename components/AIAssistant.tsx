@@ -88,7 +88,7 @@ export function AIAssistant() {
     }
 
     const SpeechRecognition = typeof window !== "undefined" && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
-    
+
     if (!SpeechRecognition) {
       alert("Seu navegador não suporta reconhecimento de voz.");
       return;
@@ -125,9 +125,8 @@ export function AIAssistant() {
       {/* Floating Action Button trigger - Oculto no desktop (agora fica no NavRail) */}
       <SheetTrigger asChild>
         <button
-          className={`fixed bottom-24 right-4 md:hidden p-0 h-12 w-12 rounded-full transition-all duration-300 ${
-            isOpen ? "scale-0 opacity-0" : "scale-100 opacity-100 bot-float"
-          } z-50 overflow-hidden ring-1 ring-white/50 shadow-sm`}
+          className={`fixed bottom-24 right-4 md:hidden p-0 h-12 w-12 rounded-full transition-all duration-300 ${isOpen ? "scale-0 opacity-0" : "scale-100 opacity-100 bot-float"
+            } z-50 overflow-hidden ring-1 ring-white/50 shadow-sm`}
           style={{ willChange: "transform" }}
         >
           <Image src="/bot.png" alt="IA Assistant" fill sizes="(max-width: 768px) 48px, 64px" className="object-cover" />
@@ -139,9 +138,9 @@ export function AIAssistant() {
         {/* Header */}
         <SheetHeader className="p-4 border-b bg-surface flex flex-row items-center gap-3 space-y-0 text-left">
           <div className="relative w-8 h-8 rounded-full overflow-hidden border">
-            <Image src="/bot.png" alt="Kim (IA)" fill className="object-cover" />
+            <Image src="/bot.png" alt="Iris (IA)" fill className="object-cover" />
           </div>
-          <SheetTitle className="text-base font-semibold">Kim</SheetTitle>
+          <SheetTitle className="text-base font-semibold">Iris</SheetTitle>
         </SheetHeader>
 
         {/* Messages Area */}
@@ -150,10 +149,10 @@ export function AIAssistant() {
             <div className="flex flex-col h-full">
               <div className="flex-1 flex flex-col items-center justify-center text-center space-y-4 opacity-80 mt-10">
                 <div className="relative w-16 h-16 rounded-full overflow-hidden border-2 border-primary/20 shadow-sm">
-                  <Image src="/bot.png" alt="Kim" fill className="object-cover" />
+                  <Image src="/bot.png" alt="Iris" fill className="object-cover" />
                 </div>
                 <p className="text-sm text-muted-foreground max-w-[250px]">
-                  Olá! Sou a Kim, sua assistente de gestão de perdas. Como posso ajudar hoje?
+                  Olá! Sou a Iris, sua assistente de gestão de perdas. Como posso ajudar hoje?
                 </p>
               </div>
 
@@ -177,16 +176,14 @@ export function AIAssistant() {
             messages.map((msg, i) => (
               <div
                 key={i}
-                className={`flex items-start gap-3 ${
-                  msg.role === "user" ? "flex-row-reverse" : ""
-                }`}
+                className={`flex items-start gap-3 ${msg.role === "user" ? "flex-row-reverse" : ""
+                  }`}
               >
                 <div
-                  className={`flex items-center justify-center h-8 w-8 rounded-full shrink-0 overflow-hidden ${
-                    msg.role === "user"
-                      ? "bg-primary/10 text-primary"
-                      : "border"
-                  }`}
+                  className={`flex items-center justify-center h-8 w-8 rounded-full shrink-0 overflow-hidden ${msg.role === "user"
+                    ? "bg-primary/10 text-primary"
+                    : "border"
+                    }`}
                 >
                   {msg.role === "user" ? (
                     <User className="h-4 w-4" />
@@ -194,14 +191,13 @@ export function AIAssistant() {
                     <Image src="/bot.png" alt="IA" width={32} height={32} className="object-cover w-full h-full" />
                   )}
                 </div>
-                
+
                 <div className={`flex flex-col max-w-[85%] ${msg.role === "user" ? "items-end" : "items-start"}`}>
                   <div
-                    className={`text-sm px-4 py-3 rounded-xl ${
-                      msg.role === "user"
-                        ? "bg-primary text-primary-foreground rounded-tr-none"
-                        : "bg-surface text-foreground rounded-tl-none border prose prose-sm prose-p:leading-relaxed prose-pre:bg-muted prose-pre:text-muted-foreground prose-a:text-primary max-w-none"
-                    }`}
+                    className={`text-sm px-4 py-3 rounded-xl ${msg.role === "user"
+                      ? "bg-primary text-primary-foreground rounded-tr-none"
+                      : "bg-surface text-foreground rounded-tl-none border prose prose-sm prose-p:leading-relaxed prose-pre:bg-muted prose-pre:text-muted-foreground prose-a:text-primary max-w-none"
+                      }`}
                   >
                     {msg.role === "user" ? (
                       <div className="whitespace-pre-wrap">{msg.content}</div>
@@ -209,7 +205,7 @@ export function AIAssistant() {
                       <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>{msg.content}</ReactMarkdown>
                     )}
                   </div>
-                  
+
                   {/* Copy Button for Assistant Messages */}
                   {msg.role === "assistant" && (
                     <button
@@ -253,11 +249,10 @@ export function AIAssistant() {
           <div className="relative flex items-center gap-2">
             <button
               onClick={toggleListening}
-              className={`flex-shrink-0 h-10 w-10 flex items-center justify-center rounded-full transition-colors shadow-sm border ${
-                isListening 
-                  ? "bg-red-100 text-red-600 border-red-200 animate-pulse" 
-                  : "bg-surface text-muted-foreground hover:bg-surface-2 hover:text-foreground"
-              }`}
+              className={`flex-shrink-0 h-10 w-10 flex items-center justify-center rounded-full transition-colors shadow-sm border ${isListening
+                ? "bg-red-100 text-red-600 border-red-200 animate-pulse"
+                : "bg-surface text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+                }`}
               title={isListening ? "Ouvindo..." : "Falar"}
             >
               <Mic className="h-5 w-5" />

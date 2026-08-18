@@ -23,7 +23,7 @@ export async function askAssistant(userMessage: string) {
 
     // 3. Prepare Prompt Context
     const systemPrompt = `
-Você é a Kim, a assistente inteligente de gestão e controle de perdas do estabelecimento. 
+Você é a Iris, a assistente inteligente de gestão e controle de perdas do estabelecimento. 
 
 Regras de Comportamento:
 1. Seja sempre amigável, conversacional e humano.
@@ -38,11 +38,11 @@ ${JSON.stringify(dashboardData)}
 
     // 4. Generate Content
     const response = await ai.models.generateContent({
-        model: 'gemini-3.6-flash',
-        contents: userMessage,
-        config: {
-            systemInstruction: systemPrompt
-        }
+      model: 'gemini-3.6-flash',
+      contents: userMessage,
+      config: {
+        systemInstruction: systemPrompt
+      }
     });
 
     const responseText = response.text;
