@@ -446,15 +446,15 @@ export default function CatalogoPage() {
         <div className="flex-1 overflow-hidden border border-border/50 rounded-2xl relative bg-card/40 backdrop-blur-md shadow-sm">
           <div className="absolute inset-0 overflow-y-auto">
             <table className="w-full caption-bottom text-sm border-collapse">
-              <TableHeader className="sticky top-0 z-20 bg-card/40 backdrop-blur-md border-b border-white/10">
-                <TableRow className="border-none hover:bg-transparent">
-                  <TableHead className="w-[40%] text-slate-300 font-medium">Item</TableHead>
-                  <TableHead className="text-slate-300 font-medium">Código</TableHead>
-                  <TableHead className="text-slate-300 font-medium">Categoria</TableHead>
-                  <TableHead className="text-slate-300 font-medium">Unidade</TableHead>
-                  <TableHead className="text-right text-slate-300 font-medium">Preço</TableHead>
-                  <TableHead className="w-25 text-center text-slate-300 font-medium">Status</TableHead>
-                  <TableHead className="w-12.5 text-slate-300"></TableHead>
+              <TableHeader className="sticky top-0 z-20 bg-card border-b border-border">
+                <TableRow className="border-none hover:bg-card">
+                  <TableHead className="w-[40%] text-slate-300 font-medium bg-card">Item</TableHead>
+                  <TableHead className="text-slate-300 font-medium bg-card">Código</TableHead>
+                  <TableHead className="text-slate-300 font-medium bg-card">Categoria</TableHead>
+                  <TableHead className="text-slate-300 font-medium bg-card">Unidade</TableHead>
+                  <TableHead className="text-right text-slate-300 font-medium bg-card">Preço</TableHead>
+                  <TableHead className="w-25 text-center text-slate-300 font-medium bg-card">Status</TableHead>
+                  <TableHead className="w-12.5 text-slate-300 bg-card"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>

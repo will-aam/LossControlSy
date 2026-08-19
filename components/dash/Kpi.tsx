@@ -56,7 +56,10 @@ export function Kpi({
       <p className={`mt-1.5 text-[22px] font-semibold leading-none tabular-nums md:text-2xl ${toneClass}`}>{value}</p>
       <div className="mt-2 flex items-center gap-1.5 text-[11px]">
         {delta !== undefined && (
-          <span className={`inline-flex items-center gap-0.5 tabular-nums ${good ? "text-positive" : "text-negative"}`}>
+          <span 
+            className={`inline-flex items-center gap-0.5 tabular-nums cursor-help ${good ? "text-positive" : "text-negative"}`}
+            title="Comparação de crescimento ou queda em relação ao período anterior"
+          >
             <Icon className="h-3 w-3" />
             {Math.abs(delta).toFixed(1)}%
           </span>

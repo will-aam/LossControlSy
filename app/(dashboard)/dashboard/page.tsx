@@ -12,15 +12,18 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { AlertTriangle, FileCode2, PanelLeft, Search } from "lucide-react";
+import { AlertTriangle, FileCode2, PanelLeft, Search, Info } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger, PopoverPrimitive } from "@/components/ui/popover";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-import { Kpi } from "@/components/dash/Kpi";
-import { Carousel } from "@/components/dash/Carousel";
 import { PageHeader } from "@/components/PageHeader";
 import { DashboardCharts } from "@/components/dashboard/dashboard-charts";
 import { CriticalItems } from "@/components/dashboard/critical-items";
+import { DashboardKpis } from "@/components/dashboard/dashboard-kpis";
+import { DashboardFilters } from "@/components/dashboard/dashboard-filters";
 import { getDashboardStats } from "@/app/actions/dashboard";
-import { DollarSign, AlertCircle, TrendingUp, PackageSearch, ArrowLeftRight, FileText } from "lucide-react";
+import { PackageSearch, ArrowLeftRight, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
@@ -35,6 +38,7 @@ type ProdutoLinha = {
   perdido: number;
   custo: number;
   precoVenda: number;
+  faturamentoReal?: number;
   limitePerda: number;
 };
 
@@ -63,6 +67,7 @@ type Totais = {
   perdido: number;
   perdaPct: number;
   perdaValor: number;
+  custoVendido: number;
   ruptura: number;
   excesso: number;
   xmlsImportados: number;
@@ -71,18 +76,22 @@ type Totais = {
 };
 
 function agregarReais(linhas: ProdutoLinha[], limiteGlobal: number, importados: number): Totais {
-  const faturamento = linhas.reduce((s, l) => s + l.vendido * l.precoVenda, 0);
-  const custoTotal = linhas.reduce((s, l) => s + l.chegou * l.custo, 0);
+  const faturamento = linhas.reduce((s, l) => s + (l.faturamentoReal || (l.vendido * l.precoVenda)), 0);
+  const custoTotal = linhas.reduce((s, l) => s + l.chegou * l.custo, 0); // Custos totais recebidos
+  const custoVendido = linhas.reduce((s, l) => s + l.vendido * l.custo, 0);
   const perdaValor = linhas.reduce((s, l) => s + l.perdido * l.custo, 0);
   const chegou = linhas.reduce((s, l) => s + l.chegou, 0);
   const vendido = linhas.reduce((s, l) => s + l.vendido, 0);
   const perdido = linhas.reduce((s, l) => s + l.perdido, 0);
 
+  const lucro = faturamento - custoVendido - perdaValor;
+
   return {
     faturamento,
     custoTotal,
-    lucro: faturamento - custoTotal,
-    margem: faturamento ? ((faturamento - custoTotal) / faturamento) * 100 : 0,
+    custoVendido,
+    lucro,
+    margem: faturamento ? (lucro / faturamento) * 100 : 0,
     chegou,
     vendido,
     perdido,
@@ -141,26 +150,8 @@ export default function Dashboard() {
   const [pa, setPa] = useState("2026-W33");
   const [pb, setPb] = useState("2026-W32");
   const [busca, setBusca] = useState("");
-  const [limiteGlobal, setLimiteGlobal] = useState(8);
+  const [limiteGlobal, setLimiteGlobal] = useState(2);
   const [soAlertas, setSoAlertas] = useState(false);
-
-  // --- Real DB Stats ---
-  const [stats, setStats] = useState<any>(null);
-  const [isLoadingStats, setIsLoadingStats] = useState(true);
-
-  useEffect(() => {
-    async function loadData() {
-      setIsLoadingStats(true);
-      const result = await getDashboardStats();
-      if (result.success && result.data) {
-        setStats(result.data);
-      } else {
-        toast.error("Erro ao carregar os dados reais do dashboard.");
-      }
-      setIsLoadingStats(false);
-    }
-    loadData();
-  }, []);
 
   const [linhasA, setLinhasA] = useState<ProdutoLinha[]>([]);
   const [linhasB, setLinhasB] = useState<ProdutoLinha[]>([]);
@@ -191,12 +182,23 @@ export default function Dashboard() {
     loadRealData();
   }, [diasA, diasB]);
 
-  const A = useMemo(() => agregarReais(linhasA, limiteGlobal, xmlsA), [linhasA, limiteGlobal, xmlsA]);
-  const B = useMemo(() => agregarReais(linhasB, limiteGlobal, xmlsB), [linhasB, limiteGlobal, xmlsB]);
+  const filteredLinhasA = useMemo(() => {
+    const q = busca.trim().toLowerCase();
+    if (!q) return linhasA;
+    return linhasA.filter((l) => l.descricao.toLowerCase().includes(q) || l.codigo.toLowerCase().includes(q));
+  }, [linhasA, busca]);
+
+  const filteredLinhasB = useMemo(() => {
+    const q = busca.trim().toLowerCase();
+    if (!q) return linhasB;
+    return linhasB.filter((l) => l.descricao.toLowerCase().includes(q) || l.codigo.toLowerCase().includes(q));
+  }, [linhasB, busca]);
+
+  const A = useMemo(() => agregarReais(filteredLinhasA, limiteGlobal, xmlsA), [filteredLinhasA, limiteGlobal, xmlsA]);
+  const B = useMemo(() => agregarReais(filteredLinhasB, limiteGlobal, xmlsB), [filteredLinhasB, limiteGlobal, xmlsB]);
 
   const tabela = useMemo(() => {
-    const q = busca.trim().toLowerCase();
-    return linhasA
+    return filteredLinhasA
       .map((l) => {
         const perdaPct = l.chegou ? (l.perdido / l.chegou) * 100 : 0;
         const giro = l.chegou ? (l.vendido / l.chegou) * 100 : 0;
@@ -205,10 +207,9 @@ export default function Dashboard() {
           giro > 95 ? "ruptura" : perdaPct > limite ? "desperdicio" : "ok";
         return { ...l, perdaPct, giro, limite, status, faturou: l.vendido * l.precoVenda };
       })
-      .filter((l) => (!q || l.descricao.toLowerCase().includes(q) || l.codigo.toLowerCase().includes(q)))
       .filter((l) => (!soAlertas ? true : l.status !== "ok"))
       .sort((a, b) => b.faturou - a.faturou);
-  }, [linhasA, busca, limiteGlobal, soAlertas]);
+  }, [filteredLinhasA, limiteGlobal, soAlertas]);
 
   const rupturas = tabela.filter((l) => l.status === "ruptura");
   const desperdicios = tabela.filter((l) => l.status === "desperdicio");
@@ -249,184 +250,43 @@ export default function Dashboard() {
 
       <main className="flex-1 overflow-y-auto space-y-6 px-4 py-5 md:px-8 md:py-6">
         {/* Filtros soltos */}
-        <section className="flex flex-wrap items-end gap-x-5 gap-y-3 text-xs">
-          <label className="flex flex-col gap-1">
-            <span className="text-[11px] uppercase tracking-wider text-muted-foreground">Período</span>
-            <input
-              type={inputType}
-              value={pa}
-              onChange={(e) => setPa(e.target.value)}
-              className="rounded-md bg-surface px-2.5 py-1.5 text-sm text-foreground outline-none focus:bg-surface-2"
-            />
-          </label>
-          <label className="flex flex-col gap-1">
-            <span className="text-[11px] uppercase tracking-wider text-muted-foreground">Comparar com</span>
-            <input
-              type={inputType}
-              value={pb}
-              onChange={(e) => setPb(e.target.value)}
-              className="rounded-md bg-surface px-2.5 py-1.5 text-sm text-foreground outline-none focus:bg-surface-2"
-            />
-          </label>
-          <label className="hidden flex-col gap-1 md:flex">
-            <span className="text-[11px] uppercase tracking-wider text-muted-foreground">
-              Limite de perda ({limiteGlobal}%)
-            </span>
-            <input
-              type="range"
-              min={1}
-              max={20}
-              value={limiteGlobal}
-              onChange={(e) => setLimiteGlobal(Number(e.target.value))}
-              className="h-8 w-40 accent-[var(--primary)]"
-            />
-          </label>
-          <label className="relative ml-auto flex items-center">
-            <Search className="pointer-events-none absolute left-2.5 h-3.5 w-3.5 text-muted-foreground" />
-            <input
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              placeholder="Buscar produto ou código"
-              className="w-full rounded-md bg-surface py-1.5 pl-8 pr-3 text-sm outline-none placeholder:text-muted-foreground focus:bg-surface-2 md:w-64"
-            />
-          </label>
-        </section>
+        <DashboardFilters
+          modo={modo}
+          pa={pa}
+          setPa={setPa}
+          pb={pb}
+          setPb={setPb}
+          limiteGlobal={limiteGlobal}
+          setLimiteGlobal={setLimiteGlobal}
+          busca={busca}
+          setBusca={setBusca}
+        />
 
-        {/* KPIs essenciais — carrossel manual no mobile */}
-        <section>
-          <Carousel gridClass="md:grid-cols-4 xl:grid-cols-6">
-            {[
-              <Kpi 
-                key="fat" 
-                label="Faturou" 
-                value={brl(A.faturamento)} 
-                delta={delta(A.faturamento, B.faturamento)} 
-                infoContent={
-                  <div className="space-y-2">
-                    <p className="flex items-center gap-1.5 font-medium text-slate-100">
-                      <DollarSign className="h-4 w-4 text-emerald-400" />
-                      Total arrecadado nas vendas
-                    </p>
-                    <p className="text-muted-foreground text-xs">
-                      Calculado multiplicando a <em>quantidade vendida</em> de cada produto pelo seu <em>preço de venda</em>.
-                    </p>
-                  </div>
-                }
-              />,
-              <Kpi
-                key="perda"
-                label="Perda"
-                value={pct(A.perdaPct)}
-                delta={delta(A.perdaPct, B.perdaPct)}
-                invert
-                tone={A.perdaPct > limiteGlobal ? "negative" : "positive"}
-                hint={`${brl(A.perdaValor)} · limite ${limiteGlobal}%`}
-                infoContent={
-                  <div className="space-y-2">
-                    <p className="flex items-center gap-1.5 font-medium text-slate-100">
-                      <AlertCircle className="h-4 w-4 text-rose-400" />
-                      % de produtos descartados
-                    </p>
-                    <p className="text-muted-foreground text-xs">
-                      <em>Perda %</em> = quantidade perdida ÷ quantidade que chegou × 100.
-                    </p>
-                    <p className="text-muted-foreground text-xs">
-                      Uma perda alta significa <strong>dinheiro jogado fora</strong>.
-                    </p>
-                  </div>
-                }
-              />,
-              <Kpi
-                key="lucro"
-                label="Lucro"
-                value={brl(A.lucro)}
-                delta={delta(A.lucro, B.lucro)}
-                hint={`margem ${pct(A.margem)}`}
-                infoContent={
-                  <div className="space-y-2">
-                    <p className="flex items-center gap-1.5 font-medium text-slate-100">
-                      <TrendingUp className="h-4 w-4 text-emerald-400" />
-                      O que sobrou de verdade
-                    </p>
-                    <p className="text-muted-foreground text-xs">
-                      <em>Lucro</em> = Faturamento − Custo total das mercadorias vendidas e perdidas.
-                    </p>
-                    <p className="text-muted-foreground text-xs">
-                      Indicador principal da <strong>saúde financeira</strong> do período.
-                    </p>
-                  </div>
-                }
-              />,
-              <Kpi
-                key="rup"
-                label="Ruptura"
-                value={`${A.ruptura} itens`}
-                tone={A.ruptura > 0 ? "warning" : "positive"}
-                hint="venderam quase tudo"
-                infoContent={
-                  <div className="space-y-2">
-                    <p className="flex items-center gap-1.5 font-medium text-slate-100">
-                      <PackageSearch className="h-4 w-4 text-amber-400" />
-                      Prestígio em prateleira
-                    </p>
-                    <p className="text-muted-foreground text-xs">
-                      Sinaliza produtos que venderam <em>mais de 95% do estoque disponível</em>.
-                    </p>
-                    <p className="text-muted-foreground text-xs">
-                      Item muito procurado e corre <strong>grande risco de faltar</strong>, perdendo vendas futuras.
-                    </p>
-                  </div>
-                }
-              />,
-              <Kpi
-                key="cheg"
-                label="Chegou vs perdeu"
-                value={`${num(A.chegou)} / ${num(A.perdido)}`}
-                hint={`vendidos ${num(A.vendido)}`}
-                className="hidden xl:block"
-                infoContent={
-                  <div className="space-y-2">
-                    <p className="flex items-center gap-1.5 font-medium text-slate-100">
-                      <ArrowLeftRight className="h-4 w-4 text-sky-400" />
-                      Balanço de volume físico
-                    </p>
-                    <p className="text-muted-foreground text-xs">
-                      <em>Chegou</em>: itens que entraram via Notas Fiscais.<br/>
-                      <em>Perdeu</em>: itens descartados.
-                    </p>
-                  </div>
-                }
-              />,
-              <Kpi
-                key="xml"
-                label="XMLs importados"
-                value={num(A.xmlsImportados)}
-                hint={`${num(A.itensXml)} itens · ${A.xmlsPendentes} pendentes`}
-                className="hidden xl:block"
-                infoContent={
-                  <div className="space-y-2">
-                    <p className="flex items-center gap-1.5 font-medium text-slate-100">
-                      <FileText className="h-4 w-4 text-indigo-400" />
-                      Notas Fiscais processadas
-                    </p>
-                    <p className="text-muted-foreground text-xs">
-                      Cada XML alimenta automaticamente o seu <em>custo</em> e a quantidade que <strong>chegou</strong> ao estoque.
-                    </p>
-                  </div>
-                }
-              />,
-            ]}
-          </Carousel>
-        </section>
+        <DashboardKpis A={A} B={B} limiteGlobal={limiteGlobal} />
 
 
         {/* Gráficos */}
         <section className="grid gap-2.5 lg:grid-cols-3">
-          <div className="rounded-xl bg-surface p-4 lg:col-span-2">
+          <div className="rounded-xl bg-surface p-4 lg:col-span-2 shadow-sm">
             <div className="mb-3 flex items-baseline justify-between">
-              <h2 className="text-[13px] font-medium">Faturamento por dia</h2>
+              <h2 className="text-[13px] font-medium flex items-center gap-1.5">
+                Faturamento por dia
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button className="text-muted-foreground hover:text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-full">
+                      <Info className="h-4 w-4" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent side="right" align="center" className="w-64 text-sm p-4 leading-relaxed bg-slate-900 border-slate-800 shadow-xl z-50">
+                    <p className="text-xs text-slate-300">
+                      Comparativo de Receita Bruta Diária do período filtrado contra o período anterior.
+                    </p>
+                    <PopoverPrimitive.Arrow className="fill-slate-900" width={16} height={8} />
+                  </PopoverContent>
+                </Popover>
+              </h2>
               <span className="text-[11px] text-muted-foreground">
-                linha clara: {rotulo(modo, pa)} · linha escura: {rotulo(modo, pb)}
+                linha sólida: {rotulo(modo, pa)} · linha pontilhada: {rotulo(modo, pb)}
               </span>
             </div>
             <div className="h-56 md:h-64">
@@ -436,12 +296,13 @@ export default function Dashboard() {
                   <XAxis dataKey="dia" tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
                   <Tooltip
+                    itemStyle={{ color: "#f1f5f9" }}
                     contentStyle={{
-                      background: "var(--surface-2)",
-                      border: "none",
+                      background: "#0f172a",
+                      border: "1px solid #1e293b",
                       borderRadius: 10,
                       fontSize: 12,
-                      color: "var(--foreground)",
+                      color: "#f1f5f9",
                     }}
                   />
                   <Line type="monotone" dataKey="Faturamento" stroke="var(--chart-1)" strokeWidth={2} dot={false} />
@@ -459,9 +320,24 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div className="rounded-xl bg-surface p-4">
+          <div className="rounded-xl bg-surface p-4 shadow-sm">
             <div className="mb-3 flex items-baseline justify-between">
-              <h2 className="text-[13px] font-medium">% de perda por dia</h2>
+              <h2 className="text-[13px] font-medium flex items-center gap-1.5">
+                % de perda por dia
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button className="text-muted-foreground hover:text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-full">
+                      <Info className="h-4 w-4" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent side="right" align="center" className="w-64 text-sm p-4 leading-relaxed bg-slate-900 border-slate-800 shadow-xl z-50">
+                    <p className="text-xs text-slate-300">
+                      Percentual financeiro de perdas em relação à receita bruta de cada dia.
+                    </p>
+                    <PopoverPrimitive.Arrow className="fill-slate-900" width={16} height={8} />
+                  </PopoverContent>
+                </Popover>
+              </h2>
               <span className="text-[11px] text-muted-foreground">limite {limiteGlobal}%</span>
             </div>
             <div className="h-56 md:h-64">
@@ -472,12 +348,14 @@ export default function Dashboard() {
                   <YAxis tick={{ fontSize: 11, fill: "var(--muted-foreground)" }} axisLine={false} tickLine={false} />
                   <Tooltip
                     cursor={{ fill: "var(--surface-2)" }}
+                    formatter={(value: number) => [`${value.toFixed(1)}%`, "Perda"]}
+                    itemStyle={{ color: "#f1f5f9" }}
                     contentStyle={{
-                      background: "var(--surface-2)",
-                      border: "none",
+                      background: "#0f172a",
+                      border: "1px solid #1e293b",
                       borderRadius: 10,
                       fontSize: 12,
-                      color: "var(--foreground)",
+                      color: "#f1f5f9",
                     }}
                   />
                   <Bar dataKey="Perda" radius={[4, 4, 0, 0]} fill="var(--chart-3)" />
@@ -487,35 +365,48 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* Decisão rápida */}
-        <section className="grid gap-2.5 md:grid-cols-2">
-          <Alerta
-            titulo="Ruptura — repor mais"
-            icone="ruptura"
-            vazio="Nenhum item em risco de faltar."
-            itens={rupturas.slice(0, 5).map((l) => ({
-              codigo: l.codigo,
-              descricao: l.descricao,
-              info: `saída ${l.giro.toFixed(0)}% · sobrou ${l.chegou - l.vendido - l.perdido}`,
-            }))}
-          />
-          <Alerta
-            titulo="Desperdício — produzir menos"
-            icone="desperdicio"
-            vazio="Nenhum item acima do limite de perda."
-            itens={desperdicios.slice(0, 5).map((l) => ({
-              codigo: l.codigo,
-              descricao: l.descricao,
-              info: `perda ${pct(l.perdaPct)} (limite ${l.limite}%) · ${brl(l.perdido * l.custo)}`,
-            }))}
-          />
-        </section>
+        {/* Blocos Integrados de Dados Reais & Desperdício Crítico */}
+        <div className="grid gap-4 lg:grid-cols-3 xl:gap-6 mt-2">
+          {/* Top 5 Critical Items agora usa os desperdícios vivos! */}
+          <div className="lg:col-span-1">
+            <CriticalItems itens={desperdicios} />
+          </div>
 
-        {/* Tabela */}
-        <section className="rounded-xl bg-surface p-4">
-          <div className="mb-3 flex flex-wrap items-center gap-3">
-            <h2 className="mr-auto text-[13px] font-medium">Produtos · {rotulo(modo, pa)}</h2>
-            <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
+          <div className="lg:col-span-2">
+            {isLoadingReal ? (
+              <div className="flex flex-col items-center justify-center py-12 gap-4 bg-surface rounded-xl shadow-sm h-full min-h-[250px]">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="text-muted-foreground text-sm">Calculando dados das categorias...</p>
+              </div>
+            ) : (
+              <DashboardCharts
+                serieDiaria={serie}
+                produtosFiltrados={filteredLinhasA}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Tabela de Produtos */}
+        <Card className="mt-4 shadow-sm border-border">
+          <CardHeader className="flex flex-row items-center justify-between pb-4 gap-3 space-y-0">
+            <CardTitle className="text-[13px] font-medium flex items-center gap-1.5">
+              Produtos · {rotulo(modo, pa)}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button className="text-muted-foreground hover:text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-full">
+                    <Info className="h-4 w-4" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent side="right" align="center" className="w-64 text-sm p-4 leading-relaxed bg-slate-900 border-slate-800 shadow-xl z-50">
+                  <p className="text-xs text-slate-300">
+                    Detalhamento item a item das entradas, saídas, perdas e alertas durante o período filtrado.
+                  </p>
+                  <PopoverPrimitive.Arrow className="fill-slate-900" width={16} height={8} />
+                </PopoverContent>
+              </Popover>
+            </CardTitle>
+            <label className="flex items-center gap-2 text-[11px] text-muted-foreground font-normal">
               <input
                 type="checkbox"
                 checked={soAlertas}
@@ -524,104 +415,85 @@ export default function Dashboard() {
               />
               somente alertas
             </label>
-          </div>
+          </CardHeader>
 
-          {/* Mobile: lista enxuta */}
-          <ul className="space-y-2.5 md:hidden">
-            {tabela.map((l) => (
-              <li key={l.codigo} className="rounded-lg bg-surface-2 px-3 py-2.5">
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="truncate text-sm">{l.descricao}</span>
-                  <span className="shrink-0 text-sm tabular-nums">{brl(l.faturou)}</span>
-                </div>
-                <div className="mt-1 flex items-center gap-3 text-[11px] text-muted-foreground">
-                  <span className={l.perdaPct > l.limite ? "text-negative" : "text-positive"}>
-                    perda {pct(l.perdaPct)}
-                  </span>
-                  <span>saída {l.giro.toFixed(0)}%</span>
-                  <StatusTag status={l.status} />
-                </div>
-              </li>
-            ))}
-          </ul>
+          <CardContent className="p-0">
+            {/* Mobile: lista enxuta */}
+            <ul className="space-y-2.5 md:hidden px-4 pb-4">
+              {tabela.map((l) => (
+                <li key={l.codigo} className="rounded-lg bg-surface-2 px-3 py-2.5">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="truncate text-sm">{l.descricao}</span>
+                    <span className="shrink-0 text-sm tabular-nums">{brl(l.faturou)}</span>
+                  </div>
+                  <div className="mt-1 flex items-center gap-3 text-[11px] text-muted-foreground">
+                    <span className={l.perdaPct > l.limite ? "text-negative" : "text-positive"}>
+                      perda {pct(l.perdaPct)}
+                    </span>
+                    <span>saída {l.giro.toFixed(0)}%</span>
+                    <StatusTag status={l.status} />
+                  </div>
+                </li>
+              ))}
+            </ul>
 
-          {/* Desktop: tabela completa */}
-          <div className="hidden overflow-x-auto md:block">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <th className="py-2 text-left font-medium">Produto</th>
-                  <th className="py-2 text-right font-medium">Chegou</th>
-                  <th className="py-2 text-right font-medium">Vendeu</th>
-                  <th className="py-2 text-right font-medium">Perdeu</th>
-                  <th className="py-2 text-right font-medium">% perda</th>
-                  <th className="py-2 text-right font-medium">Saída</th>
-                  <th className="py-2 text-right font-medium">Faturou</th>
-                  <th className="py-2 text-right font-medium">Lucro</th>
-                  <th className="py-2 text-right font-medium">Markup</th>
-                  <th className="py-2 text-right font-medium">Status</th>
-                </tr>
-              </thead>
-              <tbody className="tabular-nums">
-                {tabela.map((l) => (
-                  <tr key={l.codigo} className="transition-colors hover:bg-surface-2">
-                    <td className="max-w-[220px] truncate py-2 pr-3">
-                      <span className="text-muted-foreground">{l.codigo}</span> {l.descricao}
-                    </td>
-                    <td className="py-2 text-right">{num(l.chegou)}</td>
-                    <td className="py-2 text-right">{num(l.vendido)}</td>
-                    <td className="py-2 text-right">{num(l.perdido)}</td>
-                    <td className={`py-2 text-right ${l.perdaPct > l.limite ? "text-negative" : "text-positive"}`}>
-                      {pct(l.perdaPct)}
-                    </td>
-                    <td className="py-2 text-right">{l.giro.toFixed(0)}%</td>
-                    <td className="py-2 text-right">{brl(l.faturou)}</td>
-                    <td className="py-2 text-right">{brl(l.faturou - l.chegou * l.custo)}</td>
-                    <td className="py-2 text-right">{(l.precoVenda / l.custo).toFixed(2)}x</td>
-                    <td className="py-2 text-right">
-                      <StatusTag status={l.status} />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {tabela.length === 0 && (
-              <p className="py-6 text-center text-sm text-muted-foreground">Nenhum produto encontrado.</p>
-            )}
-          </div>
-        </section>
+            {/* Desktop: tabela completa */}
+            <div className="hidden md:block max-h-[500px] overflow-auto relative">
+              <table className="w-full caption-bottom text-sm">
+                <TableHeader>
+                    <TableRow className="bg-card text-[11px] uppercase tracking-wider hover:bg-card border-0">
+                      <TableHead className="bg-card font-medium text-left">Código</TableHead>
+                      <TableHead className="bg-card font-medium text-left">Produto</TableHead>
+                      <TableHead className="bg-card font-medium text-right">Chegou</TableHead>
+                      <TableHead className="bg-card font-medium text-right">Vendeu</TableHead>
+                      <TableHead className="bg-card font-medium text-right">Perdeu</TableHead>
+                      <TableHead className="bg-card font-medium text-right">% perda</TableHead>
+                      <TableHead className="bg-card font-medium text-right">Saída</TableHead>
+                      <TableHead className="bg-card font-medium text-right">Faturou</TableHead>
+                      <TableHead className="bg-card font-medium text-right">Lucro</TableHead>
+                      <TableHead className="bg-card font-medium text-right">Markup</TableHead>
+                      <TableHead className="bg-card font-medium text-right pr-4">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody className="tabular-nums">
+                    {tabela.map((l) => (
+                      <TableRow key={l.codigo}>
+                        <TableCell className="py-2.5 text-muted-foreground font-mono text-xs">
+                          {l.codigo}
+                        </TableCell>
+                        <TableCell className="max-w-[220px] truncate py-2.5">
+                          {l.descricao}
+                        </TableCell>
+                        <TableCell className="py-2.5 text-right">{num(l.chegou)}</TableCell>
+                        <TableCell className="py-2.5 text-right">{num(l.vendido)}</TableCell>
+                        <TableCell className="py-2.5 text-right">{num(l.perdido)}</TableCell>
+                        <TableCell className={`py-2.5 text-right ${l.perdaPct > l.limite ? "text-negative font-medium" : "text-positive"}`}>
+                          {pct(l.perdaPct)}
+                        </TableCell>
+                        <TableCell className="py-2.5 text-right">{l.giro.toFixed(0)}%</TableCell>
+                        <TableCell className="py-2.5 text-right">{brl(l.faturou)}</TableCell>
+                        <TableCell className="py-2.5 text-right">{brl(l.faturou - l.chegou * l.custo)}</TableCell>
+                        <TableCell className="py-2.5 text-right">{(l.precoVenda / l.custo).toFixed(2)}x</TableCell>
+                        <TableCell className="py-2.5 text-right pr-4">
+                          <StatusTag status={l.status} />
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+              </table>
+              {tabela.length === 0 && (
+                <p className="py-6 text-center text-sm text-muted-foreground">Nenhum produto encontrado.</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
         {isLoadingReal && (
-          <p className="flex items-center gap-2 pb-4 text-[11px] text-muted-foreground">
+          <p className="flex items-center gap-2 text-[11px] text-muted-foreground">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            Buscando dados em tempo real...
+            Buscando dados no banco...
           </p>
         )}
-
-        {/* === DADOS REAIS INTEGRADOS === */}
-        <div className="pt-8 mt-8 border-t border-border">
-          <h2 className="text-sm font-semibold mb-6 text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            Dados Reais do Sistema
-          </h2>
-
-          {isLoadingStats ? (
-            <div className="flex flex-col items-center justify-center py-12 gap-4 bg-surface rounded-xl">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-muted-foreground text-sm">Calculando dados reais do banco...</p>
-            </div>
-          ) : stats ? (
-            <div className="space-y-6 pb-8">
-              <DashboardCharts
-                tendenciaSemanal={stats.tendenciaSemanal}
-                perdasPorCategoria={stats.perdasPorCategoria}
-              />
-              <div className="grid gap-4 lg:grid-cols-2">
-                <CriticalItems topItens={stats.topItens} />
-              </div>
-            </div>
-          ) : null}
-        </div>
       </main>
     </>
   );
@@ -637,37 +509,6 @@ function StatusTag({ status }: { status: "ruptura" | "desperdicio" | "ok" }) {
   return <span className={`text-[11px] ${cls}`}>{txt}</span>;
 }
 
-function Alerta({
-  titulo,
-  itens,
-  vazio,
-  icone,
-}: {
-  titulo: string;
-  vazio: string;
-  icone: "ruptura" | "desperdicio";
-  itens: Array<{ codigo: string; descricao: string; info: string }>;
-}) {
-  return (
-    <div className="rounded-xl bg-surface p-4">
-      <h2 className="mb-3 flex items-center gap-2 text-[13px] font-medium">
-        <AlertTriangle className={`h-3.5 w-3.5 ${icone === "ruptura" ? "text-warning" : "text-negative"}`} />
-        {titulo}
-      </h2>
-      {itens.length === 0 ? (
-        <p className="text-xs text-muted-foreground">{vazio}</p>
-      ) : (
-        <ul className="space-y-2">
-          {itens.map((i) => (
-            <li key={i.codigo} className="flex items-baseline justify-between gap-3 text-sm">
-              <span className="truncate">{i.descricao}</span>
-              <span className="shrink-0 text-[11px] text-muted-foreground">{i.info}</span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-}
+
 
 export type { ProdutoLinha };

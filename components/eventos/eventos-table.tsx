@@ -56,14 +56,14 @@ export function EventosTable({
     <div className="rounded-md border bg-card overflow-hidden">
       <Table>
         <TableHeader>
-          <TableRow>
-            <TableHead>Data</TableHead>
-            <TableHead>Código</TableHead>
-            <TableHead>Produto</TableHead>
-            <TableHead className="text-right">Qtd.</TableHead>
-            <TableHead className="text-right">Total</TableHead>
-            <TableHead className="w-40">Status</TableHead>
-            <TableHead className="w-12"></TableHead>
+          <TableRow className="bg-card hover:bg-card border-0 text-[11px] uppercase tracking-wider">
+            <TableHead className="bg-card font-medium">Data</TableHead>
+            <TableHead className="bg-card font-medium">Código</TableHead>
+            <TableHead className="bg-card font-medium">Produto</TableHead>
+            <TableHead className="bg-card font-medium text-right">Qtd.</TableHead>
+            <TableHead className="bg-card font-medium text-right">Total</TableHead>
+            <TableHead className="bg-card font-medium w-40">Status</TableHead>
+            <TableHead className="bg-card font-medium w-12"></TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

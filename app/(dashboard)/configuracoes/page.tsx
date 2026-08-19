@@ -347,12 +347,12 @@ export default function ConfiguracoesPage() {
             <CardContent>
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead>Usuário</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Perfil</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="w-25">Ações</TableHead>
+                  <TableRow className="bg-card hover:bg-card border-0 text-[11px] uppercase tracking-wider">
+                    <TableHead className="bg-card font-medium">Usuário</TableHead>
+                    <TableHead className="bg-card font-medium">Email</TableHead>
+                    <TableHead className="bg-card font-medium">Perfil</TableHead>
+                    <TableHead className="bg-card font-medium">Status</TableHead>
+                    <TableHead className="bg-card font-medium w-25">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

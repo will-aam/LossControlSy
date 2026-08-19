@@ -202,7 +202,7 @@ export async function getRealDashboardMetrics(diasIsoA: string[], diasIsoB: stri
     });
 
     // Grouping by Date -> ItemId
-    const dailyData: Record<string, Record<string, { chegou: number, vendido: number, perdido: number }>> = {};
+    const dailyData: Record<string, Record<string, { chegou: number, vendido: number, perdido: number, faturamentoReal: number }>> = {};
     const globalXmlCount: Record<string, number> = {};
 
     for (const d of allDias) {
@@ -219,7 +219,7 @@ export async function getRealDashboardMetrics(diasIsoA: string[], diasIsoB: stri
       
       for (const item of nfe.itens) {
         if (!item.itemId) continue;
-        if (!dailyData[dateStr][item.itemId]) dailyData[dateStr][item.itemId] = { chegou: 0, vendido: 0, perdido: 0 };
+        if (!dailyData[dateStr][item.itemId]) dailyData[dateStr][item.itemId] = { chegou: 0, vendido: 0, perdido: 0, faturamentoReal: 0 };
         dailyData[dateStr][item.itemId].chegou += Number(item.quantidade || 0);
       }
     }
@@ -230,8 +230,9 @@ export async function getRealDashboardMetrics(diasIsoA: string[], diasIsoB: stri
       if (!dailyData[dateStr]) continue;
       
       for (const item of venda.itens) {
-        if (!dailyData[dateStr][item.itemId]) dailyData[dateStr][item.itemId] = { chegou: 0, vendido: 0, perdido: 0 };
+        if (!dailyData[dateStr][item.itemId]) dailyData[dateStr][item.itemId] = { chegou: 0, vendido: 0, perdido: 0, faturamentoReal: 0 };
         dailyData[dateStr][item.itemId].vendido += Number(item.quantidade || 0);
+        dailyData[dateStr][item.itemId].faturamentoReal += Number(item.valorLiquido || 0);
       }
     }
 
@@ -241,7 +242,7 @@ export async function getRealDashboardMetrics(diasIsoA: string[], diasIsoB: stri
       const dateStr = evento.dataHora.toISOString().split("T")[0];
       if (!dailyData[dateStr]) continue;
       
-      if (!dailyData[dateStr][evento.itemId]) dailyData[dateStr][evento.itemId] = { chegou: 0, vendido: 0, perdido: 0 };
+      if (!dailyData[dateStr][evento.itemId]) dailyData[dateStr][evento.itemId] = { chegou: 0, vendido: 0, perdido: 0, faturamentoReal: 0 };
       dailyData[dateStr][evento.itemId].perdido += Number(evento.quantidade || 0);
     }
 
@@ -260,7 +261,7 @@ export async function getRealDashboardMetrics(diasIsoA: string[], diasIsoB: stri
 
     const buildLinhasParaDias = (dias: string[]) => {
       const result: any[] = [];
-      const itemAgg: Record<string, { chegou: number, vendido: number, perdido: number }> = {};
+      const itemAgg: Record<string, { chegou: number, vendido: number, perdido: number, faturamentoReal: number }> = {};
       let xmlsImportados = 0;
 
       for (const d of dias) {
@@ -268,10 +269,11 @@ export async function getRealDashboardMetrics(diasIsoA: string[], diasIsoB: stri
         xmlsImportados += globalXmlCount[d] || 0;
         
         for (const [itemId, stats] of Object.entries(dailyData[d])) {
-          if (!itemAgg[itemId]) itemAgg[itemId] = { chegou: 0, vendido: 0, perdido: 0 };
+          if (!itemAgg[itemId]) itemAgg[itemId] = { chegou: 0, vendido: 0, perdido: 0, faturamentoReal: 0 };
           itemAgg[itemId].chegou += stats.chegou;
           itemAgg[itemId].vendido += stats.vendido;
           itemAgg[itemId].perdido += stats.perdido;
+          itemAgg[itemId].faturamentoReal += (stats.faturamentoReal || 0);
         }
       }
 
@@ -281,7 +283,8 @@ export async function getRealDashboardMetrics(diasIsoA: string[], diasIsoB: stri
           ...catalogMap[itemId],
           chegou: stats.chegou,
           vendido: stats.vendido,
-          perdido: stats.perdido
+          perdido: stats.perdido,
+          faturamentoReal: stats.faturamentoReal
         });
       }
 
@@ -304,8 +307,8 @@ export async function getRealDashboardMetrics(diasIsoA: string[], diasIsoB: stri
         for (const [itemId, stats] of Object.entries(dailyData[d])) {
           const p = catalogMap[itemId];
           if (!p) continue;
-          fatA += stats.vendido * p.precoVenda;
-          lucroA += (stats.vendido * p.precoVenda) - (stats.chegou * p.custo);
+          fatA += stats.faturamentoReal || (stats.vendido * p.precoVenda);
+          lucroA += (stats.faturamentoReal || (stats.vendido * p.precoVenda)) - (stats.vendido * p.custo) - (stats.perdido * p.custo);
           chegouA += stats.chegou;
           perdidoA += stats.perdido;
         }
@@ -315,7 +318,7 @@ export async function getRealDashboardMetrics(diasIsoA: string[], diasIsoB: stri
         for (const [itemId, stats] of Object.entries(dailyData[dB])) {
           const p = catalogMap[itemId];
           if (!p) continue;
-          fatB += stats.vendido * p.precoVenda;
+          fatB += stats.faturamentoReal || (stats.vendido * p.precoVenda);
         }
       }
 

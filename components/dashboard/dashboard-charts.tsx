@@ -1,13 +1,5 @@
-// components/dashboard/dashboard-charts.tsx
 "use client";
 
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import {
   ChartContainer,
   ChartTooltip,
@@ -24,10 +16,12 @@ import {
   Cell,
   ResponsiveContainer,
 } from "recharts";
+import { Info } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger, PopoverPrimitive } from "@/components/ui/popover";
 
 const chartConfig = {
-  custo: { label: "Custo", color: "var(--chart-1)" },
-  precoVenda: { label: "Preço Venda", color: "var(--chart-2)" },
+  custo: { label: "Perda (Custo)", color: "var(--chart-1)" },
+  venda: { label: "Faturamento", color: "var(--chart-2)" },
 };
 
 const categoryColors = [
@@ -39,31 +33,81 @@ const categoryColors = [
 ];
 
 interface DashboardChartsProps {
-  tendenciaSemanal: any[];
-  perdasPorCategoria: any[];
+  // A série diária reagirá à data (diasA)
+  serieDiaria: any[]; 
+  // A lista de produtos filtrados reagirá à busca e à data
+  produtosFiltrados: any[]; 
 }
 
 export function DashboardCharts({
-  tendenciaSemanal,
-  perdasPorCategoria,
+  serieDiaria,
+  produtosFiltrados,
 }: DashboardChartsProps) {
+  
+  // 1. Mapear série diária para o gráfico de tendência
+  // O gráfico espera 'dia', 'custo' (perda) e 'venda' (faturamento)
+  const tendencia = serieDiaria.map(d => ({
+    dia: d.dia,
+    custo: d.Perda,
+    venda: d.Faturamento
+  }));
+
+  // 2. Calcular Top Categorias com base nos produtos filtrados (reage à busca!)
+  const catMap: Record<string, number> = {};
+  produtosFiltrados.forEach(p => {
+    const perdaValor = p.perdido * p.custo;
+    if (perdaValor > 0) {
+      catMap[p.categoria] = (catMap[p.categoria] || 0) + perdaValor;
+    }
+  });
+  
+  const topCategorias = Object.entries(catMap)
+    .map(([categoria, custo]) => ({ categoria, custo }))
+    .sort((a, b) => b.custo - a.custo)
+    .slice(0, 5);
+
+  const customYAxisTick = (props: any) => {
+    const { x, y, payload } = props;
+    const isTruncated = payload.value.length > 12;
+    const text = isTruncated ? `${payload.value.substring(0, 12)}...` : payload.value;
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <title>{payload.value}</title>
+        <text x={0} y={0} dy={4} textAnchor="end" fill="var(--muted-foreground)" fontSize={11} className="font-medium">
+          {text}
+        </text>
+      </g>
+    );
+  };
+
   return (
-    <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
+    <div className="grid gap-4 grid-cols-1 lg:grid-cols-2 h-full">
       {/* Gráfico de Área (Tendência) */}
-      <Card className="col-span-1 shadow-sm flex flex-col">
-        <CardHeader className="px-4 md:px-6">
-          <CardTitle className="text-lg md:text-xl">
-            Tendência Semanal
-          </CardTitle>
-          <CardDescription>Custo vs. Preço de Venda</CardDescription>
-        </CardHeader>
-        <CardContent className="flex-1 px-2 md:px-6 pb-4">
-          {/* CORREÇÃO: Altura fixa segura e largura total */}
-          <ChartContainer config={chartConfig} className="h-[300px] w-full">
+      <div className="rounded-xl bg-surface p-4 shadow-sm flex flex-col h-full">
+        <div className="mb-3 flex items-baseline justify-between">
+          <h2 className="text-[13px] font-medium flex items-center gap-1.5">
+            Tendência do Período
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="text-muted-foreground hover:text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-full">
+                  <Info className="h-4 w-4" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent side="right" align="center" className="w-64 text-sm p-4 leading-relaxed bg-slate-900 border-slate-800 shadow-xl z-50">
+                <p className="text-xs text-slate-300">
+                  Visualização da tendência de Faturamento versus Custo de Perda ao longo do período selecionado.
+                </p>
+                <PopoverPrimitive.Arrow className="fill-slate-900" width={16} height={8} />
+              </PopoverContent>
+            </Popover>
+          </h2>
+          <span className="text-[11px] text-muted-foreground">Faturamento vs Perda</span>
+        </div>
+        <div className="flex-1 min-h-[250px]">
+          <ChartContainer config={chartConfig} className="h-full w-full">
             <ResponsiveContainer width="100%" height="100%">
-              {/* CORREÇÃO: Margens ajustadas para não cortar valores no mobile */}
               <AreaChart
-                data={tendenciaSemanal}
+                data={tendencia}
                 margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
               >
                 <CartesianGrid
@@ -83,9 +127,9 @@ export function DashboardCharts({
                   axisLine={false}
                   tickFormatter={(v) => `R$${v}`}
                   className="text-[10px] md:text-xs text-muted-foreground"
-                  width={45} // Ligeiramente maior para caber os números
+                  width={45}
                 />
-                <ChartTooltip content={<ChartTooltipContent />} />
+                <ChartTooltip content={<ChartTooltipContent className="bg-slate-900 border-slate-800 text-slate-100 shadow-xl" />} />
                 <Area
                   type="monotone"
                   dataKey="custo"
@@ -97,63 +141,80 @@ export function DashboardCharts({
                 <Area
                   type="monotone"
                   dataKey="venda"
-                  stroke="var(--color-precoVenda)"
-                  fill="var(--color-precoVenda)"
+                  stroke="var(--color-venda)"
+                  fill="var(--color-venda)"
                   fillOpacity={0.2}
                   strokeWidth={2}
                 />
               </AreaChart>
             </ResponsiveContainer>
           </ChartContainer>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
       {/* Gráfico de Barras (Categorias) */}
-      <Card className="col-span-1 shadow-sm flex flex-col">
-        <CardHeader className="px-4 md:px-6">
-          <CardTitle className="text-lg md:text-xl">
-            Top Categorias (Mês)
-          </CardTitle>
-          <CardDescription>Onde estamos perdendo mais?</CardDescription>
-        </CardHeader>
-        <CardContent className="flex-1 px-2 md:px-6 pb-4">
-          {/* CORREÇÃO: Altura fixa segura e largura total */}
-          <ChartContainer config={chartConfig} className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              {/* CORREÇÃO: Margens ajustadas para dar espaço aos rótulos no mobile */}
-              <BarChart
-                data={perdasPorCategoria}
-                layout="vertical"
-                margin={{ top: 0, right: 20, left: -10, bottom: 0 }}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  horizontal={false}
-                  className="stroke-muted"
-                />
-                <YAxis
-                  dataKey="categoria"
-                  type="category"
-                  tickLine={false}
-                  axisLine={false}
-                  width={90} // Espaço reservado para o nome da categoria
-                  className="text-[10px] md:text-xs font-medium text-muted-foreground"
-                />
-                <XAxis type="number" hide />
-                <ChartTooltip content={<ChartTooltipContent />} />
-                <Bar dataKey="custo" radius={4} barSize={28}>
-                  {perdasPorCategoria.map((_, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={categoryColors[index % categoryColors.length]}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </ChartContainer>
-        </CardContent>
-      </Card>
+      <div className="rounded-xl bg-surface p-4 shadow-sm flex flex-col h-full">
+        <div className="mb-3 flex items-baseline justify-between">
+          <h2 className="text-[13px] font-medium flex items-center gap-1.5">
+            Top Categorias
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="text-muted-foreground hover:text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-full">
+                  <Info className="h-4 w-4" />
+                </button>
+              </PopoverTrigger>
+              <PopoverContent side="right" align="center" className="w-64 text-sm p-4 leading-relaxed bg-slate-900 border-slate-800 shadow-xl z-50">
+                <p className="text-xs text-slate-300">
+                  As categorias de produtos que mais geraram custos de desperdício no período.
+                </p>
+                <PopoverPrimitive.Arrow className="fill-slate-900" width={16} height={8} />
+              </PopoverContent>
+            </Popover>
+          </h2>
+          <span className="text-[11px] text-muted-foreground">Maior custo de perda</span>
+        </div>
+        <div className="flex-1 min-h-[250px]">
+          {topCategorias.length > 0 ? (
+            <ChartContainer config={chartConfig} className="h-full w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={topCategorias}
+                  layout="vertical"
+                  margin={{ top: 0, right: 20, left: -10, bottom: 0 }}
+                >
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    horizontal={false}
+                    className="stroke-muted"
+                  />
+                  <YAxis
+                    dataKey="categoria"
+                    type="category"
+                    tickLine={false}
+                    axisLine={false}
+                    width={90}
+                    tick={customYAxisTick}
+                  />
+                  <XAxis type="number" hide />
+                  <ChartTooltip content={<ChartTooltipContent className="bg-slate-900 border-slate-800 text-slate-100 shadow-xl" />} />
+                  <Bar dataKey="custo" radius={4} barSize={28}>
+                    {topCategorias.map((_, index) => (
+                      <Cell
+                        key={`cell-${index}`}
+                        fill={categoryColors[index % categoryColors.length]}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+          ) : (
+            <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+              Nenhuma perda registrada.
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
