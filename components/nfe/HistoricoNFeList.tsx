@@ -102,17 +102,17 @@ export function HistoricoNFeList({ historico }: { historico: any[] }) {
       </div>
 
       {/* DESKTOP: Tabela (Escondida no mobile) */}
-      <div className="hidden md:block bg-surface p-2 rounded-2xl shadow-sm">
+      <div className="hidden md:block bg-card/40 backdrop-blur-md p-2 rounded-2xl shadow-sm border border-border/50">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead>
-              <tr className="text-muted-foreground">
-                <th className="font-semibold p-4">Número</th>
-                <th className="font-semibold p-4">Emitente</th>
-                <th className="font-semibold p-4">Data da Nota</th>
-                <th className="font-semibold p-4">Status</th>
-                <th className="font-semibold p-4 text-right">Valor Total</th>
-                <th className="font-semibold p-4 text-center">Ação</th>
+          <table className="w-full text-sm text-left border-collapse">
+            <thead className="border-b border-white/10">
+              <tr className="text-muted-foreground hover:bg-transparent">
+                <th className="font-semibold p-4 font-medium text-slate-300">Número</th>
+                <th className="font-semibold p-4 font-medium text-slate-300">Emitente</th>
+                <th className="font-semibold p-4 font-medium text-slate-300">Data da Nota</th>
+                <th className="font-semibold p-4 font-medium text-slate-300">Status</th>
+                <th className="font-semibold p-4 font-medium text-slate-300 text-right">Valor Total</th>
+                <th className="font-semibold p-4 font-medium text-slate-300 text-center">Ação</th>
               </tr>
             </thead>
             <tbody>
@@ -123,32 +123,32 @@ export function HistoricoNFeList({ historico }: { historico: any[] }) {
                 const isFullyMapped = total > 0 && mapped === total;
                 
                 return (
-                  <tr key={nfe.id} className="group transition-colors">
+                  <tr key={nfe.id} className="group transition-colors border-b border-white/5 hover:bg-white/5">
                     <td className="p-4 align-middle">
-                      <div className="font-medium text-foreground">NFe {nfe.numero || "-"}</div>
+                      <div className="font-medium text-slate-200">NFe {nfe.numero || "-"}</div>
                     </td>
                     <td className="p-4 align-middle text-muted-foreground truncate max-w-[250px]" title={nfe.emitente}>
                       {nfe.emitente || "Fornecedor Desconhecido"}
                     </td>
-                    <td className="p-4 align-middle">
+                    <td className="p-4 align-middle text-slate-300">
                       {format(dataPrincipal, "dd/MM/yyyy", { locale: ptBR })}
                     </td>
                     <td className="p-4 align-middle">
                       {isFullyMapped ? (
-                        <span className="text-xs font-semibold bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 px-2.5 py-1 rounded-full whitespace-nowrap">
+                        <span className="text-xs font-semibold bg-emerald-500/20 text-emerald-400 px-2.5 py-1 rounded-full whitespace-nowrap">
                           100% Mapeado
                         </span>
                       ) : (
-                        <span className="text-xs font-medium bg-amber-500/20 text-amber-600 dark:text-amber-400 px-2.5 py-1 rounded-full whitespace-nowrap">
+                        <span className="text-xs font-medium bg-amber-500/20 text-amber-400 px-2.5 py-1 rounded-full whitespace-nowrap">
                           {mapped}/{total} Mapeados
                         </span>
                       )}
                     </td>
-                    <td className="p-4 align-middle text-right font-medium">
+                    <td className="p-4 align-middle text-right font-medium text-slate-200">
                       {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(nfe.valorTotal || 0))}
                     </td>
                     <td className="p-4 align-middle text-center">
-                      <Button variant="ghost" size="sm" asChild className="rounded-xl hover:text-primary">
+                      <Button variant="ghost" size="sm" asChild className="rounded-xl hover:bg-white/10 hover:text-primary">
                         <Link href={`/nfe-importacao/${nfe.id}`}>
                           Detalhes
                         </Link>

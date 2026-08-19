@@ -176,7 +176,7 @@ export function EventosToolbar({
       </div>
 
       {/* Linha Inferior: Filtros */}
-      <div className="flex flex-col md:flex-row gap-3 items-end bg-background z-10 py-1">
+      <div className="flex flex-col md:flex-row gap-3 items-end z-10 py-1">
         {/* Busca Global */}
         <div className="flex-1 w-full">
           <span className="text-xs font-medium mb-1.5 block text-muted-foreground ml-1">

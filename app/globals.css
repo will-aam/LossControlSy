@@ -112,6 +112,7 @@
     border-color: var(--color-border);
     @apply outline-ring/50;
   }
+
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);
@@ -119,11 +120,14 @@
   }
 
   /* === SCROLLBARS INTERNAS (TABELAS, DIVS) === */
-  html, body {
+  html,
+  body {
     scrollbar-width: none;
     -ms-overflow-style: none;
   }
-  html::-webkit-scrollbar, body::-webkit-scrollbar {
+
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar {
     display: none;
   }
 
@@ -132,16 +136,20 @@
     scrollbar-color: transparent transparent;
     transition: scrollbar-color 0.3s ease;
   }
+
   *:not(html):not(body):hover {
     scrollbar-color: var(--color-surface-3) transparent;
   }
+
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
+
   ::-webkit-scrollbar-track {
     background: transparent;
   }
+
   ::-webkit-scrollbar-thumb {
     background-color: transparent;
     border-radius: 4px;
@@ -149,17 +157,19 @@
 }
 
 /* === EFEITO GLASS (AZUL FOSCO MINIMALISTA) EM CARDS, SUPERFÍCIES E TABELAS === */
-.bg-surface, 
-.bg-surface-2, 
-.bg-surface-3, 
-.bg-card, 
+.bg-surface,
+.bg-surface-2,
+.bg-surface-3,
+.bg-card,
 .card,
 [data-slot="card"] {
-  background-color: rgba(37, 99, 235, 0.06) !important; /* Azul fosco e bem suave (flat) */
+  background-color: rgba(37, 99, 235, 0.06) !important;
+  /* Azul fosco e bem suave (flat) */
   backdrop-filter: blur(12px) !important;
   -webkit-backdrop-filter: blur(12px) !important;
   border: none !important;
-  box-shadow: none !important; /* Remove o efeito 3D / sombreado */
+  box-shadow: none !important;
+  /* Remove o efeito 3D / sombreado */
 }
 
 /* Aplicando na tabela e removendo linhas gerais */
@@ -167,20 +177,13 @@ table {
   border-collapse: collapse !important;
 }
 
-table th, 
-table td, 
+table th,
+table td,
 [data-slot="table-cell"],
 [data-slot="table-head"] {
   border: none !important;
 }
 
-table th,
-[data-slot="table-head"] {
-  background-color: var(--color-background) !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  z-index: 10;
-}
 
 /* Linhas divisórias BEM suaves entre as linhas (rows) da tabela */
 table tr,
@@ -205,13 +208,23 @@ table tbody tr:hover,
 */
 @media (min-width: 768px) {
   @keyframes float {
-    0%   { transform: translateY(0px); }
-    50%  { transform: translateY(-8px); }
-    100% { transform: translateY(0px); }
+    0% {
+      transform: translateY(0px);
+    }
+
+    50% {
+      transform: translateY(-8px);
+    }
+
+    100% {
+      transform: translateY(0px);
+    }
   }
+
   .bot-float {
     animation: float 3s ease-in-out infinite;
   }
+
   .bot-float:hover {
     animation-play-state: paused;
   }

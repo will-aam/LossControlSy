@@ -26,7 +26,7 @@ export function AIAssistant() {
   const [isListening, setIsListening] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  
+
   const isMobile = useIsMobile();
 
   const suggestions = [
@@ -266,7 +266,7 @@ export function AIAssistant() {
       </div>
 
       {/* Input Area */}
-      <div className="p-4 border-t bg-surface/30">
+      <div className="p-4 border-t">
         <div className="relative flex items-center gap-2">
           <button
             onClick={toggleListening}

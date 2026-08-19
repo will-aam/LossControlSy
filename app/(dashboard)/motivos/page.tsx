@@ -178,160 +178,160 @@ export default function MotivosPage() {
           </Button>
         )}
       </PageHeader>
-      
+
       <main className={`flex flex-col flex-1 space-y-6 px-4 py-5 md:px-8 md:py-6 overflow-hidden ${hideScrollClass}`}>
 
-      {/* Filtros */}
-      <div className="flex items-center shrink-0 bg-background/95 backdrop-blur z-10 py-1">
-        <div className="relative w-full max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar motivo..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
-          />
+        {/* Filtros */}
+        <div className="flex items-center shrink-0  z-10 py-1">
+          <div className="relative w-full max-w-md">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar motivo..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
         </div>
-      </div>
 
-      {/* Grid de "Nuvenzinhas" (Badges) */}
-      <div className="flex-1 overflow-y-auto border rounded-md p-6 bg-card shadow-sm">
-        {isLoading ? (
-          <div className="flex justify-center items-center h-40">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : filteredMotivos.length > 0 ? (
-          <div className="flex flex-wrap gap-3">
-            {filteredMotivos.map((motivo) => (
-              <div
-                key={motivo.id}
-                className="group flex items-center gap-2 pl-4 pr-2 py-2 rounded-full border bg-background hover:border-primary/50 transition-colors shadow-xs"
-              >
-                <span className="font-medium text-sm flex items-center gap-2">
-                  <Tag className="h-3 w-3 text-muted-foreground" />
-                  {motivo.nome}
-                </span>
-
-                {/* Ações (Menu) */}
-                {(hasPermission("motivos:editar") ||
-                  hasPermission("motivos:excluir")) && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-6 w-6 rounded-full ml-1 text-muted-foreground hover:text-foreground"
-                      >
-                        <MoreVertical className="h-3 w-3" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start">
-                      {hasPermission("motivos:editar") && (
-                        <DropdownMenuItem
-                          onClick={() => handleOpenDialog(motivo)}
-                        >
-                          <Edit className="mr-2 h-3 w-3" /> Editar Texto
-                        </DropdownMenuItem>
-                      )}
-                      {hasPermission("motivos:excluir") && (
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={() => setMotivoToDelete(motivo.id)}
-                        >
-                          <Trash2 className="mr-2 h-3 w-3" /> Excluir
-                        </DropdownMenuItem>
-                      )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-            <MessageSquareWarning className="h-12 w-12 mb-4 opacity-20" />
-            <p>Nenhum motivo encontrado.</p>
-            <p className="text-sm">
-              Crie motivos padrão como "Validade", "Avaria", etc.
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Dialog Criar/Editar */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editingMotivo ? "Editar Motivo" : "Novo Motivo"}
-            </DialogTitle>
-            <DialogDescription>
-              {editingMotivo
-                ? "Altere o texto do motivo padrão."
-                : "Crie um novo motivo para padronizar os registros."}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label htmlFor="nome">Descrição do Motivo</Label>
-              <Input
-                id="nome"
-                value={formData.nome}
-                onChange={(e) =>
-                  setFormData({ ...formData, nome: e.target.value })
-                }
-                placeholder="Ex: Validade Vencida"
-                onKeyDown={(e) => e.key === "Enter" && handleSave()}
-                disabled={isSaving}
-              />
+        {/* Grid de "Nuvenzinhas" (Badges) */}
+        <div className="flex-1 overflow-y-auto border rounded-md p-6 bg-card shadow-sm">
+          {isLoading ? (
+            <div className="flex justify-center items-center h-40">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsDialogOpen(false)}
-              disabled={isSaving}
-            >
-              Cancelar
-            </Button>
-            <Button onClick={handleSave} disabled={isSaving}>
-              {isSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Salvando...
-                </>
-              ) : (
-                "Salvar"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          ) : filteredMotivos.length > 0 ? (
+            <div className="flex flex-wrap gap-3">
+              {filteredMotivos.map((motivo) => (
+                <div
+                  key={motivo.id}
+                  className="group flex items-center gap-2 pl-4 pr-2 py-2 rounded-full border bg-background hover:border-primary/50 transition-colors shadow-xs"
+                >
+                  <span className="font-medium text-sm flex items-center gap-2">
+                    <Tag className="h-3 w-3 text-muted-foreground" />
+                    {motivo.nome}
+                  </span>
 
-      {/* Alerta de Exclusão */}
-      <AlertDialog
-        open={!!motivoToDelete}
-        onOpenChange={(open) => !open && setMotivoToDelete(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir motivo?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Isso removerá o motivo da lista de sugestões. Registros passados
-              não serão alterados.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </main>
+                  {/* Ações (Menu) */}
+                  {(hasPermission("motivos:editar") ||
+                    hasPermission("motivos:excluir")) && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-6 w-6 rounded-full ml-1 text-muted-foreground hover:text-foreground"
+                          >
+                            <MoreVertical className="h-3 w-3" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                          {hasPermission("motivos:editar") && (
+                            <DropdownMenuItem
+                              onClick={() => handleOpenDialog(motivo)}
+                            >
+                              <Edit className="mr-2 h-3 w-3" /> Editar Texto
+                            </DropdownMenuItem>
+                          )}
+                          {hasPermission("motivos:excluir") && (
+                            <DropdownMenuItem
+                              className="text-destructive focus:text-destructive"
+                              onClick={() => setMotivoToDelete(motivo.id)}
+                            >
+                              <Trash2 className="mr-2 h-3 w-3" /> Excluir
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+              <MessageSquareWarning className="h-12 w-12 mb-4 opacity-20" />
+              <p>Nenhum motivo encontrado.</p>
+              <p className="text-sm">
+                Crie motivos padrão como "Validade", "Avaria", etc.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Dialog Criar/Editar */}
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>
+                {editingMotivo ? "Editar Motivo" : "Novo Motivo"}
+              </DialogTitle>
+              <DialogDescription>
+                {editingMotivo
+                  ? "Altere o texto do motivo padrão."
+                  : "Crie um novo motivo para padronizar os registros."}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <Label htmlFor="nome">Descrição do Motivo</Label>
+                <Input
+                  id="nome"
+                  value={formData.nome}
+                  onChange={(e) =>
+                    setFormData({ ...formData, nome: e.target.value })
+                  }
+                  placeholder="Ex: Validade Vencida"
+                  onKeyDown={(e) => e.key === "Enter" && handleSave()}
+                  disabled={isSaving}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setIsDialogOpen(false)}
+                disabled={isSaving}
+              >
+                Cancelar
+              </Button>
+              <Button onClick={handleSave} disabled={isSaving}>
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Salvando...
+                  </>
+                ) : (
+                  "Salvar"
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Alerta de Exclusão */}
+        <AlertDialog
+          open={!!motivoToDelete}
+          onOpenChange={(open) => !open && setMotivoToDelete(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir motivo?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Isso removerá o motivo da lista de sugestões. Registros passados
+                não serão alterados.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDelete}
+                className="bg-destructive hover:bg-destructive/90"
+              >
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </main>
     </>
   );
 }

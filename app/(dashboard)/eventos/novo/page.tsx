@@ -30,6 +30,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { ItemSearch } from "@/components/forms/item-search";
 import { Item } from "@/lib/types";
 import { formatCurrency, compressImage } from "@/lib/utils"; // <--- Importei compressImage
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { useAuth } from "@/lib/auth-context";
 import { createEvento, CreateEventoData } from "@/app/actions/eventos";
 import { getMotivos, createMotivo } from "@/app/actions/motivos";
@@ -56,6 +58,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/PageHeader";
 import { cn } from "@/lib/utils";
 
 const numberInputClass =
@@ -73,7 +76,7 @@ interface ItemLancamento {
   motivo: string;
 }
 
-export default function NovoEventoPage() {
+export default function EventoForm() {
   const router = useRouter();
   const { user, hasPermission, settings } = useAuth();
 
@@ -85,10 +88,8 @@ export default function NovoEventoPage() {
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [quantidade, setQuantidade] = useState("");
 
-  // ESTADO DA DATA (Padrão: Hoje)
   const [date, setDate] = useState<Date | undefined>(new Date());
 
-  // Controle de Motivos
   const [motivos, setMotivos] = useState<{ id: string; nome: string }[]>([]);
   const [selectedMotivo, setSelectedMotivo] = useState("");
   const [openMotivo, setOpenMotivo] = useState(false);
@@ -163,11 +164,9 @@ export default function NovoEventoPage() {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && activeItemIdForPhoto) {
-      // Feedback visual imediato
       toast.loading("Processando imagem...", { id: "compress-toast" });
 
       try {
-        // --- AQUI A MÁGICA: Comprime antes de salvar ---
         const compressedBase64 = await compressImage(file);
 
         setItemsList((prev) =>
@@ -224,7 +223,6 @@ export default function NovoEventoPage() {
       toast.dismiss("submit-toast");
 
       if (errors.length > 0) {
-        // MOSTRA O ERRO REAL QUE VEIO DO SERVIDOR
         toast.error(`Erro: ${errors[0].message}`);
         console.error("Erros no envio:", errors);
       } else {
@@ -233,7 +231,6 @@ export default function NovoEventoPage() {
     } catch (error: any) {
       toast.dismiss("submit-toast");
       console.error(error);
-      // Tratamento de erro genérico
       toast.error(`Erro crítico: ${error.message || "Falha na conexão"}`);
     } finally {
       setIsSubmitting(false);
@@ -256,12 +253,7 @@ export default function NovoEventoPage() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] md:h-[calc(100vh-8rem)] space-y-4 max-w-6xl mx-auto w-full pb-20 md:pb-0 overflow-hidden"> 
-      {/* INPUT DE ARQUIVO AJUSTADO 
-          accept="image/*" -> Padrão universal para "Quero uma imagem". 
-          No Android/iOS isso abre o menu "Câmera ou Galeria".
-          Removemos 'capture' para dar a escolha ao usuário.
-      */}
+    <>
       <input
         type="file"
         accept="image/*"
@@ -270,305 +262,304 @@ export default function NovoEventoPage() {
         onChange={handleFileChange}
       />
 
-      {/* Header */}
-      <div className="flex items-center justify-between shrink-0 px-1">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight">Registrar Perda</h1>
+      <PageHeader
+        title="Registrar Perda"
+        description="Preencha os detalhes do produto e adicione evidências fotográficas."
+      >
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant={"outline"}
+              size="sm"
+              className={cn(
+                "justify-start text-left font-normal h-8",
+                !date && "text-muted-foreground",
+              )}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {date ? (
+                format(date, "PPP", { locale: ptBR })
+              ) : (
+                <span>Data do registro</span>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0">
+            <Calendar
+              mode="single"
+              selected={date}
+              onSelect={(d) => d && setDate(d)}
+              initialFocus
+              locale={ptBR}
+            />
+          </PopoverContent>
+        </Popover>
+      </PageHeader>
 
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button
-                variant={"outline"}
-                size="sm"
-                className={cn(
-                  "mt-1 justify-start text-left font-normal h-8",
-                  !date && "text-muted-foreground",
-                )}
-              >
-                <CalendarIcon className="mr-2 h-3.5 w-3.5" />
-                {date ? (
-                  date.toLocaleDateString("pt-BR")
-                ) : (
-                  <span>Selecione a data</span>
-                )}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={date}
-                onSelect={setDate}
-                initialFocus
+      <main className="flex-1 flex flex-col space-y-4 px-4 py-5 md:px-8 md:py-6 overflow-hidden pb-24 md:pb-6 max-w-6xl mx-auto w-full">
+        <div className="flex items-center justify-end px-1">
+          <div className="text-right">
+            <span className="text-xs text-muted-foreground block">
+              Total Estimado
+            </span>
+            <span className="text-xl font-bold text-primary">
+              {formatCurrency(
+                itemsList.reduce(
+                  (acc, cur) => acc + (cur.item.custo || 0) * cur.quantidade,
+                  0,
+                ),
+              )}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-col xl:flex-row gap-3 xl:items-end items-stretch shrink-0 pb-2">
+          <div className="flex-1 w-full relative min-w-50">
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 ml-1 block">
+              Produto
+            </label>
+            <div className="h-10">
+              <ItemSearch
+                onSelect={handleItemSelect}
+                selectedItem={selectedItem}
+                className="w-full h-full"
               />
-            </PopoverContent>
-          </Popover>
-        </div>
-        <div className="text-right">
-          <span className="text-xs text-muted-foreground block">
-            Total Estimado
-          </span>
-          <span className="text-xl font-bold text-primary">
-            {formatCurrency(
-              itemsList.reduce(
-                (acc, cur) => acc + (cur.item.custo || 0) * cur.quantidade,
-                0,
-              ),
-            )}
-          </span>
-        </div>
-      </div>
-
-      {/* Área de Input */}
-      <div className="flex flex-col xl:flex-row gap-3 xl:items-end items-stretch shrink-0 pb-2">
-        {/* Produto */}
-        <div className="flex-1 w-full relative min-w-50">
-          <label className="text-xs font-medium text-muted-foreground mb-1.5 ml-1 block">
-            Produto
-          </label>
-          <div className="h-10">
-            <ItemSearch
-              onSelect={handleItemSelect}
-              selectedItem={selectedItem}
-              className="w-full h-full"
-            />
-          </div>
-        </div>
-
-        {/* Motivo */}
-        <div className="w-full xl:w-64">
-          <label className="text-xs font-medium text-muted-foreground mb-1.5 ml-1 block">
-            Motivo
-          </label>
-          <Popover open={openMotivo} onOpenChange={setOpenMotivo}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="outline"
-                role="combobox"
-                aria-expanded={openMotivo}
-                className="w-full h-10 justify-between font-normal"
-              >
-                {selectedMotivo || "Selecione ou digite..."}
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-62.5 p-0">
-              <Command>
-                <CommandInput
-                  placeholder="Buscar ou criar motivo..."
-                  onValueChange={(val) => {
-                    setSelectedMotivo(val);
-                  }}
-                />
-                <CommandList>
-                  <CommandEmpty>
-                    <span className="text-muted-foreground text-xs">
-                      "{selectedMotivo}" será criado ao adicionar.
-                    </span>
-                  </CommandEmpty>
-                  <CommandGroup heading="Sugestões">
-                    {motivos.map((motivo) => (
-                      <CommandItem
-                        key={motivo.id}
-                        value={motivo.nome}
-                        onSelect={(currentValue) => {
-                          const originalName =
-                            motivos.find(
-                              (m) =>
-                                m.nome.toLowerCase() ===
-                                currentValue.toLowerCase(),
-                            )?.nome || currentValue;
-                          setSelectedMotivo(originalName);
-                          setOpenMotivo(false);
-                        }}
-                      >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4",
-                            selectedMotivo === motivo.nome
-                              ? "opacity-100"
-                              : "opacity-0",
-                          )}
-                        />
-                        {motivo.nome}
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
-        </div>
-
-        {/* Qtd e Unidade */}
-        <div className="flex gap-2 w-full md:w-auto">
-          <div className="w-24">
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 ml-1 block">
-              Qtd.
-            </label>
-            <Input
-              type="number"
-              min="0"
-              placeholder="0"
-              className={numberInputClass}
-              value={quantidade}
-              onChange={(e) => setQuantidade(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAddItem()}
-            />
-          </div>
-          <div className="w-16">
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 ml-1 block">
-              Unid.
-            </label>
-            <div className="flex h-10 w-full items-center justify-center rounded-md border border-input bg-muted/50 text-sm text-muted-foreground font-medium">
-              {selectedItem ? selectedItem.unidade : "-"}
             </div>
           </div>
+
+          <div className="w-full xl:w-64">
+            <label className="text-xs font-medium text-muted-foreground mb-1.5 ml-1 block">
+              Motivo
+            </label>
+            <Popover open={openMotivo} onOpenChange={setOpenMotivo}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={openMotivo}
+                  className="w-full h-10 justify-between font-normal"
+                >
+                  {selectedMotivo || "Selecione ou digite..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-62.5 p-0">
+                <Command>
+                  <CommandInput
+                    placeholder="Buscar ou criar motivo..."
+                    onValueChange={(val) => {
+                      setSelectedMotivo(val);
+                    }}
+                  />
+                  <CommandList>
+                    <CommandEmpty>
+                      <span className="text-muted-foreground text-xs">
+                        "{selectedMotivo}" será criado ao adicionar.
+                      </span>
+                    </CommandEmpty>
+                    <CommandGroup heading="Sugestões">
+                      {motivos.map((motivo) => (
+                        <CommandItem
+                          key={motivo.id}
+                          value={motivo.nome}
+                          onSelect={(currentValue) => {
+                            const originalName =
+                              motivos.find(
+                                (m) =>
+                                  m.nome.toLowerCase() ===
+                                  currentValue.toLowerCase(),
+                              )?.nome || currentValue;
+                            setSelectedMotivo(originalName);
+                            setOpenMotivo(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              selectedMotivo === motivo.nome
+                                ? "opacity-100"
+                                : "opacity-0",
+                            )}
+                          />
+                          {motivo.nome}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <div className="flex gap-2 w-full md:w-auto">
+            <div className="w-24">
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 ml-1 block">
+                Qtd.
+              </label>
+              <Input
+                type="number"
+                min="0"
+                placeholder="0"
+                className={numberInputClass}
+                value={quantidade}
+                onChange={(e) => setQuantidade(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleAddItem()}
+              />
+            </div>
+            <div className="w-16">
+              <label className="text-xs font-medium text-muted-foreground mb-1.5 ml-1 block">
+                Unid.
+              </label>
+              <div className="flex h-10 w-full items-center justify-center rounded-md border border-input bg-muted/50 text-sm text-muted-foreground font-medium">
+                {selectedItem ? selectedItem.unidade : "-"}
+              </div>
+            </div>
+          </div>
+
+          <Button
+            onClick={handleAddItem}
+            disabled={!selectedItem || !quantidade}
+            className="h-10 w-full md:w-auto px-6"
+          >
+            Adicionar
+          </Button>
         </div>
 
-        <Button
-          onClick={handleAddItem}
-          disabled={!selectedItem || !quantidade}
-          className="h-10 w-full md:w-auto px-6"
-        >
-          Adicionar
-        </Button>
-      </div>
-
-      {/* Tabela */}
-      <div className="flex-1 border rounded-md overflow-hidden bg-background relative flex flex-col shadow-sm">
-        <div className={`flex-1 ${customScrollbarClass}`}>
-          <Table>
-            <TableHeader className="sticky top-0 bg-background z-20 shadow-sm">
-              <TableRow>
-                <TableHead className="w-auto">Produto / Motivo</TableHead>
-                <TableHead className="text-right w-24">Qtd.</TableHead>
-                <TableHead className="text-center w-20">Foto</TableHead>
-                <TableHead className="w-12"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {itemsList.length > 0 ? (
-                itemsList.map((entry) => (
-                  <TableRow key={entry.tempId} className="hover:bg-muted/50">
-                    <TableCell className="py-2">
-                      <div className="flex flex-col">
-                        <span className="font-medium text-sm">
-                          {entry.item.nome}
+        <div className="flex-1 border border-border/50 rounded-2xl overflow-hidden bg-card/40 backdrop-blur-md relative flex flex-col shadow-sm">
+          <div className={`flex-1 ${customScrollbarClass}`}>
+            <Table className="border-collapse">
+              <TableHeader className="sticky top-0 bg-card/40 backdrop-blur-md z-20 shadow-sm border-b border-white/10">
+                <TableRow className="border-none hover:bg-transparent">
+                  <TableHead className="w-auto text-slate-300">Produto / Motivo</TableHead>
+                  <TableHead className="text-right w-24 text-slate-300">Qtd.</TableHead>
+                  <TableHead className="text-center w-20 text-slate-300">Foto</TableHead>
+                  <TableHead className="w-12"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {itemsList.length > 0 ? (
+                  itemsList.map((entry) => (
+                    <TableRow key={entry.tempId} className="hover:bg-white/5 border-b border-white/5">
+                      <TableCell className="py-2">
+                        <div className="flex flex-col">
+                          <span className="font-medium text-sm text-slate-200">
+                            {entry.item.nome}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {entry.motivo}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right py-2 font-medium text-slate-200">
+                        {entry.quantidade}{" "}
+                        <span className="text-[10px] text-muted-foreground">
+                          {entry.unidade}
                         </span>
-                        <span className="text-xs text-muted-foreground">
-                          {entry.motivo}
-                        </span>
+                      </TableCell>
+                      <TableCell className="text-center py-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className={`h-8 w-8 rounded-xl ${
+                            entry.fotoUrl
+                              ? "text-primary bg-primary/10"
+                              : "text-muted-foreground/40 hover:bg-white/10 hover:text-primary"
+                          } ${exigirFoto && !entry.fotoUrl ? "animate-pulse text-orange-500" : ""}`}
+                          onClick={() => triggerPhotoInput(entry.tempId)}
+                        >
+                          {entry.fotoUrl ? (
+                            <ImageIcon className="h-4 w-4" />
+                          ) : (
+                            <Camera className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </TableCell>
+                      <TableCell className="py-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 rounded-xl text-muted-foreground hover:bg-white/10 hover:text-destructive"
+                          onClick={() => handleRemoveItem(entry.tempId)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell
+                      colSpan={4}
+                      className="h-32 text-center text-muted-foreground"
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="bg-muted/30 p-3 rounded-full">
+                          <Plus className="h-6 w-6 text-muted-foreground/50" />
+                        </div>
+                        <span className="text-sm">Lista vazia.</span>
                       </div>
-                    </TableCell>
-                    <TableCell className="text-right py-2 font-medium">
-                      {entry.quantidade}{" "}
-                      <span className="text-[10px] text-muted-foreground">
-                        {entry.unidade}
-                      </span>
-                    </TableCell>
-                    <TableCell className="text-center py-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className={`h-8 w-8 ${
-                          entry.fotoUrl
-                            ? "text-primary bg-primary/10"
-                            : "text-muted-foreground/40 hover:text-primary"
-                        } ${exigirFoto && !entry.fotoUrl ? "animate-pulse text-orange-500" : ""}`}
-                        onClick={() => triggerPhotoInput(entry.tempId)}
-                      >
-                        {entry.fotoUrl ? (
-                          <ImageIcon className="h-4 w-4" />
-                        ) : (
-                          <Camera className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </TableCell>
-                    <TableCell className="py-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => handleRemoveItem(entry.tempId)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
                     </TableCell>
                   </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell
-                    colSpan={4}
-                    className="h-32 text-center text-muted-foreground"
-                  >
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="bg-muted/30 p-3 rounded-full">
-                        <Plus className="h-6 w-6 text-muted-foreground/50" />
-                      </div>
-                      <span className="text-sm">Lista vazia.</span>
-                    </div>
-                  </TableCell>
-                </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {itemsList.length > 0 && (
+            <div className="p-3 bg-white/5 border-t border-white/5 flex justify-end gap-3 shrink-0 items-center">
+              {exigirFoto && itemsList.some((i) => !i.fotoUrl) && (
+                <span className="text-xs text-orange-600 font-medium flex items-center mr-auto">
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  Fotos pendentes
+                </span>
               )}
-            </TableBody>
-          </Table>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setItemsList([])}
+                disabled={isSubmitting}
+              >
+                Limpar
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="px-8 font-semibold"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-3 w-3 animate-spin" /> Salvando...
+                  </>
+                ) : (
+                  <>
+                    <Send className="mr-2 h-3 w-3" /> Finalizar
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </div>
 
-        {itemsList.length > 0 && (
-          <div className="p-3 bg-muted/20 border-t flex justify-end gap-3 shrink-0 items-center">
-            {exigirFoto && itemsList.some((i) => !i.fotoUrl) && (
-              <span className="text-xs text-orange-600 font-medium flex items-center mr-auto">
-                <AlertTriangle className="h-3 w-3 mr-1" />
-                Fotos pendentes
-              </span>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setItemsList([])}
-              disabled={isSubmitting}
-            >
-              Limpar
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="px-8 font-semibold"
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="mr-2 h-3 w-3 animate-spin" /> Salvando...
-                </>
-              ) : (
-                <>
-                  <Send className="mr-2 h-3 w-3" /> Finalizar
-                </>
-              )}
-            </Button>
-          </div>
-        )}
-      </div>
-
-      <Dialog open={showSuccess} onOpenChange={setShowSuccess}>
-        <DialogContent className="sm:max-w-xs text-center">
-          <DialogHeader>
-            <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-              <CheckCircle2 className="h-5 w-5 text-primary" />
-            </div>
-            <DialogTitle className="text-center">Sucesso!</DialogTitle>
-            <DialogDescription className="text-center text-xs">
-              Registros salvos para {date?.toLocaleDateString("pt-BR")}.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="sm:justify-center">
-            <Button onClick={handleSuccessClose} className="w-full" size="sm">
-              Ok
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </div>
+        <Dialog open={showSuccess} onOpenChange={setShowSuccess}>
+          <DialogContent className="sm:max-w-xs text-center">
+            <DialogHeader>
+              <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                <CheckCircle2 className="h-5 w-5 text-primary" />
+              </div>
+              <DialogTitle className="text-center">Sucesso!</DialogTitle>
+              <DialogDescription className="text-center text-xs">
+                Registros salvos para {date?.toLocaleDateString("pt-BR")}.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="sm:justify-center">
+              <Button onClick={handleSuccessClose} className="w-full" size="sm">
+                Ok
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </main>
+    </>
   );
 }

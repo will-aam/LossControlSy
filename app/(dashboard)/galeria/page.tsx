@@ -98,7 +98,7 @@ export default function GaleriaPage() {
   // Filtros e Seleção
   const [selectedDate, setSelectedDate] = useState<string>("todas");
   const [searchQuery, setSearchQuery] = useState("");
-  
+
   // Paginação
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 32;
@@ -141,19 +141,19 @@ export default function GaleriaPage() {
           user: ev.user,
           evento: ev.evento
             ? {
-                id: ev.evento.id,
-                status: ev.evento.status,
-                quantidade: Number(ev.evento.quantidade),
-                unidade: ev.evento.unidade,
-                motivo: ev.evento.motivo,
-                item: ev.evento.item
-                  ? {
-                      id: ev.evento.item.id,
-                      nome: ev.evento.item.nome,
-                      codigoInterno: ev.evento.item.codigoInterno,
-                    }
-                  : undefined,
-              }
+              id: ev.evento.id,
+              status: ev.evento.status,
+              quantidade: Number(ev.evento.quantidade),
+              unidade: ev.evento.unidade,
+              motivo: ev.evento.motivo,
+              item: ev.evento.item
+                ? {
+                  id: ev.evento.item.id,
+                  nome: ev.evento.item.nome,
+                  codigoInterno: ev.evento.item.codigoInterno,
+                }
+                : undefined,
+            }
             : undefined,
         }),
       );
@@ -376,285 +376,285 @@ export default function GaleriaPage() {
           </div>
         )}
       </PageHeader>
-      
+
       <main className="flex-1 flex flex-col space-y-6 px-4 py-5 md:px-8 md:py-6 overflow-hidden">
-      {/* Filtros */}
-      <div className="flex flex-col gap-4 sm:flex-row bg-background/95 backdrop-blur z-10 py-1">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por item ou motivo..."
-            value={searchQuery}
-            onChange={(e) => {
-              setSearchQuery(e.target.value);
-              setCurrentPage(1);
-            }}
-            className="pl-9"
-          />
-        </div>
-        <Select value={selectedDate} onValueChange={(v) => { setSelectedDate(v); setCurrentPage(1); }}>
-          <SelectTrigger className="w-full sm:w-48">
-            <Calendar className="mr-2 h-4 w-4" />
-            <SelectValue placeholder="Filtrar por data" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todas">Todas as datas</SelectItem>
-            {uniqueDates.map((date) => (
-              <SelectItem key={date} value={date}>
-                {date}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* Grid de Fotos - AJUSTADO PARA QUADRADOS PEQUENOS */}
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
-      ) : paginatedEvidencias.length > 0 ? (
-        <div className="flex-1 overflow-y-auto">
-          <div className="grid gap-2 grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 pb-10">
-            {paginatedEvidencias.map((evidencia, index) => (
-              <button
-                key={evidencia.id}
-                type="button"
-                onClick={() => handlePhotoClick(evidencia, index)}
-                className="group relative aspect-square w-full overflow-hidden rounded-md ring-1 ring-border/50 shadow-sm"
-              >
-                <img
-                  src={evidencia.url || "/placeholder.svg"}
-                  alt={`Evidência ${index + 1}`}
-                  className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                  loading="lazy"
-                />
-
-                <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100 flex items-center justify-center">
-                  <ZoomIn className="h-6 w-6 text-white" />
-                </div>
-
-                <span
-                  className={`absolute bottom-1 right-1 h-2 w-2 rounded-full ${evidencia.evento ? "bg-green-500" : "bg-yellow-500"}`}
-                />
-              </button>
-            ))}
+        {/* Filtros */}
+        <div className="flex flex-col gap-4 sm:flex-row  z-10 py-1">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por item ou motivo..."
+              value={searchQuery}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="pl-9"
+            />
           </div>
+          <Select value={selectedDate} onValueChange={(v) => { setSelectedDate(v); setCurrentPage(1); }}>
+            <SelectTrigger className="w-full sm:w-48">
+              <Calendar className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Filtrar por data" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todas">Todas as datas</SelectItem>
+              {uniqueDates.map((date) => (
+                <SelectItem key={date} value={date}>
+                  {date}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center py-16 text-center border-2 border-dashed rounded-lg bg-muted/5">
-          <div className="bg-muted/50 p-4 rounded-full mb-4">
-            <Search className="h-8 w-8 text-muted-foreground" />
-          </div>
-          <h3 className="text-lg font-medium">Nenhuma foto encontrada</h3>
-        </div>
-      )}
 
-      {/* Paginação */}
-      {!isLoading && filteredEvidencias.length > 0 && (
-        <div className="flex items-center justify-between shrink-0 pt-2 border-t mt-auto">
-          <p className="text-xs text-muted-foreground">
-            {paginatedEvidencias.length} de {filteredEvidencias.length} fotos
-          </p>
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8"
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <div className="text-xs font-medium px-2">
-              Pág {currentPage} de {Math.max(1, totalPages)}
+        {/* Grid de Fotos - AJUSTADO PARA QUADRADOS PEQUENOS */}
+        {isLoading ? (
+          <div className="flex justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : paginatedEvidencias.length > 0 ? (
+          <div className="flex-1 overflow-y-auto">
+            <div className="grid gap-2 grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8 pb-10">
+              {paginatedEvidencias.map((evidencia, index) => (
+                <button
+                  key={evidencia.id}
+                  type="button"
+                  onClick={() => handlePhotoClick(evidencia, index)}
+                  className="group relative aspect-square w-full overflow-hidden rounded-md ring-1 ring-border/50 shadow-sm"
+                >
+                  <img
+                    src={evidencia.url || "/placeholder.svg"}
+                    alt={`Evidência ${index + 1}`}
+                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                    loading="lazy"
+                  />
+
+                  <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100 flex items-center justify-center">
+                    <ZoomIn className="h-6 w-6 text-white" />
+                  </div>
+
+                  <span
+                    className={`absolute bottom-1 right-1 h-2 w-2 rounded-full ${evidencia.evento ? "bg-green-500" : "bg-yellow-500"}`}
+                  />
+                </button>
+              ))}
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8"
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages || totalPages === 0}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="flex flex-col items-center justify-center py-16 text-center border-2 border-dashed rounded-lg bg-muted/5">
+            <div className="bg-muted/50 p-4 rounded-full mb-4">
+              <Search className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-lg font-medium">Nenhuma foto encontrada</h3>
+          </div>
+        )}
 
-      {/* Modal Visualizador */}
-      <Dialog open={isViewerOpen} onOpenChange={setIsViewerOpen}>
-        <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden bg-black/95 border-none [&>button]:hidden">
-          <DialogTitle className="sr-only">Visualizar Evidência</DialogTitle>
-
-          <div className="relative w-full h-full flex flex-col">
-            {/* Header Flutuante */}
-            <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-start z-50 bg-linear-to-b from-black/80 to-transparent">
-              <div>
-                <h2 className="text-white font-medium text-sm">
-                  {selectedPhoto?.evento?.item?.nome || "Foto Avulsa"}
-                </h2>
-                <p className="text-white/70 text-xs">
-                  {selectedPhoto && formatDateTime(selectedPhoto.dataUpload)}
-                </p>
+        {/* Paginação */}
+        {!isLoading && filteredEvidencias.length > 0 && (
+          <div className="flex items-center justify-between shrink-0 pt-2 border-t mt-auto">
+            <p className="text-xs text-muted-foreground">
+              {paginatedEvidencias.length} de {filteredEvidencias.length} fotos
+            </p>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <div className="text-xs font-medium px-2">
+                Pág {currentPage} de {Math.max(1, totalPages)}
               </div>
               <Button
-                variant="ghost"
-                size="icon"
-                className="rounded-full text-white hover:bg-white/20"
-                onClick={() => setIsViewerOpen(false)}
+                variant="outline"
+                size="sm"
+                className="h-8"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages || totalPages === 0}
               >
-                <X className="h-5 w-5" />
+                <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
+          </div>
+        )}
 
-            {/* Imagem Principal */}
-            <div className="relative flex-1 bg-black min-h-[50vh] max-h-[80vh] flex items-center justify-center">
-              {selectedPhoto && (
-                <img
-                  src={selectedPhoto.url || "/placeholder.svg"}
-                  alt="Evidência Detalhada"
-                  className="max-h-full max-w-full object-contain"
-                />
-              )}
+        {/* Modal Visualizador */}
+        <Dialog open={isViewerOpen} onOpenChange={setIsViewerOpen}>
+          <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden bg-black/95 border-none [&>button]:hidden">
+            <DialogTitle className="sr-only">Visualizar Evidência</DialogTitle>
 
-              {/* Navegação */}
-              {filteredEvidencias.length > 1 && (
-                <>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute left-2 top-1/2 -translate-y-1/2 text-white hover:bg-white/10 rounded-full h-10 w-10"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handlePrevPhoto();
-                    }}
-                  >
-                    <ChevronLeft className="h-6 w-6" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute right-2 top-1/2 -translate-y-1/2 text-white hover:bg-white/10 rounded-full h-10 w-10"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleNextPhoto();
-                    }}
-                  >
-                    <ChevronRight className="h-6 w-6" />
-                  </Button>
-                </>
-              )}
-            </div>
-
-            {/* Footer com Detalhes e Ações */}
-            <div className="bg-background p-4 border-t flex flex-col gap-3">
-              <div className="flex items-start justify-between">
-                {/* Informações */}
-                <div className="flex-1">
-                  {selectedPhoto?.evento ? (
-                    <>
-                      <div className="flex items-center gap-2 mb-1">
-                        <Badge variant="outline">
-                          {selectedPhoto.evento.item?.codigoInterno}
-                        </Badge>
-                        <Badge
-                          className={getStatusColor(
-                            selectedPhoto.evento.status as any,
-                          )}
-                        >
-                          {getStatusLabel(selectedPhoto.evento.status as any)}
-                        </Badge>
-                      </div>
-                      <p className="text-sm">
-                        Qtd:{" "}
-                        <strong>
-                          {selectedPhoto.evento.quantidade}{" "}
-                          {selectedPhoto.evento.unidade}
-                        </strong>
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        Motivo: {selectedPhoto.evento.motivo}
-                      </p>
-                    </>
-                  ) : (
-                    <div>
-                      <Badge variant="secondary" className="mb-1">
-                        Avulso
-                      </Badge>
-                      <p className="text-sm">
-                        Motivo: {selectedPhoto?.motivo || "-"}
-                      </p>
-                    </div>
-                  )}
+            <div className="relative w-full h-full flex flex-col">
+              {/* Header Flutuante */}
+              <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-start z-50 bg-linear-to-b from-black/80 to-transparent">
+                <div>
+                  <h2 className="text-white font-medium text-sm">
+                    {selectedPhoto?.evento?.item?.nome || "Foto Avulsa"}
+                  </h2>
+                  <p className="text-white/70 text-xs">
+                    {selectedPhoto && formatDateTime(selectedPhoto.dataUpload)}
+                  </p>
                 </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-full text-white hover:bg-white/20"
+                  onClick={() => setIsViewerOpen(false)}
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
 
-                {/* Ações: Editar e Excluir */}
-                <div className="flex gap-2">
-                  {/* Botão EDITAR (Só se tiver permissão e for avulsa ou quiser editar detalhes) */}
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() =>
-                      selectedPhoto && openEditDialog(selectedPhoto)
-                    }
-                  >
-                    <Edit className="mr-2 h-4 w-4" />{" "}
-                    {selectedPhoto?.evento
-                      ? "Ver Detalhes"
-                      : "Completar Cadastro"}
-                  </Button>
+              {/* Imagem Principal */}
+              <div className="relative flex-1 bg-black min-h-[50vh] max-h-[80vh] flex items-center justify-center">
+                {selectedPhoto && (
+                  <img
+                    src={selectedPhoto.url || "/placeholder.svg"}
+                    alt="Evidência Detalhada"
+                    className="max-h-full max-w-full object-contain"
+                  />
+                )}
 
-                  {hasPermission("galeria:excluir") && (
+                {/* Navegação */}
+                {filteredEvidencias.length > 1 && (
+                  <>
                     <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => {
-                        setPhotoToDelete(selectedPhoto);
+                      variant="ghost"
+                      size="icon"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 text-white hover:bg-white/10 rounded-full h-10 w-10"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePrevPhoto();
                       }}
                     >
-                      <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                      <ChevronLeft className="h-6 w-6" />
                     </Button>
-                  )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-white hover:bg-white/10 rounded-full h-10 w-10"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleNextPhoto();
+                      }}
+                    >
+                      <ChevronRight className="h-6 w-6" />
+                    </Button>
+                  </>
+                )}
+              </div>
+
+              {/* Footer com Detalhes e Ações */}
+              <div className="bg-background p-4 border-t flex flex-col gap-3">
+                <div className="flex items-start justify-between">
+                  {/* Informações */}
+                  <div className="flex-1">
+                    {selectedPhoto?.evento ? (
+                      <>
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant="outline">
+                            {selectedPhoto.evento.item?.codigoInterno}
+                          </Badge>
+                          <Badge
+                            className={getStatusColor(
+                              selectedPhoto.evento.status as any,
+                            )}
+                          >
+                            {getStatusLabel(selectedPhoto.evento.status as any)}
+                          </Badge>
+                        </div>
+                        <p className="text-sm">
+                          Qtd:{" "}
+                          <strong>
+                            {selectedPhoto.evento.quantidade}{" "}
+                            {selectedPhoto.evento.unidade}
+                          </strong>
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Motivo: {selectedPhoto.evento.motivo}
+                        </p>
+                      </>
+                    ) : (
+                      <div>
+                        <Badge variant="secondary" className="mb-1">
+                          Avulso
+                        </Badge>
+                        <p className="text-sm">
+                          Motivo: {selectedPhoto?.motivo || "-"}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Ações: Editar e Excluir */}
+                  <div className="flex gap-2">
+                    {/* Botão EDITAR (Só se tiver permissão e for avulsa ou quiser editar detalhes) */}
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() =>
+                        selectedPhoto && openEditDialog(selectedPhoto)
+                      }
+                    >
+                      <Edit className="mr-2 h-4 w-4" />{" "}
+                      {selectedPhoto?.evento
+                        ? "Ver Detalhes"
+                        : "Completar Cadastro"}
+                    </Button>
+
+                    {hasPermission("galeria:excluir") && (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => {
+                          setPhotoToDelete(selectedPhoto);
+                        }}
+                      >
+                        <Trash2 className="mr-2 h-4 w-4" /> Excluir
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
 
-      {/* Modal de Upload/Edição Detalhado */}
-      <UploadDialog
-        open={showUploadDialog}
-        onOpenChange={setShowUploadDialog}
-        onSave={handleDetailedSave}
-        // Passaremos a foto para edição se houver
-        editMode={!!photoToEdit}
-        initialData={photoToEdit}
-      />
+        {/* Modal de Upload/Edição Detalhado */}
+        <UploadDialog
+          open={showUploadDialog}
+          onOpenChange={setShowUploadDialog}
+          onSave={handleDetailedSave}
+          // Passaremos a foto para edição se houver
+          editMode={!!photoToEdit}
+          initialData={photoToEdit}
+        />
 
-      <AlertDialog
-        open={!!photoToDelete}
-        onOpenChange={(open) => !open && setPhotoToDelete(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir foto?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Essa ação removerá a foto da galeria permanentemente.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmDelete}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        <AlertDialog
+          open={!!photoToDelete}
+          onOpenChange={(open) => !open && setPhotoToDelete(null)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir foto?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Essa ação removerá a foto da galeria permanentemente.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={confirmDelete}
+                className="bg-destructive hover:bg-destructive/90"
+              >
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </main>
     </>
   );
