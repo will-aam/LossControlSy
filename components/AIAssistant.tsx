@@ -217,7 +217,7 @@ export function AIAssistant() {
                 <div
                   className={`text-sm px-4 py-3 rounded-xl ${msg.role === "user"
                     ? "bg-primary text-primary-foreground rounded-tr-none"
-                    : "bg-surface text-foreground rounded-tl-none border prose prose-sm prose-p:leading-relaxed prose-pre:bg-muted prose-pre:text-muted-foreground prose-a:text-primary max-w-none"
+                    : "bg-surface text-foreground rounded-tl-none border prose prose-sm prose-p:leading-relaxed prose-p:mb-5 prose-ul:mb-5 prose-li:mb-3 prose-pre:bg-muted prose-pre:text-muted-foreground prose-a:text-primary max-w-none [&>p:last-child]:mb-0"
                     }`}
                 >
                   {msg.role === "user" ? (
