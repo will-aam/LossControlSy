@@ -27,7 +27,6 @@ export function NavRail() {
   const navItems = [
     { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
     { icon: PlusCircle, label: "Registrar Perda", href: "/eventos/novo" },
-    { icon: FileText, label: "Notas", href: "/notas" },
     { icon: Store, label: "Catálogo", href: "/catalogo" },
     { icon: Grid, label: "Categorias", href: "/categorias" },
     { icon: AlertCircle, label: "Motivos", href: "/motivos" },
@@ -45,7 +44,7 @@ export function NavRail() {
         aberto ? "w-56 items-start px-4" : "w-16"
       )}
     >
-      <nav className="flex-1 w-full space-y-2 mt-4">
+      <nav className="flex-1 w-full space-y-2 mt-4 overflow-y-auto pb-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         {navItems.map((item) => {
           const isActive = pathname === item.href;
           return (

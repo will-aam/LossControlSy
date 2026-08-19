@@ -56,12 +56,6 @@ const ALL_NAV_ITEMS: NavItemWithPermission[] = [
     permission: "galeria:ver",
   },
   {
-    title: "Notas Fiscais",
-    href: "/notas",
-    icon: "Tags",
-    permission: "notas:ver",
-  },
-  {
     title: "Motivos",
     href: "/motivos",
     icon: "MessageSquareWarning",

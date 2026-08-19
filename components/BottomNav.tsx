@@ -36,7 +36,6 @@ export function BottomNav() {
 
   const moreMenuOptions = [
     { icon: Calendar, label: "Eventos", href: "/eventos" },
-    { icon: FileText, label: "Notas Fiscais", href: "/notas" },
     { icon: Store, label: "Catálogo", href: "/catalogo" },
     { icon: Grid, label: "Categorias", href: "/categorias" },
     { icon: AlertCircle, label: "Motivos", href: "/motivos" },
