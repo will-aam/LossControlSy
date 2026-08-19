@@ -366,13 +366,13 @@ export default function Dashboard() {
         </section>
 
         {/* Blocos Integrados de Dados Reais & Desperdício Crítico */}
-        <div className="grid gap-4 lg:grid-cols-3 xl:gap-6 mt-2">
+        <div className="grid gap-4 lg:grid-cols-2 xl:gap-6 mt-2">
           {/* Top 5 Critical Items agora usa os desperdícios vivos! */}
           <div className="lg:col-span-1">
             <CriticalItems itens={desperdicios} />
           </div>
 
-          <div className="lg:col-span-2">
+          <div className="lg:col-span-1">
             {isLoadingReal ? (
               <div className="flex flex-col items-center justify-center py-12 gap-4 bg-surface rounded-xl shadow-sm h-full min-h-[250px]">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />

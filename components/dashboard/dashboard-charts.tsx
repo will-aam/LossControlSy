@@ -81,76 +81,7 @@ export function DashboardCharts({
   };
 
   return (
-    <div className="grid gap-4 grid-cols-1 lg:grid-cols-2 h-full">
-      {/* Gráfico de Área (Tendência) */}
-      <div className="rounded-xl bg-surface p-4 shadow-sm flex flex-col h-full">
-        <div className="mb-3 flex items-baseline justify-between">
-          <h2 className="text-[13px] font-medium flex items-center gap-1.5">
-            Tendência do Período
-            <Popover>
-              <PopoverTrigger asChild>
-                <button className="text-muted-foreground hover:text-foreground transition-colors outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-full">
-                  <Info className="h-4 w-4" />
-                </button>
-              </PopoverTrigger>
-              <PopoverContent side="right" align="center" className="w-64 text-sm p-4 leading-relaxed bg-slate-900 border-slate-800 shadow-xl z-50">
-                <p className="text-xs text-slate-300">
-                  Visualização da tendência de Faturamento versus Custo de Perda ao longo do período selecionado.
-                </p>
-                <PopoverPrimitive.Arrow className="fill-slate-900" width={16} height={8} />
-              </PopoverContent>
-            </Popover>
-          </h2>
-          <span className="text-[11px] text-muted-foreground">Faturamento vs Perda</span>
-        </div>
-        <div className="flex-1 min-h-[250px]">
-          <ChartContainer config={chartConfig} className="h-full w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
-                data={tendencia}
-                margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  vertical={false}
-                  className="stroke-muted"
-                />
-                <XAxis
-                  dataKey="dia"
-                  tickLine={false}
-                  axisLine={false}
-                  tickMargin={8}
-                  className="text-[10px] md:text-xs text-muted-foreground"
-                />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(v) => `R$${v}`}
-                  className="text-[10px] md:text-xs text-muted-foreground"
-                  width={45}
-                />
-                <ChartTooltip content={<ChartTooltipContent className="bg-slate-900 border-slate-800 text-slate-100 shadow-xl" />} />
-                <Area
-                  type="monotone"
-                  dataKey="custo"
-                  stroke="var(--color-custo)"
-                  fill="var(--color-custo)"
-                  fillOpacity={0.2}
-                  strokeWidth={2}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="venda"
-                  stroke="var(--color-venda)"
-                  fill="var(--color-venda)"
-                  fillOpacity={0.2}
-                  strokeWidth={2}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </ChartContainer>
-        </div>
-      </div>
+    <div className="h-full">
 
       {/* Gráfico de Barras (Categorias) */}
       <div className="rounded-xl bg-surface p-4 shadow-sm flex flex-col h-full">
