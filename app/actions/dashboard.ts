@@ -3,6 +3,8 @@
 
 import { prisma } from "@/lib/prisma";
 
+import { getSession } from "@/lib/session";
+
 export async function getDashboardStats() {
   try {
     const hoje = new Date();
@@ -158,3 +160,187 @@ export async function getDashboardStats() {
     return { success: false, error: "Falha ao calcular dados do dashboard." };
   }
 }
+
+export async function getRealDashboardMetrics(diasIsoA: string[], diasIsoB: string[]) {
+  try {
+    const session = await getSession();
+    if (!session || !session.ownerId) {
+      return { success: false, error: "Usuário não autenticado." };
+    }
+
+    const allDias = [...new Set([...diasIsoA, ...diasIsoB])].sort();
+    if (allDias.length === 0) {
+      return { success: true, data: { linhasA: [], linhasB: [], xmlsImportadosA: 0, xmlsImportadosB: 0, serie: [] } };
+    }
+
+    const minDateStr = allDias[0];
+    const maxDateStr = allDias[allDias.length - 1];
+    const minDate = new Date(`${minDateStr}T00:00:00Z`);
+    const maxDate = new Date(`${maxDateStr}T23:59:59Z`);
+
+    // Fetch all catalog items
+    const itens = await prisma.item.findMany({
+      where: { ownerId: session.ownerId },
+      select: { id: true, codigoInterno: true, nome: true, custo: true, precoVenda: true, categoria: { select: { nome: true } } }
+    });
+
+    // Fetch NFEs for "XMLs importados" and their items for "chegou"
+    const nfes = await prisma.nFeCompra.findMany({
+      where: { ownerId: session.ownerId, dataEmissao: { gte: minDate, lte: maxDate } },
+      include: { itens: true }
+    });
+
+    // Fetch Vendas
+    const vendas = await prisma.vendaDiaria.findMany({
+      where: { ownerId: session.ownerId, data: { gte: minDate, lte: maxDate } },
+      include: { itens: true }
+    });
+
+    // Fetch Eventos
+    const eventos = await prisma.evento.findMany({
+      where: { ownerId: session.ownerId, dataHora: { gte: minDate, lte: maxDate }, status: { notIn: ["rascunho", "rejeitado"] } }
+    });
+
+    // Grouping by Date -> ItemId
+    const dailyData: Record<string, Record<string, { chegou: number, vendido: number, perdido: number }>> = {};
+    const globalXmlCount: Record<string, number> = {};
+
+    for (const d of allDias) {
+      dailyData[d] = {};
+      globalXmlCount[d] = 0;
+    }
+
+    // Populate NFEs
+    for (const nfe of nfes) {
+      if (!nfe.dataEmissao) continue;
+      const dateStr = nfe.dataEmissao.toISOString().split("T")[0];
+      if (!dailyData[dateStr]) continue;
+      globalXmlCount[dateStr] += 1;
+      
+      for (const item of nfe.itens) {
+        if (!item.itemId) continue;
+        if (!dailyData[dateStr][item.itemId]) dailyData[dateStr][item.itemId] = { chegou: 0, vendido: 0, perdido: 0 };
+        dailyData[dateStr][item.itemId].chegou += Number(item.quantidade || 0);
+      }
+    }
+
+    // Populate Vendas
+    for (const venda of vendas) {
+      const dateStr = venda.data.toISOString().split("T")[0];
+      if (!dailyData[dateStr]) continue;
+      
+      for (const item of venda.itens) {
+        if (!dailyData[dateStr][item.itemId]) dailyData[dateStr][item.itemId] = { chegou: 0, vendido: 0, perdido: 0 };
+        dailyData[dateStr][item.itemId].vendido += Number(item.quantidade || 0);
+      }
+    }
+
+    // Populate Eventos
+    for (const evento of eventos) {
+      if (!evento.itemId) continue;
+      const dateStr = evento.dataHora.toISOString().split("T")[0];
+      if (!dailyData[dateStr]) continue;
+      
+      if (!dailyData[dateStr][evento.itemId]) dailyData[dateStr][evento.itemId] = { chegou: 0, vendido: 0, perdido: 0 };
+      dailyData[dateStr][evento.itemId].perdido += Number(evento.quantidade || 0);
+    }
+
+    // Convert Item Map to base object
+    const catalogMap: Record<string, any> = {};
+    for (const item of itens) {
+      catalogMap[item.id] = {
+        codigo: item.codigoInterno,
+        descricao: item.nome,
+        categoria: item.categoria?.nome || "Sem Categoria",
+        custo: Number(item.custo || 0),
+        precoVenda: Number(item.precoVenda || 0),
+        limitePerda: 0 // Will be calculated dynamically in UI with limiteGlobal
+      };
+    }
+
+    const buildLinhasParaDias = (dias: string[]) => {
+      const result: any[] = [];
+      const itemAgg: Record<string, { chegou: number, vendido: number, perdido: number }> = {};
+      let xmlsImportados = 0;
+
+      for (const d of dias) {
+        if (!dailyData[d]) continue;
+        xmlsImportados += globalXmlCount[d] || 0;
+        
+        for (const [itemId, stats] of Object.entries(dailyData[d])) {
+          if (!itemAgg[itemId]) itemAgg[itemId] = { chegou: 0, vendido: 0, perdido: 0 };
+          itemAgg[itemId].chegou += stats.chegou;
+          itemAgg[itemId].vendido += stats.vendido;
+          itemAgg[itemId].perdido += stats.perdido;
+        }
+      }
+
+      for (const [itemId, stats] of Object.entries(itemAgg)) {
+        if (!catalogMap[itemId]) continue;
+        result.push({
+          ...catalogMap[itemId],
+          chegou: stats.chegou,
+          vendido: stats.vendido,
+          perdido: stats.perdido
+        });
+      }
+
+      return { linhas: result, xmlsImportados };
+    };
+
+    const resA = buildLinhasParaDias(diasIsoA);
+    const resB = buildLinhasParaDias(diasIsoB);
+
+    // Also build 'serie' data for charts
+    const serie = diasIsoA.map((d, i) => {
+      const dB = diasIsoB[i];
+      let fatA = 0;
+      let lucroA = 0;
+      let chegouA = 0;
+      let perdidoA = 0;
+      let fatB = 0;
+
+      if (dailyData[d]) {
+        for (const [itemId, stats] of Object.entries(dailyData[d])) {
+          const p = catalogMap[itemId];
+          if (!p) continue;
+          fatA += stats.vendido * p.precoVenda;
+          lucroA += (stats.vendido * p.precoVenda) - (stats.chegou * p.custo);
+          chegouA += stats.chegou;
+          perdidoA += stats.perdido;
+        }
+      }
+
+      if (dB && dailyData[dB]) {
+        for (const [itemId, stats] of Object.entries(dailyData[dB])) {
+          const p = catalogMap[itemId];
+          if (!p) continue;
+          fatB += stats.vendido * p.precoVenda;
+        }
+      }
+
+      return {
+        dia: d.slice(8) + "/" + d.slice(5, 7),
+        Faturamento: Math.round(fatA),
+        Lucro: Math.round(lucroA),
+        Perda: chegouA > 0 ? Number(((perdidoA / chegouA) * 100).toFixed(1)) : 0,
+        comparado: Math.round(fatB)
+      };
+    });
+
+    return {
+      success: true,
+      data: {
+        linhasA: resA.linhas,
+        linhasB: resB.linhas,
+        xmlsImportadosA: resA.xmlsImportados,
+        xmlsImportadosB: resB.xmlsImportados,
+        serie
+      }
+    };
+  } catch (error: any) {
+    console.error("Erro ao gerar as estatísticas reais do dashboard:", error);
+    return { success: false, error: "Falha ao calcular dados reais do dashboard." };
+  }
+}
+

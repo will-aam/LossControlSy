@@ -20,20 +20,81 @@ import { PageHeader } from "@/components/PageHeader";
 import { DashboardCharts } from "@/components/dashboard/dashboard-charts";
 import { CriticalItems } from "@/components/dashboard/critical-items";
 import { getDashboardStats } from "@/app/actions/dashboard";
+import { DollarSign, AlertCircle, TrendingUp, PackageSearch, ArrowLeftRight, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
 
-import {
-  agregar,
-  brl,
-  isoDate,
-  linhasDoDia,
-  num,
-  pct,
-  rangeDias,
-  somarLinhas,
-  type ProdutoLinha,
-} from "@/lib/mock-data";
+import { brl, pct, num } from "@/lib/format";
+
+type ProdutoLinha = {
+  codigo: string;
+  descricao: string;
+  categoria: string;
+  chegou: number;
+  vendido: number;
+  perdido: number;
+  custo: number;
+  precoVenda: number;
+  limitePerda: number;
+};
+
+function isoDate(d: Date) {
+  return d.toISOString().slice(0, 10);
+}
+
+function rangeDias(inicio: string, fim: string): string[] {
+  const out: string[] = [];
+  const a = new Date(inicio + "T00:00:00Z");
+  const b = new Date(fim + "T00:00:00Z");
+  if (isNaN(a.getTime()) || isNaN(b.getTime()) || b < a) return out;
+  for (let d = new Date(a); d <= b && out.length < 400; d.setUTCDate(d.getUTCDate() + 1)) {
+    out.push(isoDate(d));
+  }
+  return out;
+}
+
+type Totais = {
+  faturamento: number;
+  custoTotal: number;
+  lucro: number;
+  margem: number;
+  chegou: number;
+  vendido: number;
+  perdido: number;
+  perdaPct: number;
+  perdaValor: number;
+  ruptura: number;
+  excesso: number;
+  xmlsImportados: number;
+  xmlsPendentes: number;
+  itensXml: number;
+};
+
+function agregarReais(linhas: ProdutoLinha[], limiteGlobal: number, importados: number): Totais {
+  const faturamento = linhas.reduce((s, l) => s + l.vendido * l.precoVenda, 0);
+  const custoTotal = linhas.reduce((s, l) => s + l.chegou * l.custo, 0);
+  const perdaValor = linhas.reduce((s, l) => s + l.perdido * l.custo, 0);
+  const chegou = linhas.reduce((s, l) => s + l.chegou, 0);
+  const vendido = linhas.reduce((s, l) => s + l.vendido, 0);
+  const perdido = linhas.reduce((s, l) => s + l.perdido, 0);
+
+  return {
+    faturamento,
+    custoTotal,
+    lucro: faturamento - custoTotal,
+    margem: faturamento ? ((faturamento - custoTotal) / faturamento) * 100 : 0,
+    chegou,
+    vendido,
+    perdido,
+    perdaPct: chegou ? (perdido / chegou) * 100 : 0,
+    perdaValor,
+    ruptura: linhas.filter((l) => l.chegou > 0 && l.vendido / l.chegou > 0.95).length,
+    excesso: linhas.filter((l) => l.chegou > 0 && (l.perdido / l.chegou) * 100 > limiteGlobal).length,
+    xmlsImportados: importados,
+    xmlsPendentes: 0,
+    itensXml: chegou,
+  };
+}
 
 type Modo = "dia" | "semana" | "mes";
 
@@ -101,29 +162,37 @@ export default function Dashboard() {
     loadData();
   }, []);
 
+  const [linhasA, setLinhasA] = useState<ProdutoLinha[]>([]);
+  const [linhasB, setLinhasB] = useState<ProdutoLinha[]>([]);
+  const [serie, setSerie] = useState<any[]>([]);
+  const [xmlsA, setXmlsA] = useState(0);
+  const [xmlsB, setXmlsB] = useState(0);
+  const [isLoadingReal, setIsLoadingReal] = useState(false);
+
   const diasA = useMemo(() => periodoDias(modo, pa), [modo, pa]);
   const diasB = useMemo(() => periodoDias(modo, pb), [modo, pb]);
 
-  const linhasA = useMemo(() => somarLinhas(diasA), [diasA]);
-  const linhasB = useMemo(() => somarLinhas(diasB), [diasB]);
-  const A = useMemo(() => agregar(linhasA, diasA), [linhasA, diasA]);
-  const B = useMemo(() => agregar(linhasB, diasB), [linhasB, diasB]);
+  useEffect(() => {
+    async function loadRealData() {
+      setIsLoadingReal(true);
+      const { getRealDashboardMetrics } = await import("@/app/actions/dashboard");
+      const result = await getRealDashboardMetrics(diasA, diasB);
+      if (result.success && result.data) {
+        setLinhasA(result.data.linhasA);
+        setLinhasB(result.data.linhasB);
+        setSerie(result.data.serie);
+        setXmlsA(result.data.xmlsImportadosA);
+        setXmlsB(result.data.xmlsImportadosB);
+      } else {
+        toast.error("Erro ao carregar métricas reais do dashboard.");
+      }
+      setIsLoadingReal(false);
+    }
+    loadRealData();
+  }, [diasA, diasB]);
 
-  const serie = useMemo(
-    () =>
-      diasA.map((d, i) => {
-        const l = linhasDoDia(d);
-        const t = agregar(l, [d]);
-        return {
-          dia: d.slice(8) + "/" + d.slice(5, 7),
-          Faturamento: Math.round(t.faturamento),
-          Lucro: Math.round(t.lucro),
-          Perda: Number(t.perdaPct.toFixed(1)),
-          comparado: diasB[i] ? Math.round(agregar(linhasDoDia(diasB[i]), [diasB[i]]).faturamento) : 0,
-        };
-      }),
-    [diasA, diasB],
-  );
+  const A = useMemo(() => agregarReais(linhasA, limiteGlobal, xmlsA), [linhasA, limiteGlobal, xmlsA]);
+  const B = useMemo(() => agregarReais(linhasB, limiteGlobal, xmlsB), [linhasB, limiteGlobal, xmlsB]);
 
   const tabela = useMemo(() => {
     const q = busca.trim().toLowerCase();
@@ -131,7 +200,7 @@ export default function Dashboard() {
       .map((l) => {
         const perdaPct = l.chegou ? (l.perdido / l.chegou) * 100 : 0;
         const giro = l.chegou ? (l.vendido / l.chegou) * 100 : 0;
-        const limite = Math.min(l.limitePerda, limiteGlobal);
+        const limite = l.limitePerda > 0 ? Math.min(l.limitePerda, limiteGlobal) : limiteGlobal;
         const status: "ruptura" | "desperdicio" | "ok" =
           giro > 95 ? "ruptura" : perdaPct > limite ? "desperdicio" : "ok";
         return { ...l, perdaPct, giro, limite, status, faturou: l.vendido * l.precoVenda };
@@ -227,7 +296,23 @@ export default function Dashboard() {
         <section>
           <Carousel gridClass="md:grid-cols-4 xl:grid-cols-6">
             {[
-              <Kpi key="fat" label="Faturou" value={brl(A.faturamento)} delta={delta(A.faturamento, B.faturamento)} />,
+              <Kpi 
+                key="fat" 
+                label="Faturou" 
+                value={brl(A.faturamento)} 
+                delta={delta(A.faturamento, B.faturamento)} 
+                infoContent={
+                  <div className="space-y-2">
+                    <p className="flex items-center gap-1.5 font-medium text-slate-100">
+                      <DollarSign className="h-4 w-4 text-emerald-400" />
+                      Total arrecadado nas vendas
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                      Calculado multiplicando a <em>quantidade vendida</em> de cada produto pelo seu <em>preço de venda</em>.
+                    </p>
+                  </div>
+                }
+              />,
               <Kpi
                 key="perda"
                 label="Perda"
@@ -236,6 +321,20 @@ export default function Dashboard() {
                 invert
                 tone={A.perdaPct > limiteGlobal ? "negative" : "positive"}
                 hint={`${brl(A.perdaValor)} · limite ${limiteGlobal}%`}
+                infoContent={
+                  <div className="space-y-2">
+                    <p className="flex items-center gap-1.5 font-medium text-slate-100">
+                      <AlertCircle className="h-4 w-4 text-rose-400" />
+                      % de produtos descartados
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                      <em>Perda %</em> = quantidade perdida ÷ quantidade que chegou × 100.
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                      Uma perda alta significa <strong>dinheiro jogado fora</strong>.
+                    </p>
+                  </div>
+                }
               />,
               <Kpi
                 key="lucro"
@@ -243,6 +342,20 @@ export default function Dashboard() {
                 value={brl(A.lucro)}
                 delta={delta(A.lucro, B.lucro)}
                 hint={`margem ${pct(A.margem)}`}
+                infoContent={
+                  <div className="space-y-2">
+                    <p className="flex items-center gap-1.5 font-medium text-slate-100">
+                      <TrendingUp className="h-4 w-4 text-emerald-400" />
+                      O que sobrou de verdade
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                      <em>Lucro</em> = Faturamento − Custo total das mercadorias vendidas e perdidas.
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                      Indicador principal da <strong>saúde financeira</strong> do período.
+                    </p>
+                  </div>
+                }
               />,
               <Kpi
                 key="rup"
@@ -250,6 +363,20 @@ export default function Dashboard() {
                 value={`${A.ruptura} itens`}
                 tone={A.ruptura > 0 ? "warning" : "positive"}
                 hint="venderam quase tudo"
+                infoContent={
+                  <div className="space-y-2">
+                    <p className="flex items-center gap-1.5 font-medium text-slate-100">
+                      <PackageSearch className="h-4 w-4 text-amber-400" />
+                      Prestígio em prateleira
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                      Sinaliza produtos que venderam <em>mais de 95% do estoque disponível</em>.
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                      Item muito procurado e corre <strong>grande risco de faltar</strong>, perdendo vendas futuras.
+                    </p>
+                  </div>
+                }
               />,
               <Kpi
                 key="cheg"
@@ -257,6 +384,18 @@ export default function Dashboard() {
                 value={`${num(A.chegou)} / ${num(A.perdido)}`}
                 hint={`vendidos ${num(A.vendido)}`}
                 className="hidden xl:block"
+                infoContent={
+                  <div className="space-y-2">
+                    <p className="flex items-center gap-1.5 font-medium text-slate-100">
+                      <ArrowLeftRight className="h-4 w-4 text-sky-400" />
+                      Balanço de volume físico
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                      <em>Chegou</em>: itens que entraram via Notas Fiscais.<br/>
+                      <em>Perdeu</em>: itens descartados.
+                    </p>
+                  </div>
+                }
               />,
               <Kpi
                 key="xml"
@@ -264,6 +403,17 @@ export default function Dashboard() {
                 value={num(A.xmlsImportados)}
                 hint={`${num(A.itensXml)} itens · ${A.xmlsPendentes} pendentes`}
                 className="hidden xl:block"
+                infoContent={
+                  <div className="space-y-2">
+                    <p className="flex items-center gap-1.5 font-medium text-slate-100">
+                      <FileText className="h-4 w-4 text-indigo-400" />
+                      Notas Fiscais processadas
+                    </p>
+                    <p className="text-muted-foreground text-xs">
+                      Cada XML alimenta automaticamente o seu <em>custo</em> e a quantidade que <strong>chegou</strong> ao estoque.
+                    </p>
+                  </div>
+                }
               />,
             ]}
           </Carousel>
@@ -441,10 +591,12 @@ export default function Dashboard() {
           </div>
         </section>
 
-        <p className="flex items-center gap-2 pb-4 text-[11px] text-muted-foreground">
-          <FileCode2 className="h-3.5 w-3.5" />
-          Os gráficos e tabelas acima são alimentados por dados de demonstração da importação.
-        </p>
+        {isLoadingReal && (
+          <p className="flex items-center gap-2 pb-4 text-[11px] text-muted-foreground">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Buscando dados em tempo real...
+          </p>
+        )}
 
         {/* === DADOS REAIS INTEGRADOS === */}
         <div className="pt-8 mt-8 border-t border-border">
