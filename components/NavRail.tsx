@@ -112,22 +112,18 @@ export function NavRail() {
           </div>
           {aberto && <span className="font-medium text-foreground">Iris (IA)</span>}
         </button>
-        <button className={cn(
-          "p-3 rounded-xl text-muted-foreground hover:bg-surface-2 hover:text-foreground transition-colors flex items-center",
-          aberto ? "justify-start gap-3 w-full" : "justify-center"
-        )}>
-          <Settings size={20} />
-          {aberto && <span className="font-medium">Configurações</span>}
-        </button>
-        <button className={cn(
-          "p-3 rounded-xl text-muted-foreground hover:bg-surface-2 hover:text-foreground transition-colors flex items-center",
-          aberto ? "justify-start gap-3 w-full" : "justify-center"
-        )}>
+        <Link 
+          href="/configuracoes"
+          className={cn(
+            "p-3 rounded-xl text-muted-foreground hover:bg-surface-2 hover:text-foreground transition-colors flex items-center",
+            aberto ? "justify-start gap-3 w-full" : "justify-center"
+          )}
+        >
           <div className="w-8 h-8 rounded-full bg-surface-3 flex items-center justify-center">
             <User size={16} />
           </div>
           {aberto && <span className="font-medium">Perfil</span>}
-        </button>
+        </Link>
       </div>
     </aside>
   );

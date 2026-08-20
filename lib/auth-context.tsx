@@ -201,7 +201,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const checkPermission = (permission: string) => {
     if (!user) return false;
-    return hasPermission(user.role, permission as any);
+    // Dono always has full access
+    if (user.role === "dono") return true;
+    
+    // Check custom permissions in settings
+    if (settings?.permissoes && settings.permissoes[user.role]) {
+      return settings.permissoes[user.role].includes(permission);
+    }
+    
+    // Fallback to defaults
+    return hasPermission(user.role, permission as Permission);
   };
 
   return (

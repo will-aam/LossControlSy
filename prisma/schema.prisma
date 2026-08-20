@@ -231,6 +231,7 @@ model Configuracao {
   bloquearAprovados          Boolean @default(true)
   limiteDiario               Decimal @default(1000.00) @db.Decimal(10, 2)
   permitirFuncionarioGaleria Boolean @default(false)
+  permissoes                 Json?
 
   donoId String @unique
   dono   User   @relation(fields: [donoId], references: [id])

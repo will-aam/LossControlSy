@@ -118,17 +118,17 @@ export function UserFormDialog({
             />
           </div>
           <div className="grid gap-2">
-            <Label htmlFor="role">Função / Cargo</Label>
+            <Label htmlFor="role">Tipo de Usuário</Label>
             <Select
               value={role}
               onValueChange={(val) => setRole(val as UserRole)}
+              disabled={role === "dono"}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Selecione..." />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="funcionario">Funcionário</SelectItem>
-                <SelectItem value="fiscal">Fiscal</SelectItem>
                 <SelectItem value="gestor">Gestor</SelectItem>
                 {/* Apenas exibe Dono se estiver editando um Dono */}
                 {role === "dono" && (

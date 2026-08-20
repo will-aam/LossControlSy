@@ -50,6 +50,7 @@ export async function saveSettings(data: {
   bloquearAprovados: boolean;
   permitirFuncionarioGaleria: boolean;
   limiteDiario?: number;
+  permissoes?: any;
 }) {
   const session = await getSession();
 
@@ -70,6 +71,9 @@ export async function saveSettings(data: {
       ...(data.limiteDiario !== undefined && {
         limiteDiario: data.limiteDiario,
       }),
+      ...(data.permissoes !== undefined && {
+        permissoes: data.permissoes,
+      })
     };
 
     await prisma.configuracao.upsert({
@@ -238,7 +242,27 @@ export async function deleteUser(id: string) {
       return { success: false, message: "Usuário não pertence à sua equipe." };
     }
 
-    await prisma.user.delete({ where: { id } });
+    // Transferir autoria dos registros para o dono antes de excluir
+    await prisma.$transaction([
+      prisma.evento.updateMany({
+        where: { criadoPorId: id },
+        data: { criadoPorId: session.ownerId },
+      }),
+      prisma.evento.updateMany({
+        where: { aprovadoPorId: id },
+        data: { aprovadoPorId: session.ownerId },
+      }),
+      prisma.notaFiscal.updateMany({
+        where: { uploadedById: id },
+        data: { uploadedById: session.ownerId },
+      }),
+      prisma.evidencia.updateMany({
+        where: { userId: id },
+        data: { userId: session.ownerId },
+      }),
+      prisma.user.delete({ where: { id } }),
+    ]);
+
     revalidatePath("/configuracoes");
     return { success: true };
   } catch (error) {

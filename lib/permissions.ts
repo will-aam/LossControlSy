@@ -48,9 +48,8 @@ export type Permission =
   | "configuracoes:ver"
   | "usuarios:gerenciar";
 
-const rolePermissions: Record<UserRole, Permission[]> = {
+export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   funcionario: [
-    // REMOVIDO: "dashboard:ver",
     "eventos:menu",
     "eventos:criar",
     "catalogo:ver",
@@ -147,10 +146,23 @@ const rolePermissions: Record<UserRole, Permission[]> = {
   ],
 };
 
-export function hasPermission(role: UserRole, permission: Permission): boolean {
-  return rolePermissions[role]?.includes(permission) ?? false;
+export function hasPermission(
+  role: UserRole, 
+  permission: Permission, 
+  customPermissions?: Record<string, Permission[]>
+): boolean {
+  if (role === "dono") return true;
+  
+  if (customPermissions && customPermissions[role]) {
+    return customPermissions[role].includes(permission);
+  }
+
+  return DEFAULT_ROLE_PERMISSIONS[role]?.includes(permission) ?? false;
 }
 
-export function getPermissions(role: UserRole): Permission[] {
-  return rolePermissions[role] ?? [];
+export function getPermissions(role: UserRole, customPermissions?: Record<string, Permission[]>): Permission[] {
+  if (customPermissions && customPermissions[role]) {
+    return customPermissions[role];
+  }
+  return DEFAULT_ROLE_PERMISSIONS[role] ?? [];
 }

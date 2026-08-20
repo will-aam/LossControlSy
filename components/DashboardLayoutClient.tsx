@@ -20,14 +20,14 @@ export function DashboardLayoutClient({ children }: { children: React.ReactNode 
       <div 
         className={`transition-[padding] duration-200 ease-out pl-0 ${
           navAberto ? "md:pl-56" : "md:pl-16"
-        } ${isEventoNovo ? "pb-0" : "pb-24 md:pb-0"}`}
+        } ${isEventoNovo ? "pb-0" : "pb-20 md:pb-0"}`}
       >
-        <div className={isEventoNovo ? "p-0 md:p-4" : "p-2.5 md:p-4"}>
+        <div className={isEventoNovo ? "p-0 md:p-4" : "p-0 md:p-4"}>
           <div 
             className={`flex flex-col overflow-hidden ${
               isEventoNovo 
                 ? "h-[100dvh] md:h-[calc(100vh-2rem)] md:rounded-2xl md:bg-slate-900/50" 
-                : "h-[calc(100vh-1.25rem-4.5rem)] md:h-[calc(100vh-2rem)] rounded-2xl bg-slate-900/50"
+                : "h-[calc(100dvh-5rem)] md:h-[calc(100vh-2rem)] md:rounded-2xl md:bg-slate-900/50"
             }`}
           >
             {children}

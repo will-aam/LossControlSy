@@ -46,8 +46,7 @@ export function BottomNav() {
   ];
 
   const systemOptions = [
-    { icon: Settings, label: "Configurações", href: "#" },
-    { icon: User, label: "Perfil", href: "#" },
+    { icon: User, label: "Perfil", href: "/configuracoes" },
   ];
 
   // Hide bottom nav completely on the event creation page to give it full screen

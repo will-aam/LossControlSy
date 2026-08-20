@@ -57,6 +57,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
+import { PageHeader } from "@/components/PageHeader";
 
 const roleColors: Record<UserRole, string> = {
   funcionario: "bg-blue-500 text-white",
@@ -66,7 +67,7 @@ const roleColors: Record<UserRole, string> = {
 };
 
 export default function ConfiguracoesPage() {
-  const { hasPermission, user: currentUser } = useAuth();
+  const { hasPermission, user: currentUser, isLoading: isAuthLoading } = useAuth();
 
   const [users, setUsers] = useState<User[]>([]);
   const [settings, setSettings] = useState<any>({
@@ -173,6 +174,14 @@ export default function ConfiguracoesPage() {
     }
   };
 
+  if (isAuthLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   if (!hasPermission("configuracoes:ver")) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
@@ -186,19 +195,18 @@ export default function ConfiguracoesPage() {
   }
 
   return (
-    <div className="space-y-6 pb-20 md:pb-0">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Configurações</h1>
-        <p className="text-muted-foreground">
-          Gerencie as configurações do sistema
-        </p>
-      </div>
+    <>
+      <PageHeader 
+        title="Configurações" 
+        description="Gerencie as configurações do sistema"
+      />
 
-      <Tabs defaultValue="geral" className="space-y-6">
+      <div className="flex-1 flex flex-col p-0 md:p-4 min-h-0 overflow-y-auto space-y-4 md:space-y-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        <Tabs defaultValue="geral" className="space-y-6">
         <TabsList>
           <TabsTrigger value="geral">Geral</TabsTrigger>
           <TabsTrigger value="usuarios">Usuários</TabsTrigger>
-          <TabsTrigger value="notificacoes">Notificações</TabsTrigger>
+          <TabsTrigger value="permissoes">Acessos</TabsTrigger>
         </TabsList>
 
         <TabsContent value="geral" className="space-y-6">
@@ -446,36 +454,81 @@ export default function ConfiguracoesPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="notificacoes" className="space-y-6">
+        <TabsContent value="permissoes" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Bell className="h-5 w-5" />
-                Preferências de Notificação
+                <Shield className="h-5 w-5" />
+                Permissões de Acesso
               </CardTitle>
               <CardDescription>
-                Configure os alertas (Disponível em breve)
+                Defina as páginas que cada tipo de usuário pode acessar no menu
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6 opacity-60 pointer-events-none">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Novos eventos de perda</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Notificar gestores via App
-                  </p>
-                </div>
-                <Switch defaultChecked />
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Alerta de limite de perda</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Alertar quando ultrapassar o limite diário
-                  </p>
-                </div>
-                <Switch defaultChecked />
+            <CardContent className="space-y-6">
+              {["gestor", "funcionario"].map((role) => {
+                const currentPerms =
+                  settings.permissoes?.[role] ||
+                  (role === "gestor"
+                    ? ["dashboard:ver", "eventos:menu", "catalogo:ver", "categorias:ver", "galeria:ver", "relatorios:ver", "motivos:ver"]
+                    : ["eventos:menu", "catalogo:ver", "categorias:ver"]);
+
+                const togglePermission = (permission: string) => {
+                  const currentRolePerms = [...currentPerms];
+                  const hasPerm = currentRolePerms.includes(permission);
+                  
+                  let newPerms;
+                  if (hasPerm) {
+                    newPerms = currentRolePerms.filter(p => p !== permission);
+                  } else {
+                    newPerms = [...currentRolePerms, permission];
+                  }
+
+                  setSettings({
+                    ...settings,
+                    permissoes: {
+                      ...(settings.permissoes || {}),
+                      [role]: newPerms
+                    }
+                  });
+                };
+
+                const permissionOptions = [
+                  { id: "dashboard:ver", label: "Dashboard / Visão Geral" },
+                  { id: "eventos:menu", label: "Eventos de Perda" },
+                  { id: "catalogo:ver", label: "Catálogo de Itens" },
+                  { id: "categorias:ver", label: "Categorias" },
+                  { id: "galeria:ver", label: "Galeria" },
+                  { id: "motivos:ver", label: "Motivos" },
+                  { id: "relatorios:ver", label: "Relatórios" },
+                ];
+
+                return (
+                  <div key={role} className="space-y-4">
+                    <h3 className="text-lg font-medium capitalize flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${role === 'gestor' ? 'bg-purple-500' : 'bg-blue-500'}`} />
+                      {role}
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pl-4">
+                      {permissionOptions.map((opt) => (
+                        <div key={opt.id} className="flex items-center space-x-2">
+                          <Switch
+                            id={`${role}-${opt.id}`}
+                            checked={currentPerms.includes(opt.id)}
+                            onCheckedChange={() => togglePermission(opt.id)}
+                          />
+                          <Label htmlFor={`${role}-${opt.id}`}>{opt.label}</Label>
+                        </div>
+                      ))}
+                    </div>
+                    <Separator />
+                  </div>
+                );
+              })}
+              <div className="flex justify-end mt-4">
+                <Button onClick={handleSaveSettings}>
+                  Salvar Permissões
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -518,6 +571,7 @@ export default function ConfiguracoesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+      </div>
+    </>
   );
 }
