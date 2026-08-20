@@ -28,6 +28,7 @@ import { MoreVertical, Eye, Trash2, Lock } from "lucide-react";
 import { formatCurrency, formatDate, getStatusColor } from "@/lib/utils";
 import { Evento, EventoStatus } from "@/lib/types";
 import { useAuth } from "@/lib/auth-context";
+import { toast } from "sonner";
 
 interface EventosTableProps {
   data: Evento[];
@@ -76,7 +77,16 @@ export function EventosTable({
                 <TableCell className="text-xs whitespace-nowrap text-muted-foreground">
                   {formatDate(evento.dataHora)}
                 </TableCell>
-                <TableCell className="font-mono text-xs text-muted-foreground">
+                <TableCell 
+                  className="font-mono text-xs text-muted-foreground cursor-pointer transition-colors hover:text-foreground"
+                  title="Clique para copiar"
+                  onClick={() => {
+                    if (evento.item?.codigoInterno) {
+                      navigator.clipboard.writeText(evento.item.codigoInterno);
+                      toast.success("Código copiado!");
+                    }
+                  }}
+                >
                   {evento.item?.codigoInterno}
                 </TableCell>
                 <TableCell className="font-medium text-sm">

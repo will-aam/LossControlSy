@@ -86,42 +86,16 @@ export async function importVendasCSV(formData: FormData) {
 
       if (!codSubgrupo || !codItem) continue; // Dados essenciais ausentes
 
-      // 1. Verificar/Criar Subgrupo
-      let subgrupo = await prisma.subgrupo.findUnique({
-        where: { codigo_ownerId: { codigo: codSubgrupo, ownerId } }
-      });
-      if (!subgrupo) {
-        subgrupo = await prisma.subgrupo.create({
-          data: {
-            codigo: codSubgrupo,
-            ownerId,
-          }
-        });
-      }
-
-      // 2. Verificar/Criar Item
-      let item = await prisma.item.findUnique({
+      // A importação de vendas não deve cadastrar itens novos automaticamente.
+      // 1. Verificar se o item já existe no sistema
+      const item = await prisma.item.findUnique({
         where: { codigoInterno_ownerId: { codigoInterno: codItem, ownerId } }
       });
       
-      const qtd = parseBrazilianDecimal(qtdStr);
+      // Se não existir, pulamos essa linha
+      if (!item) continue;
       
-      if (!item) {
-        const hasFraction = qtd % 1 !== 0;
-        
-        item = await prisma.item.create({
-          data: {
-            codigoInterno: codItem,
-            codigoBarras: codItem,
-            nome: descItem || "Item Desconhecido",
-            unidade: hasFraction ? "KG" : "UN",
-            custo: 0, // Como não temos o custo de cadastro no CSV (só da venda), iniciamos zerado ou com o preço médio?
-            precoVenda: parseBrazilianDecimal(valPrecoMedioStr),
-            subgrupoId: subgrupo.id,
-            ownerId,
-          }
-        });
-      }
+      const qtd = parseBrazilianDecimal(qtdStr);
 
       // 3. Criar VendaItem
       const valLiquido = parseBrazilianDecimal(valLiquidoStr);
