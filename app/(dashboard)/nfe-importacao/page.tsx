@@ -7,20 +7,44 @@ import { HistoricoNFeList } from "@/components/nfe/HistoricoNFeList";
 import { Receipt } from "lucide-react";
 import { PageHeader } from "@/components/PageHeader";
 
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+
 export const metadata = {
   title: "Importação de NFe | Controle",
 };
 
-export default async function NFeImportacaoPage() {
+export default async function NFeImportacaoPage(props: {
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const searchParams = await props.searchParams;
   const user = await getSession();
   if (!user || !user.ownerId) {
     redirect("/login");
   }
 
-  // Buscar histórico de NFe com os itens para calcular o progresso de mapeamento
+  const page = Number(searchParams?.page) || 1;
+  const pageSize = 10;
+  const skip = (page - 1) * pageSize;
+
+  // Buscar total para paginação
+  const totalItems = await prisma.nFeCompra.count({
+    where: { ownerId: user.ownerId }
+  });
+  const totalPages = Math.ceil(totalItems / pageSize);
+
+  // Buscar histórico de NFe paginado
   const historicoRaw = await prisma.nFeCompra.findMany({
     where: { ownerId: user.ownerId },
     orderBy: { dataImportacao: "desc" },
+    skip,
+    take: pageSize,
     include: {
       itens: {
         select: { itemId: true }
@@ -59,6 +83,42 @@ export default async function NFeImportacaoPage() {
 
         <div>
           <HistoricoNFeList historico={historico} />
+          
+          {totalPages > 1 && (
+            <div className="mt-6 flex justify-center">
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious 
+                      href={page > 1 ? `/nfe-importacao?page=${page - 1}` : "#"} 
+                      className={page <= 1 ? "pointer-events-none opacity-50" : ""}
+                    />
+                  </PaginationItem>
+                  
+                  {Array.from({ length: totalPages }).map((_, i) => {
+                    const pageNumber = i + 1;
+                    return (
+                      <PaginationItem key={pageNumber}>
+                        <PaginationLink 
+                          href={`/nfe-importacao?page=${pageNumber}`}
+                          isActive={pageNumber === page}
+                        >
+                          {pageNumber}
+                        </PaginationLink>
+                      </PaginationItem>
+                    );
+                  })}
+                  
+                  <PaginationItem>
+                    <PaginationNext 
+                      href={page < totalPages ? `/nfe-importacao?page=${page + 1}` : "#"} 
+                      className={page >= totalPages ? "pointer-events-none opacity-50" : ""}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </div>
       </main>
     </>

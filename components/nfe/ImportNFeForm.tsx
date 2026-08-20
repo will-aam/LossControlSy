@@ -2,12 +2,22 @@
 
 import React, { useRef, useState } from "react";
 import { importNFeXML } from "@/app/actions/nfe-import";
-import { Upload, Loader2 } from "lucide-react";
+import { Upload, Loader2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function ImportNFeForm() {
   const [isUploading, setIsUploading] = useState(false);
+  const [duplicateNFe, setDuplicateNFe] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -32,6 +42,8 @@ export function ImportNFeForm() {
         if (res.nfeId) {
           router.push(`/nfe-importacao/${res.nfeId}`);
         }
+      } else if (res.error === "DUPLICATED") {
+        setDuplicateNFe(res.numero || "Desconhecido");
       } else {
         toast.error(res.error || "Erro ao importar XML");
       }
@@ -72,6 +84,28 @@ export function ImportNFeForm() {
           </>
         )}
       </button>
+
+      {/* Modal de Alerta de Duplicidade */}
+      <AlertDialog open={!!duplicateNFe} onOpenChange={() => setDuplicateNFe(null)}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-amber-500">
+              <AlertCircle className="w-5 h-5" />
+              Nota Fiscal Já Importada
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-base pt-2">
+              O sistema identificou que a NF-e nº <strong className="text-foreground">{duplicateNFe}</strong> já foi importada anteriormente.
+              <br /><br />
+              Para evitar duplicidade de itens e custos no seu catálogo, esta importação foi cancelada.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-4">
+            <AlertDialogAction onClick={() => setDuplicateNFe(null)} className="w-full sm:w-auto">
+              Entendi
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

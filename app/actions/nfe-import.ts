@@ -104,6 +104,21 @@ export async function importNFeXML(formData: FormData) {
     const dataEmissao = dataEmissaoRaw ? new Date(dataEmissaoRaw) : null;
     const valorTotal = valorTotalRaw ? parseFloat(valorTotalRaw) : 0;
 
+    // Verificar se a nota já foi importada (evitar duplicidade)
+    if (numero) {
+      const existeNfe = await prisma.nFeCompra.findFirst({
+        where: {
+          numero,
+          emitente: emitente || undefined,
+          ownerId: user.ownerId
+        }
+      });
+
+      if (existeNfe) {
+        return { success: false, error: "DUPLICATED", numero };
+      }
+    }
+
     // Extrair os itens (grupo <det>)
     const detGroups = xmlText.split(/<det /i).slice(1);
     const itensNFe: NFeItemExtracted[] = [];
