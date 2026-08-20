@@ -433,3 +433,39 @@ export async function createItemFornecedor(itemId: string, codigoFornecedor: str
   }
 }
 
+// 10. ATUALIZAÇÃO EM MASSA DE PREÇOS
+export async function atualizarPrecosLote(itensParaAtualizar: { codigoInterno: string; precoVenda: number }[]) {
+  const session = await getSession();
+  if (!session) return { success: false, message: "Não autorizado" };
+
+  try {
+    let count = 0;
+    
+    // Process in a loop to find items by codigoInterno and ownerId, then update
+    for (const item of itensParaAtualizar) {
+      const dbItem = await prisma.item.findFirst({
+        where: {
+          codigoInterno: item.codigoInterno,
+          ownerId: session.ownerId
+        },
+      });
+
+      if (dbItem && Number(dbItem.precoVenda) !== item.precoVenda) {
+        await prisma.item.update({
+          where: { id: dbItem.id },
+          data: { precoVenda: item.precoVenda },
+        });
+        count++;
+      }
+    }
+
+    revalidatePath("/catalogo");
+    return { success: true, count };
+  } catch (error) {
+    console.error("Erro na atualização de preços:", error);
+    return {
+      success: false,
+      message: "Erro na atualização de preços em lote.",
+    };
+  }
+}

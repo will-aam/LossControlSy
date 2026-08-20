@@ -77,6 +77,7 @@ export async function getEventos() {
             ...ev.item,
             custo: Number(ev.item.custo),
             precoVenda: Number(ev.item.precoVenda),
+            custoMedio: Number((ev.item as any).custoMedio || 0),
           }
         : null,
     }));
@@ -167,6 +168,30 @@ export async function deleteEvento(id: string) {
     return { success: true };
   } catch (error) {
     return { success: false, message: "Erro ao excluir." };
+  }
+}
+
+export async function toggleNfeEmitidaLote(eventoIds: string[], nfeEmitida: boolean) {
+  const session = await getSession();
+  if (!session) return { success: false, message: "Não autorizado" };
+
+  try {
+    // Only update events that belong to the user's ownerId for security
+    await prisma.evento.updateMany({
+      where: {
+        id: { in: eventoIds },
+        ownerId: session.ownerId,
+      },
+      data: {
+        nfeEmitida,
+      },
+    });
+    
+    revalidatePath("/eventos");
+    return { success: true };
+  } catch (error) {
+    console.error("Erro ao atualizar nfeEmitida em lote:", error);
+    return { success: false, message: "Erro ao atualizar status da nota fiscal." };
   }
 }
 

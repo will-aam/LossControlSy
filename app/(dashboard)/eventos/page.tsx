@@ -19,7 +19,7 @@ import {
   getEventos,
   updateEventoStatus,
   deleteEvento,
-  getNotaDoLote,
+  toggleNfeEmitidaLote,
 } from "@/app/actions/eventos";
 
 import {
@@ -51,7 +51,6 @@ const hideScrollClass =
 export default function EventosPage() {
   const { hasPermission } = useAuth();
 
-  const [viewMode, setViewMode] = useState<ViewMode>("pastas");
   const [loteSelecionado, setLoteSelecionado] = useState<LoteDiario | null>(
     null,
   );
@@ -97,7 +96,7 @@ export default function EventosPage() {
           : undefined,
         criadoPor: ev.criadoPor,
         evidencias: ev.evidencias,
-        notasFiscais: ev.notasFiscais || [],
+        nfeEmitida: ev.nfeEmitida, // NOVO
       }));
 
       setEventosDoBanco(mappedEventos);
@@ -109,7 +108,7 @@ export default function EventosPage() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [viewMode, dateRange, globalSearch, statusFilter, loteSelecionado]);
+  }, [dateRange, globalSearch, statusFilter, loteSelecionado]);
 
   const eventosFiltradosGlobalmente = useMemo(() => {
     return eventosDoBanco.filter((evento) => {
@@ -139,8 +138,6 @@ export default function EventosPage() {
   }, [eventosDoBanco, dateRange, globalSearch, statusFilter]);
 
   const lotesDiarios = useMemo(() => {
-    if (viewMode === "lista-completa") return [];
-
     const grupos: Record<string, Evento[]> = {};
 
     eventosFiltradosGlobalmente.forEach((evento) => {
@@ -160,11 +157,7 @@ export default function EventosPage() {
         if (todosOk) status = "aprovado";
         else if (temRejeitado) status = "rejeitado";
 
-        const notaReferencia = eventos.find(
-          (e) => e.notasFiscais && e.notasFiscais.length > 0,
-        )?.notasFiscais[0];
-        const isExpired =
-          !!notaReferencia && !notaReferencia.pdfUrl && !notaReferencia.xmlUrl;
+        const isNfeEmitida = eventos.some((e) => e.nfeEmitida);
 
         return {
           data,
@@ -176,25 +169,22 @@ export default function EventosPage() {
           ),
           status,
           autor: eventos[0].criadoPor?.nome || "Sistema",
-          nfNumero: notaReferencia?.numero,
-          isExpired: isExpired,
+          nfeEmitida: isNfeEmitida,
         } as LoteDiario;
       })
       .sort((a, b) => b.dataOriginal.getTime() - a.dataOriginal.getTime());
-  }, [eventosFiltradosGlobalmente, viewMode]);
+  }, [eventosFiltradosGlobalmente]);
 
   const dadosPaginados = useMemo(() => {
     let dados: any[] = [];
-    const itemsPerPage = viewMode === "pastas" && !loteSelecionado ? 10 : 15;
+    const itemsPerPage = !loteSelecionado ? 10 : 15;
 
     if (loteSelecionado) {
       dados = eventosFiltradosGlobalmente.filter(
         (e) => formatDate(e.dataHora) === loteSelecionado.data,
       );
-    } else if (viewMode === "pastas") {
-      dados = lotesDiarios;
     } else {
-      dados = eventosFiltradosGlobalmente;
+      dados = lotesDiarios;
     }
 
     const totalItems = dados.length;
@@ -209,7 +199,6 @@ export default function EventosPage() {
     };
   }, [
     loteSelecionado,
-    viewMode,
     lotesDiarios,
     eventosFiltradosGlobalmente,
     currentPage,
@@ -253,31 +242,29 @@ export default function EventosPage() {
         toast.error(result.message);
         loadData();
       } else {
-        toast.success("Evento excluído");
+        toast.success("Evento excluído com sucesso.");
       }
       setEventoToDelete(null);
     }
   };
 
-  const handleDownloadLote = async (lote: LoteDiario) => {
-    try {
-      const dataString = lote.dataOriginal.toISOString().split("T")[0];
-      const result = await getNotaDoLote(dataString);
+  const handleToggleNfe = async (lote: LoteDiario) => {
+    const eventoIds = lote.eventos.map((e) => e.id);
+    const newStatus = !lote.nfeEmitida;
+    
+    // Update Optimistically
+    setEventosDoBanco((prev) =>
+      prev.map((ev) =>
+        eventoIds.includes(ev.id) ? { ...ev, nfeEmitida: newStatus } : ev
+      )
+    );
 
-      if (result.success && result.url) {
-        window.open(result.url, "_blank");
-        toast.success("Nota fiscal aberta.");
-      } else if (result.isExpired) {
-        toast.error(result.message, {
-          description:
-            "Documentos fiscais são removidos permanentemente após 30 dias.",
-          duration: 5000,
-        });
-      } else {
-        toast.error(result.message || "Nenhuma nota encontrada.");
-      }
-    } catch (error) {
-      toast.error("Erro ao buscar nota fiscal.");
+    const result = await toggleNfeEmitidaLote(eventoIds, newStatus);
+    if (!result.success) {
+      toast.error(result.message);
+      loadData();
+    } else {
+      toast.success(newStatus ? "Nota Fiscal marcada como emitida." : "Nota Fiscal desmarcada.");
     }
   };
 
@@ -361,8 +348,6 @@ export default function EventosPage() {
       />
       <main className={`flex-1 flex flex-col space-y-4 px-4 py-5 md:px-8 md:py-6 overflow-hidden ${hideScrollClass}`}>
       <EventosToolbar
-        viewMode={viewMode}
-        setViewMode={setViewMode}
         globalSearch={globalSearch}
         setGlobalSearch={setGlobalSearch}
         statusFilter={statusFilter}
@@ -379,18 +364,11 @@ export default function EventosPage() {
             <div className="flex justify-center items-center h-full gap-2 text-muted-foreground">
               <Loader2 className="h-6 w-6 animate-spin" /> Carregando...
             </div>
-          ) : viewMode === "pastas" ? (
+          ) : (
             <EventosGrid
               lotes={dadosPaginados.currentItems as LoteDiario[]}
               onSelect={setLoteSelecionado}
-              onDownload={handleDownloadLote}
-            />
-          ) : (
-            <EventosTable
-              data={dadosPaginados.currentItems as Evento[]}
-              onStatusChange={handleStatusChange}
-              onDelete={setEventoToDelete}
-              onViewDetails={(ev) => console.log(ev)}
+              onToggleNfe={handleToggleNfe}
             />
           )}
         </div>

@@ -40,7 +40,7 @@ import {
 import { Item } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
-import { parseItemsCSV } from "@/lib/csv-parser"; // <--- Importei o parser
+import { parseItemsCSV, parsePrecosCSV } from "@/lib/csv-parser"; // <--- Importei o parser
 
 // Novos Actions e Componentes
 import {
@@ -50,6 +50,7 @@ import {
   createItem,
   updateItem,
   importarItens, // <--- Importei a nova action (criaremos no próximo passo)
+  atualizarPrecosLote,
   CreateItemData,
 } from "@/app/actions/catalogo";
 import { getCategorias } from "@/app/actions/categorias";
@@ -107,6 +108,10 @@ export default function CatalogoPage() {
   // Importação
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Atualização de Preços
+  const [isUpdatingPrecos, setIsUpdatingPrecos] = useState(false);
+  const fileInputPrecosRef = useRef<HTMLInputElement>(null);
 
   // Carrega Itens e Categorias ao iniciar
   useEffect(() => {
@@ -234,6 +239,45 @@ export default function CatalogoPage() {
     }
   };
 
+  const handleFileUploadPrecos = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUpdatingPrecos(true);
+    toast.info("Lendo arquivo de preços CSV...");
+
+    try {
+      const parsedPrecos = await parsePrecosCSV(file);
+
+      if (parsedPrecos.length === 0) {
+        toast.warning("O arquivo de preços parece estar vazio ou inválido.");
+        setIsUpdatingPrecos(false);
+        return;
+      }
+
+      toast.loading(`Atualizando preços de ${parsedPrecos.length} itens encontrados no CSV...`);
+
+      const result = await atualizarPrecosLote(parsedPrecos);
+
+      if (result.success) {
+        toast.dismiss();
+        toast.success(`${result.count} preços atualizados com sucesso! (Itens não encontrados foram descartados)`);
+        loadData();
+      } else {
+        toast.dismiss();
+        toast.error(result.message || "Erro ao atualizar preços.");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Erro ao processar o arquivo de preços.");
+    } finally {
+      setIsUpdatingPrecos(false);
+      if (fileInputPrecosRef.current) fileInputPrecosRef.current.value = "";
+    }
+  };
+
   const handleSaveItem = async (itemData: Partial<Item>) => {
     const catResult = await getCategorias();
     const categoriaEncontrada = catResult.data?.find(
@@ -341,6 +385,32 @@ export default function CatalogoPage() {
                   <Upload className="mr-2 h-4 w-4" />
                 )}
                 {isImporting ? "Importando..." : "Importar CSV"}
+              </Button>
+            </>
+          )}
+
+          {/* BOTÃO ATUALIZAR PREÇOS */}
+          {hasPermission("catalogo:editar") && (
+            <>
+              <input
+                type="file"
+                accept=".csv"
+                className="hidden"
+                ref={fileInputPrecosRef}
+                onChange={handleFileUploadPrecos}
+              />
+              <Button
+                variant="secondary"
+                onClick={() => fileInputPrecosRef.current?.click()}
+                disabled={isUpdatingPrecos}
+                className="hidden md:inline-flex"
+              >
+                {isUpdatingPrecos ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="mr-2 h-4 w-4" />
+                )}
+                {isUpdatingPrecos ? "Atualizando..." : "Atualizar Preços"}
               </Button>
             </>
           )}

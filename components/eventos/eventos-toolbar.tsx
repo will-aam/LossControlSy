@@ -31,11 +31,7 @@ import { DateRange } from "react-day-picker";
 import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
-type ViewMode = "pastas" | "lista-completa";
-
 interface EventosToolbarProps {
-  viewMode: ViewMode;
-  setViewMode: (mode: ViewMode) => void;
   globalSearch: string;
   setGlobalSearch: (value: string) => void;
   statusFilter: string;
@@ -45,8 +41,6 @@ interface EventosToolbarProps {
 }
 
 export function EventosToolbar({
-  viewMode,
-  setViewMode,
   globalSearch,
   setGlobalSearch,
   statusFilter,
@@ -128,7 +122,7 @@ export function EventosToolbar({
 
   return (
     <div className="flex flex-col gap-4 shrink-0">
-      {/* Linha Superior: Título e Alternância de Visualização */}
+      {/* Linha Superior: Título */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
@@ -137,41 +131,6 @@ export function EventosToolbar({
           <p className="text-muted-foreground">
             Gerencie e audite os registros de perdas.
           </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 bg-muted/50 p-1 rounded-lg border">
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn(
-                "h-8 gap-2 text-xs hover:bg-background/60",
-                viewMode === "pastas" &&
-                "bg-background shadow-sm text-foreground hover:bg-background",
-              )}
-              onClick={() => {
-                setViewMode("pastas");
-                // Opcional: resetar dataRange ao mudar para pastas se desejar comportamento original
-                setDateRange(undefined);
-              }}
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-              Lotes
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className={cn(
-                "h-8 gap-2 text-xs hover:bg-background/60",
-                viewMode === "lista-completa" &&
-                "bg-background shadow-sm text-foreground hover:bg-background",
-              )}
-              onClick={() => setViewMode("lista-completa")}
-            >
-              <LayoutList className="h-3.5 w-3.5" />
-              Lista
-            </Button>
-          </div>
         </div>
       </div>
 

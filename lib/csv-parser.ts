@@ -88,3 +88,56 @@ export async function parseItemsCSV(file: File): Promise<Item[]> {
     reader.readAsText(file, "ISO-8859-1");
   });
 }
+
+export async function parsePrecosCSV(file: File): Promise<{ codigoInterno: string; precoVenda: number }[]> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      if (!text) {
+        reject(new Error("Arquivo vazio"));
+        return;
+      }
+
+      const lines = text.split(/\r?\n/).filter((line) => line.trim() !== "");
+      const itemsToUpdate: { codigoInterno: string; precoVenda: number }[] = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        const cols = line.split(";");
+        if (cols.length < 4) continue;
+
+        // cod_item is index 0, val_preco_venda_a is index 3
+        const codigoInterno = cols[0]?.trim();
+        const precoVendaRaw = cols[3]?.trim() || "0";
+
+        if (!codigoInterno) continue;
+
+        const parseMoney = (val: string) => {
+          if (!val) return 0;
+          const cleanVal = val
+            .replace("R$", "")
+            .trim()
+            .replace(/\./g, "")
+            .replace(",", ".");
+          return parseFloat(cleanVal) || 0;
+        };
+
+        const precoVenda = parseMoney(precoVendaRaw);
+        itemsToUpdate.push({ codigoInterno, precoVenda });
+      }
+
+      console.log(`Leitura de preços concluída: ${itemsToUpdate.length} itens encontrados.`);
+      resolve(itemsToUpdate);
+    };
+
+    reader.onerror = () => {
+      reject(new Error("Erro ao ler o arquivo"));
+    };
+
+    reader.readAsText(file, "ISO-8859-1");
+  });
+}

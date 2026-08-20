@@ -93,7 +93,8 @@ export interface Evento {
   aprovadoPor?: User;
   evidencias: Evidencia[];
   // NOVO: Adicionado para suportar o vínculo com Notas Fiscais
-  notasFiscais: NotaFiscal[];
+  notasFiscais?: NotaFiscal[];
+  nfeEmitida?: boolean;
 }
 
 export interface CategoriaData {

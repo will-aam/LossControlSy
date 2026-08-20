@@ -141,6 +141,7 @@ model Evento {
   unidade            String
   custoSnapshot      Decimal @db.Decimal(10, 2)
   precoVendaSnapshot Decimal @db.Decimal(10, 2)
+  nfeEmitida         Boolean @default(false) // NOVO: Flag para marcar se a NFe foi feita
 
   itemId String? 
   item   Item?   @relation(fields: [itemId], references: [id], onDelete: SetNull)
