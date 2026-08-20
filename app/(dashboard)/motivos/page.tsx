@@ -173,9 +173,17 @@ export default function MotivosPage() {
         description="Padronize as justificativas para os registros de perda."
       >
         {hasPermission("motivos:criar") && (
-          <Button onClick={() => handleOpenDialog()}>
-            <Plus className="mr-2 h-4 w-4" /> Novo Motivo
-          </Button>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground hidden sm:inline-block">
+              {motivos.length}/15
+            </span>
+            <Button
+              onClick={() => handleOpenDialog()}
+              disabled={motivos.length >= 15}
+            >
+              <Plus className="mr-2 h-4 w-4" /> Novo Motivo
+            </Button>
+          </div>
         )}
       </PageHeader>
 

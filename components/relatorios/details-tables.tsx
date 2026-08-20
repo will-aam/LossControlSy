@@ -58,14 +58,22 @@ export function DetailsTables({ topItens, topMotivos }: DetailsTablesProps) {
                     </div>
                   </div>
                   <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-1 shrink-0">
-                    <div className="text-sm font-bold text-destructive">
-                      {formatCurrency(d.custo)}
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="text-sm font-bold text-destructive">
+                        {formatCurrency(d.custoPerda)}
+                      </div>
+                      <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                        Taxa de Perda: 
+                        <span className={d.taxaPerda > 5 ? "text-destructive font-bold" : "font-bold"}>
+                          {Number(d.taxaPerda).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%
+                        </span>
+                      </div>
                     </div>
                     <Badge
                       variant="outline"
-                      className="text-[10px] font-normal h-5"
+                      className="text-[10px] font-normal h-5 mt-1"
                     >
-                      {Number(d.qtd).toLocaleString("pt-BR", {
+                      {Number(d.qtdPerda).toLocaleString("pt-BR", {
                         maximumFractionDigits: 3,
                       })}{" "}
                       {d.item.unidade}

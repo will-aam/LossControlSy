@@ -13,7 +13,8 @@ import {
   Store,
   Image as ImageIcon,
   PlusCircle,
-  Receipt
+  Receipt,
+  TrendingUp
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -24,17 +25,43 @@ export function NavRail() {
   const pathname = usePathname();
   const { navAberto: aberto } = useSidebar();
 
-  const navItems = [
-    { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
-    { icon: PlusCircle, label: "Registrar Perda", href: "/eventos/novo" },
-    { icon: Store, label: "Catálogo", href: "/catalogo" },
-    { icon: Grid, label: "Categorias", href: "/categorias" },
-    { icon: AlertCircle, label: "Motivos", href: "/motivos" },
-    { icon: BarChart2, label: "Relatórios", href: "/relatorios" },
-    { icon: Calendar, label: "Eventos", href: "/eventos" },
-    { icon: ImageIcon, label: "Galeria", href: "/galeria" },
-    { icon: BarChart2, label: "Vendas", href: "/vendas" },
-    { icon: Receipt, label: "Importação NFe", href: "/nfe-importacao" },
+  const navGroups = [
+    {
+      title: "Visão Geral",
+      items: [
+        { icon: LayoutDashboard, label: "Dashboard", href: "/dashboard" },
+        { icon: TrendingUp, label: "Evoluções", href: "/evolucoes" },
+        { icon: BarChart2, label: "Relatórios", href: "/relatorios" },
+      ]
+    },
+    {
+      title: "Operações",
+      items: [
+        { icon: PlusCircle, label: "Registrar Perda", href: "/eventos/novo" },
+      ]
+    },
+    {
+      title: "Cadastros",
+      items: [
+        { icon: Store, label: "Catálogo", href: "/catalogo" },
+        { icon: Grid, label: "Categorias", href: "/categorias" },
+        { icon: AlertCircle, label: "Motivos", href: "/motivos" },
+      ]
+    },
+    {
+      title: "Registros",
+      items: [
+        { icon: Calendar, label: "Eventos", href: "/eventos" },
+        { icon: ImageIcon, label: "Galeria", href: "/galeria" },
+      ]
+    },
+    {
+      title: "Integrações",
+      items: [
+        { icon: BarChart2, label: "Vendas", href: "/vendas" },
+        { icon: Receipt, label: "Importação NFe", href: "/nfe-importacao" },
+      ]
+    }
   ];
 
   return (
@@ -44,26 +71,37 @@ export function NavRail() {
         aberto ? "w-56 items-start px-4" : "w-16"
       )}
     >
-      <nav className="flex-1 w-full space-y-2 mt-4 overflow-y-auto pb-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href;
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex items-center p-3 rounded-xl transition-colors",
-                isActive
-                  ? "bg-primary/15 text-primary font-medium"
-                  : "text-muted-foreground hover:bg-surface-2 hover:text-foreground",
-                aberto ? "justify-start gap-3 w-full" : "justify-center"
-              )}
-            >
-              <item.icon size={20} />
-              {aberto && <span>{item.label}</span>}
-            </Link>
-          );
-        })}
+      <nav className="flex-1 w-full space-y-4 mt-4 overflow-y-auto pb-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        {navGroups.map((group, groupIdx) => (
+          <div key={groupIdx} className="w-full space-y-1 flex flex-col items-center">
+            {aberto && (
+              <div className="w-full px-3 pb-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                {group.title}
+              </div>
+            )}
+            {!aberto && groupIdx > 0 && <div className="h-px bg-border w-8 mx-auto my-2" />}
+            
+            {group.items.map((item) => {
+              const isActive = pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center p-3 rounded-xl transition-colors",
+                    isActive
+                      ? "bg-primary/15 text-primary font-medium"
+                      : "text-muted-foreground hover:bg-surface-2 hover:text-foreground",
+                    aberto ? "justify-start gap-3 w-full" : "justify-center"
+                  )}
+                >
+                  <item.icon size={20} />
+                  {aberto && <span>{item.label}</span>}
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
       <div className="mt-auto w-full space-y-2 flex flex-col items-center">

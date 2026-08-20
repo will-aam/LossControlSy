@@ -245,7 +245,7 @@ export function CategoriesManager() {
                   </TableCell>
 
                   <TableCell className="text-right py-3">
-                    <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex justify-end gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                       {hasPermission("categorias:editar") && (
                         <Button
                           variant="ghost"

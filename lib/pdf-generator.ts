@@ -191,14 +191,14 @@ export const generateReportPDF = (data: ReportData) => {
     index + 1,
     item.item.codigoInterno || "-",
     item.item.nome,
-    `${formatQuantityPDF(item.qtd)} ${item.item.unidade}`,
-    formatCurrency(item.custo),
-    formatCurrency(item.qtd * (item.item.precoVenda || 0)),
+    `${formatQuantityPDF(item.qtdPerda)} ${item.item.unidade}`,
+    formatCurrency(item.custoPerda),
+    `${Number(item.taxaPerda).toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`,
   ]);
 
   autoTable(doc, {
     startY: finalY + 4,
-    head: [["RANK", "CÓD.", "PRODUTO", "QTD.", "CUSTO", "VENDA PERDIDA"]],
+    head: [["RANK", "CÓD.", "PRODUTO", "QTD.", "CUSTO", "TAXA PERDA"]],
     body: itensData,
     theme: "plain",
     headStyles: {
@@ -419,4 +419,92 @@ export const generateEventPDF = (
       : `lote_${dataReferencia.replace(/\//g, "-")}.pdf`;
 
   doc.save(nomeArquivo);
+};
+
+// --- 3. RELATÓRIO DE EVOLUÇÃO ---
+export const generateEvolucaoPDF = (data: {
+  historico: any[];
+  produtoNome: string;
+  periodoTexto: string;
+  metaPerda: number;
+}) => {
+  const doc = new jsPDF();
+
+  addModernHeader(
+    doc,
+    "Evolução de Perdas e Vendas",
+    `Produto: ${data.produtoNome} | Período: ${data.periodoTexto}`,
+  );
+
+  let finalY = 60;
+
+  doc.setFontSize(11);
+  doc.setTextColor(...COLORS.black);
+  doc.setFont("helvetica", "bold");
+  doc.text("Detalhamento Financeiro Histórico", 14, finalY);
+
+  const tableRows = data.historico.map((h: any) => {
+    let evolucaoTxt = "-";
+    if (h.statusAumento === "aumentou") evolucaoTxt = "AUMENTOU";
+    if (h.statusAumento === "diminuiu") evolucaoTxt = "DIMINUIU";
+    if (h.statusAumento === "manteve") evolucaoTxt = "MANTEVE";
+
+    return [
+      h.label,
+      formatCurrency(h.faturamento),
+      formatCurrency(h.custoPerda),
+      `${h.taxaPerda.toFixed(2)}%`,
+      evolucaoTxt,
+    ];
+  });
+
+  autoTable(doc, {
+    startY: finalY + 4,
+    head: [["MÊS", "FATURAMENTO", "CUSTO PERDA", "TAXA PERDA", "EVOLUÇÃO"]],
+    body: tableRows,
+    theme: "plain",
+    headStyles: {
+      fillColor: COLORS.background,
+      textColor: COLORS.secondary,
+      fontStyle: "bold",
+      fontSize: 9,
+    },
+    styles: {
+      fontSize: 9,
+      cellPadding: 4,
+      lineColor: COLORS.border,
+      lineWidth: { bottom: 0.5 },
+    },
+    columnStyles: {
+      0: { cellWidth: 30, fontStyle: "bold" },
+      1: { cellWidth: 40, halign: "right" },
+      2: { cellWidth: 40, halign: "right", textColor: COLORS.danger },
+      3: { cellWidth: 35, halign: "right", fontStyle: "bold" },
+      4: { cellWidth: 35, halign: "center" },
+    },
+    didParseCell: (hookData) => {
+      if (hookData.section === "body" && hookData.column.index === 4) {
+        const text = hookData.cell.raw as string;
+        if (text === "AUMENTOU") hookData.cell.styles.textColor = COLORS.danger;
+        else if (text === "DIMINUIU") hookData.cell.styles.textColor = COLORS.success;
+        else if (text === "MANTEVE") hookData.cell.styles.textColor = COLORS.secondary;
+      }
+      if (hookData.section === "body" && hookData.column.index === 3) {
+        const rowData = data.historico[hookData.row.index];
+        if (rowData && rowData.taxaPerda > data.metaPerda) {
+          hookData.cell.styles.textColor = COLORS.danger;
+        } else {
+          hookData.cell.styles.textColor = COLORS.success;
+        }
+      }
+    },
+  });
+
+  const totalPages = (doc.internal as any).getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    addFooter(doc, i, totalPages);
+  }
+
+  doc.save(`evolucao_${new Date().toISOString().split("T")[0]}.pdf`);
 };

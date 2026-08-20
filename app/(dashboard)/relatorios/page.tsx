@@ -10,6 +10,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import { getEventos } from "@/app/actions/eventos";
+import { getRelatorioGeral } from "@/app/actions/relatorios";
 import { useAuth } from "@/lib/auth-context";
 import {
   AlertTriangle,
@@ -47,13 +48,19 @@ export default function RelatoriosPage() {
 
   const [eventos, setEventos] = useState<Evento[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [combinedItens, setCombinedItens] = useState<any[]>([]);
 
   useEffect(() => {
     async function loadData() {
+      if (!dateRange?.from || !dateRange?.to) return;
       setIsLoading(true);
-      const result = await getEventos();
+      const result = await getRelatorioGeral(
+        dateRange.from.toISOString().split("T")[0],
+        dateRange.to.toISOString().split("T")[0]
+      );
+      
       if (result.success && result.data) {
-        const mappedEventos: Evento[] = (result.data as any[]).map((ev) => ({
+        const mappedEventos: Evento[] = (result.data.eventos as any[]).map((ev) => ({
           id: ev.id,
           dataHora: ev.dataHora,
           motivo: ev.motivo,
@@ -64,29 +71,30 @@ export default function RelatoriosPage() {
           precoVendaSnapshot: Number(ev.precoVendaSnapshot),
           item: ev.item
             ? {
-                id: ev.item.id,
-                nome: ev.item.nome,
-                codigoInterno: ev.item.codigoInterno,
-                categoria: ev.item.categoria?.nome || "Sem Categoria",
-                unidade: ev.item.unidade,
-                custo: Number(ev.item.custo),
-                precoVenda: Number(ev.item.precoVenda),
-                status: ev.item.status,
-                imagemUrl: ev.item.imagemUrl,
-              }
+              id: ev.item.id,
+              nome: ev.item.nome,
+              codigoInterno: ev.item.codigoInterno,
+              categoria: ev.item.categoria?.nome || "Sem Categoria",
+              unidade: ev.item.unidade,
+              custo: Number(ev.item.custo),
+              precoVenda: Number(ev.item.precoVenda),
+              status: ev.item.status,
+              imagemUrl: ev.item.imagemUrl,
+            }
             : undefined,
           criadoPor: ev.criadoPor,
           evidencias: ev.evidencias,
           notasFiscais: ev.notasFiscais || [],
         }));
         setEventos(mappedEventos);
+        setCombinedItens(result.data.combinedItens);
       } else {
         toast.error("Erro ao carregar relatórios");
       }
       setIsLoading(false);
     }
     loadData();
-  }, []);
+  }, [dateRange]);
 
   const stats = useMemo(() => {
     const from = dateRange?.from || startOfMonth(new Date());
@@ -225,18 +233,8 @@ export default function RelatoriosPage() {
       custo: val.custo,
     }));
 
-    const itemMap: Record<string, { item: Item; qtd: number; custo: number }> =
-      {};
-    validEventos.forEach((ev) => {
-      if (!ev.item) return;
-      if (!itemMap[ev.item.id])
-        itemMap[ev.item.id] = { item: ev.item, qtd: 0, custo: 0 };
-      itemMap[ev.item.id].qtd += ev.quantidade;
-      itemMap[ev.item.id].custo += (ev.custoSnapshot || 0) * ev.quantidade;
-    });
-
-    const topItens = Object.values(itemMap)
-      .sort((a, b) => b.custo - a.custo)
+    const topItens = combinedItens
+      .sort((a, b) => b.custoPerda - a.custoPerda)
       .slice(0, 10);
 
     return {
@@ -247,7 +245,7 @@ export default function RelatoriosPage() {
       validEventos,
       diffDias,
     };
-  }, [eventos, dateRange]);
+  }, [eventos, dateRange, combinedItens]);
 
   const summary = useMemo(() => {
     const totalCusto = stats.validEventos.reduce(
@@ -386,18 +384,18 @@ export default function RelatoriosPage() {
 
       <main className="flex-1 space-y-6 px-4 py-5 md:px-8 md:py-6 overflow-y-auto">
 
-      <SummaryCards summary={summary} />
+        <SummaryCards summary={summary} />
 
-      <ChartsOverview
-        monthlyData={stats.monthlyData}
-        perdasPorDiaSemana={stats.perdasPorDiaSemana}
-        isDiario={isDiario}
-      />
+        <ChartsOverview
+          monthlyData={stats.monthlyData}
+          perdasPorDiaSemana={stats.perdasPorDiaSemana}
+          isDiario={isDiario}
+        />
 
-      <DetailsTables
-        topItens={stats.topItens}
-        topMotivos={stats.topMotivosPerdas}
-      />
+        <DetailsTables
+          topItens={stats.topItens}
+          topMotivos={stats.topMotivosPerdas}
+        />
       </main>
     </>
   );

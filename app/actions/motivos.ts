@@ -43,6 +43,18 @@ export async function createMotivo(nome: string) {
       return { success: true, data: existente };
     }
 
+    // Limite de 15 motivos
+    const totalMotivos = await prisma.motivo.count({
+      where: { ownerId: session.ownerId },
+    });
+
+    if (totalMotivos >= 15) {
+      return {
+        success: false,
+        message: "Limite de 15 motivos atingido. Exclua um motivo para criar outro.",
+      };
+    }
+
     // RESOLVE O ERRO: Agora passamos o ownerId obrigatório
     const novo = await prisma.motivo.create({
       data: {
@@ -65,22 +77,63 @@ export async function updateMotivo(id: string, nome: string) {
   if (!session) return { success: false, message: "Não autorizado" };
 
   try {
+    const nomeFormatado = nome.trim();
+
     // Verifica se o motivo pertence à loja antes de permitir a edição
-    const motivo = await prisma.motivo.findUnique({ where: { id } });
-    if (!motivo || motivo.ownerId !== session.ownerId) {
+    const motivoAntigo = await prisma.motivo.findUnique({ where: { id } });
+    if (!motivoAntigo || motivoAntigo.ownerId !== session.ownerId) {
       return {
         success: false,
         message: "Motivo não encontrado ou sem permissão.",
       };
     }
 
-    await prisma.motivo.update({
-      where: { id },
-      data: { nome: nome.trim() },
+    if (motivoAntigo.nome === nomeFormatado) {
+      return { success: true };
+    }
+
+    // Verifica se JÁ EXISTE outro motivo com esse novo nome na mesma loja
+    const motivoExistente = await prisma.motivo.findFirst({
+      where: {
+        nome: { equals: nomeFormatado, mode: "insensitive" },
+        ownerId: session.ownerId,
+        id: { not: id }, // Garante que não é o próprio
+      },
     });
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Atualizar todas as Evidencias que usavam o nome antigo
+      await tx.evidencia.updateMany({
+        where: { motivo: motivoAntigo.nome, ownerId: session.ownerId },
+        data: { motivo: nomeFormatado },
+      });
+
+      // 2. Atualizar todos os Eventos que usavam o nome antigo
+      await tx.evento.updateMany({
+        where: { motivo: motivoAntigo.nome, ownerId: session.ownerId },
+        data: { motivo: nomeFormatado },
+      });
+
+      if (motivoExistente) {
+        // Se existe, a gente MESCLA (deleta o antigo, pois as evidências/eventos já apontam pro novo nome)
+        await tx.motivo.delete({
+          where: { id },
+        });
+      } else {
+        // Se não existe, apenas renomeamos o atual
+        await tx.motivo.update({
+          where: { id },
+          data: { nome: nomeFormatado },
+        });
+      }
+    });
+
     revalidatePath("/motivos");
+    revalidatePath("/eventos");
+    
     return { success: true };
   } catch (error) {
+    console.error("Erro ao mesclar/atualizar motivo:", error);
     return { success: false, message: "Erro ao atualizar." };
   }
 }

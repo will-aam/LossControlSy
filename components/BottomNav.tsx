@@ -17,6 +17,7 @@ import {
   User,
   Calendar,
   Receipt,
+  TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -35,6 +36,7 @@ export function BottomNav() {
   ];
 
   const moreMenuOptions = [
+    { icon: TrendingUp, label: "Evoluções", href: "/evolucoes" },
     { icon: Calendar, label: "Eventos", href: "/eventos" },
     { icon: Store, label: "Catálogo", href: "/catalogo" },
     { icon: Grid, label: "Categorias", href: "/categorias" },
