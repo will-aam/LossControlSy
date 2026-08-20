@@ -13,101 +13,123 @@ export async function importVendasCSV(formData: FormData) {
   const ownerId = user.ownerId || user.id;
 
   const file = formData.get("file") as File;
-  const data = formData.get("data") as string;
+  const mode = formData.get("mode") as string || "lote";
+  const dataManual = formData.get("data") as string;
 
-  if (!file || !data) {
-    return { success: false, error: "Arquivo e data são obrigatórios." };
+  if (!file) {
+    return { success: false, error: "Arquivo é obrigatório." };
+  }
+
+  if (mode === "isolado" && !dataManual) {
+    return { success: false, error: "A data é obrigatória para importação isolada." };
   }
 
   try {
     const text = await file.text();
-    // Split by new line, handling Windows (\r\n) and Unix (\n)
     const lines = text.split(/\r?\n/).filter(line => line.trim() !== "");
     
-    // We assume the first line might be a header or not. 
-    // The user said the file has 16 columns. 
-    // Let's assume the first line is header if it doesn't look like data (contains letters in numeric fields).
-    // Or we just skip it if it's the header. We'll always skip the first line assuming it's the header.
-    let startIndex = 1;
+    let startIndex = 1; // Pular cabeçalho
     
-    // If the file is smaller than 2 lines, it has no data.
     if (lines.length < 2) {
       return { success: false, error: "O arquivo parece estar vazio ou não possui dados suficientes." };
     }
 
     const parseBrazilianDecimal = (val: string) => {
       if (!val) return 0;
-      // Trata possíveis valores como "1.234,56"
       const cleanVal = val.replace(/\./g, "").replace(",", ".");
       const parsed = parseFloat(cleanVal);
       return isNaN(parsed) ? 0 : parsed;
     };
 
     let processedCount = 0;
+    const vendaDiariaCache: Record<string, string> = {}; 
 
-    // A VendaDiaria for the selected date
-    const [year, month, day] = data.split("-").map(Number);
-    const dateObj = new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0)); // Normalize time to noon UTC to avoid timezone shift
-
-    // Find or create VendaDiaria for this date and owner
-    let vendaDiaria = await prisma.vendaDiaria.findUnique({
-      where: {
-        data_ownerId: {
-          data: dateObj,
-          ownerId,
-        }
-      }
-    });
-
-    if (!vendaDiaria) {
-      vendaDiaria = await prisma.vendaDiaria.create({
-        data: {
-          data: dateObj,
-          ownerId,
-        }
+    // Se for isolado, já sabemos a data
+    let dateObjIsolado: Date | null = null;
+    let vendaDiariaIdIsolado: string | null = null;
+    if (mode === "isolado") {
+      const [year, month, day] = dataManual.split("-").map(Number);
+      dateObjIsolado = new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
+      
+      let vendaDiaria = await prisma.vendaDiaria.findUnique({
+        where: { data_ownerId: { data: dateObjIsolado, ownerId } }
       });
+      if (!vendaDiaria) {
+        vendaDiaria = await prisma.vendaDiaria.create({
+          data: { data: dateObjIsolado, ownerId }
+        });
+      }
+      vendaDiariaIdIsolado = vendaDiaria.id;
     }
 
     for (let i = startIndex; i < lines.length; i++) {
       const line = lines[i];
-      // Separator could be ";" or "\t". Let's assume ";" as it is standard for Brazilian CSVs.
-      // But we will also support "," if ";" is not found.
       const separator = line.includes(";") ? ";" : (line.includes("\t") ? "\t" : ",");
-      const cols = line.split(separator).map(c => c.trim().replace(/^"|"$/g, '')); // Remove outer quotes if any
+      const cols = line.split(separator).map(c => c.trim().replace(/^"|"$/g, ''));
       
-      if (cols.length < 10) continue; // Pular linhas incompletas
+      if (cols.length < 5) continue; // Linha inválida
 
-      const codSubgrupo = cols[0]; // Letra A
-      const codItem = cols[2];     // Letra C
-      const descItem = cols[3];    // Letra D
-      const qtdStr = cols[4];      // Letra E
-      const valLiquidoStr = cols[8]; // Letra I (Valor Líquido)
-      const valPrecoMedioStr = cols[9]; // Letra J
+      let codItem = "";
+      let qtdStr = "";
+      let valLiquidoStr = "";
+      let vendaDiariaId = "";
 
-      if (!codSubgrupo || !codItem) continue; // Dados essenciais ausentes
+      if (mode === "lote") {
+        const dtaEmissao = cols[0];  // A
+        codItem = cols[1];           // B
+        qtdStr = cols[5];            // F
+        valLiquidoStr = cols[8];     // I
 
-      // A importação de vendas não deve cadastrar itens novos automaticamente.
-      // 1. Verificar se o item já existe no sistema
+        if (!dtaEmissao || !codItem) continue;
+
+        const dateParts = dtaEmissao.split('/');
+        if (dateParts.length !== 3) continue;
+        const day = parseInt(dateParts[0], 10);
+        const month = parseInt(dateParts[1], 10);
+        const year = parseInt(dateParts[2], 10);
+        
+        const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        
+        vendaDiariaId = vendaDiariaCache[dateKey];
+        if (!vendaDiariaId) {
+          const dateObj = new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
+          let vendaDiaria = await prisma.vendaDiaria.findUnique({
+            where: { data_ownerId: { data: dateObj, ownerId } }
+          });
+          if (!vendaDiaria) {
+            vendaDiaria = await prisma.vendaDiaria.create({
+              data: { data: dateObj, ownerId }
+            });
+          }
+          vendaDiariaId = vendaDiaria.id;
+          vendaDiariaCache[dateKey] = vendaDiariaId;
+        }
+
+      } else { // mode === "isolado"
+        codItem = cols[2];           // C
+        qtdStr = cols[4];            // E
+        valLiquidoStr = cols[7];     // H
+
+        if (!codItem) continue;
+        vendaDiariaId = vendaDiariaIdIsolado!;
+      }
+
       const item = await prisma.item.findUnique({
         where: { codigoInterno_ownerId: { codigoInterno: codItem, ownerId } }
       });
       
-      // Se não existir, pulamos essa linha
       if (!item) continue;
       
       const qtd = parseBrazilianDecimal(qtdStr);
-
-      // 3. Criar VendaItem
       const valLiquido = parseBrazilianDecimal(valLiquidoStr);
-      const precoMedio = parseBrazilianDecimal(valPrecoMedioStr);
 
       await prisma.vendaItem.create({
         data: {
-          vendaDiariaId: vendaDiaria.id,
+          vendaDiariaId: vendaDiariaId,
           itemId: item.id,
           quantidade: qtd,
           valorLiquido: valLiquido,
-          precoMedio: precoMedio,
+          precoMedio: 0,
         }
       });
       
@@ -130,10 +152,7 @@ export async function deleteVenda(id: string) {
 
   try {
     await prisma.vendaDiaria.delete({
-      where: {
-        id,
-        ownerId,
-      }
+      where: { id, ownerId }
     });
 
     revalidatePath("/vendas");
@@ -143,4 +162,3 @@ export async function deleteVenda(id: string) {
     return { success: false, error: "Erro interno ao excluir a venda. " + (error.message || "") };
   }
 }
-

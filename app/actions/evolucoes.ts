@@ -13,8 +13,11 @@ export async function getDadosEvolucao(
   if (!session) return { success: false, data: null };
 
   try {
-    const minDate = startOfMonth(new Date(dataInicioStr));
-    const maxDate = endOfMonth(new Date(dataFimStr));
+    const [anoIni, mesIni] = dataInicioStr.split("-").map(Number);
+    const minDate = startOfMonth(new Date(anoIni, mesIni - 1, 15));
+
+    const [anoFim, mesFim] = dataFimStr.split("-").map(Number);
+    const maxDate = endOfMonth(new Date(anoFim, mesFim - 1, 15));
 
     // Filtros base
     const whereEvento: any = {

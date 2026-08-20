@@ -21,7 +21,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 
 // A mock function for generateEvolucaoPDF that we'll implement later
 import { generateEvolucaoPDF } from "@/lib/pdf-generator";
@@ -42,14 +42,14 @@ export default function EvolucoesPage() {
   
   // Períodos customizados
   const hoje = new Date();
-  const seisMesesAtras = new Date();
-  seisMesesAtras.setMonth(hoje.getMonth() - 5);
+  const mesAnterior = new Date();
+  mesAnterior.setMonth(hoje.getMonth() - 1);
   
   const formataInputMonth = (d: Date) => {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   };
 
-  const [dataInicio, setDataInicio] = useState(formataInputMonth(seisMesesAtras));
+  const [dataInicio, setDataInicio] = useState(formataInputMonth(mesAnterior));
   const [dataFim, setDataFim] = useState(formataInputMonth(hoje));
 
   const [produtoId, setProdutoId] = useState<string>("todos");
@@ -234,6 +234,7 @@ export default function EvolucoesPage() {
                         tickFormatter={(val) => `${val}%`}
                       />
                       <ChartTooltip content={<ChartTooltipContent formatter={(val: any) => `${Number(val).toFixed(2)}%`} className="bg-slate-900 border-slate-800 text-slate-100 shadow-xl" />} />
+                      <ChartLegend content={<ChartLegendContent />} />
                       
                       <ReferenceLine y={META_PERDA} stroke="hsl(var(--success))" strokeDasharray="3 3" label={{ position: 'top', value: `Meta (${META_PERDA}%)`, fill: 'hsl(var(--success))', fontSize: 11 }} />
                       
@@ -282,6 +283,7 @@ export default function EvolucoesPage() {
                         }}
                       />
                       <ChartTooltip content={<ChartTooltipContent formatter={(val: any) => formatCurrency(Number(val))} className="bg-slate-900 border-slate-800 text-slate-100 shadow-xl" />} />
+                      <ChartLegend content={<ChartLegendContent />} />
                       
                       <Bar dataKey="faturamento" name="Faturamento (R$)" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
                       <Bar dataKey="custoPerda" name="Custo Perda (R$)" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
