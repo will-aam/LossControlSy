@@ -81,7 +81,7 @@ export async function importVendasCSV(formData: FormData) {
       const codItem = cols[2];     // Letra C
       const descItem = cols[3];    // Letra D
       const qtdStr = cols[4];      // Letra E
-      const valLiquidoStr = cols[7]; // Letra H
+      const valLiquidoStr = cols[8]; // Letra I (Valor Líquido)
       const valPrecoMedioStr = cols[9]; // Letra J
 
       if (!codSubgrupo || !codItem) continue; // Dados essenciais ausentes
