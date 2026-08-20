@@ -133,6 +133,7 @@ export default function CatalogoPage() {
         categoria: i.categoria?.nome || "Sem Categoria",
         unidade: i.unidade,
         custo: Number(i.custo) || 0,
+        custoMedio: Number(i.custoMedio) || 0,
         precoVenda: Number(i.precoVenda),
         status: i.status as "ativo" | "inativo",
         imagemUrl: i.imagemUrl,
