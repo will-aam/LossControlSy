@@ -44,6 +44,11 @@ export type Permission =
 
   // Outros
   | "relatorios:ver"
+  | "evolucoes:ver"
+  | "vendas:ver"
+  | "notas:importar"
+  | "iris:ver"
+  | "perfil:ver"
   | "dashboard:ver"
   | "configuracoes:ver"
   | "usuarios:gerenciar";
@@ -58,6 +63,8 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "categorias:ver",
     "categorias:criar",
     "categorias:editar",
+    "notas:importar",
+    "perfil:ver",
   ],
   gestor: [
     "eventos:menu",
@@ -83,7 +90,11 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "notas:ver",
     "notas:upload",
     "notas:excluir",
+    "notas:importar",
     "relatorios:ver",
+    "evolucoes:ver",
+    "vendas:ver",
+    "perfil:ver",
     "dashboard:ver",
     "motivos:ver",
     "motivos:criar",
@@ -108,7 +119,10 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "galeria:upload",
     "notas:ver",
     "notas:upload",
+    "notas:importar",
     "relatorios:ver",
+    "evolucoes:ver",
+    "vendas:ver",
     "dashboard:ver",
   ],
   dono: [
@@ -136,6 +150,11 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "notas:upload",
     "notas:excluir",
     "relatorios:ver",
+    "evolucoes:ver",
+    "vendas:ver",
+    "notas:importar",
+    "iris:ver",
+    "perfil:ver",
     "dashboard:ver",
     "configuracoes:ver",
     "usuarios:gerenciar",

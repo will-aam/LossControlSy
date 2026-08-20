@@ -470,8 +470,53 @@ export default function ConfiguracoesPage() {
                 const currentPerms =
                   settings.permissoes?.[role] ||
                   (role === "gestor"
-                    ? ["dashboard:ver", "eventos:menu", "catalogo:ver", "categorias:ver", "galeria:ver", "relatorios:ver", "motivos:ver"]
-                    : ["eventos:menu", "catalogo:ver", "categorias:ver"]);
+                    ? [
+                        "eventos:menu",
+                        "eventos:criar",
+                        "eventos:ver_todos",
+                        "eventos:aprovar",
+                        "eventos:editar",
+                        "eventos:excluir",
+                        "eventos:exportar",
+                        "catalogo:ver",
+                        "catalogo:criar",
+                        "catalogo:status",
+                        "catalogo:editar",
+                        "catalogo:excluir",
+                        "catalogo:importar",
+                        "categorias:ver",
+                        "categorias:criar",
+                        "categorias:editar",
+                        "categorias:excluir",
+                        "galeria:ver",
+                        "galeria:upload",
+                        "galeria:excluir",
+                        "notas:ver",
+                        "notas:upload",
+                        "notas:excluir",
+                        "notas:importar",
+                        "relatorios:ver",
+                        "evolucoes:ver",
+                        "vendas:ver",
+                        "perfil:ver",
+                        "dashboard:ver",
+                        "motivos:ver",
+                        "motivos:criar",
+                        "motivos:editar",
+                        "motivos:excluir",
+                      ]
+                    : [
+                        "eventos:menu",
+                        "eventos:criar",
+                        "catalogo:ver",
+                        "catalogo:status",
+                        "catalogo:criar",
+                        "categorias:ver",
+                        "categorias:criar",
+                        "categorias:editar",
+                        "notas:importar",
+                        "perfil:ver",
+                      ]);
 
                 const togglePermission = (permission: string) => {
                   const currentRolePerms = [...currentPerms];
@@ -495,12 +540,18 @@ export default function ConfiguracoesPage() {
 
                 const permissionOptions = [
                   { id: "dashboard:ver", label: "Dashboard / Visão Geral" },
-                  { id: "eventos:menu", label: "Eventos de Perda" },
-                  { id: "catalogo:ver", label: "Catálogo de Itens" },
-                  { id: "categorias:ver", label: "Categorias" },
-                  { id: "galeria:ver", label: "Galeria" },
-                  { id: "motivos:ver", label: "Motivos" },
+                  { id: "evolucoes:ver", label: "Evoluções" },
                   { id: "relatorios:ver", label: "Relatórios" },
+                  { id: "eventos:criar", label: "Registrar Perda" },
+                  { id: "catalogo:ver", label: "Catálogo" },
+                  { id: "categorias:ver", label: "Categorias" },
+                  { id: "motivos:ver", label: "Motivos" },
+                  { id: "eventos:menu", label: "Eventos" },
+                  { id: "galeria:ver", label: "Galeria" },
+                  { id: "vendas:ver", label: "Vendas" },
+                  { id: "notas:importar", label: "Importação de Nota Fiscal" },
+                  { id: "iris:ver", label: "Íris IA" },
+                  { id: "perfil:ver", label: "Perfil" },
                 ];
 
                 return (
