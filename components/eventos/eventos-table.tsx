@@ -135,36 +135,26 @@ export function EventosTable({
                   </Select>
                 </TableCell>
                 <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <MoreVertical className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => onViewDetails(evento)}>
-                        <Eye className="mr-2 h-4 w-4" /> Ver Detalhes
-                      </DropdownMenuItem>
-                      {hasPermission("eventos:excluir") && (
-                        <DropdownMenuItem
-                          className={`focus:text-destructive ${
-                            isLocked
-                              ? "opacity-50 cursor-not-allowed"
-                              : "text-destructive"
-                          }`}
-                          disabled={isLocked}
-                          onClick={() => !isLocked && onDelete(evento.id)}
-                        >
-                          {isLocked ? (
-                            <Lock className="mr-2 h-4 w-4" />
-                          ) : (
-                            <Trash2 className="mr-2 h-4 w-4" />
-                          )}
-                          <span>Excluir</span>
-                        </DropdownMenuItem>
+                  {hasPermission("eventos:excluir") && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={`h-8 w-8 ${
+                        isLocked
+                          ? "opacity-50 cursor-not-allowed text-muted-foreground"
+                          : "text-destructive hover:text-destructive hover:bg-destructive/10"
+                      }`}
+                      disabled={isLocked}
+                      onClick={() => !isLocked && onDelete(evento.id)}
+                      title="Excluir evento"
+                    >
+                      {isLocked ? (
+                        <Lock className="h-4 w-4" />
+                      ) : (
+                        <Trash2 className="h-4 w-4" />
                       )}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                    </Button>
+                  )}
                 </TableCell>
               </TableRow>
             );

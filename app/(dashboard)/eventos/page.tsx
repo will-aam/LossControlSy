@@ -277,6 +277,38 @@ export default function EventosPage() {
     );
   }
 
+  const handleDownloadCSV = () => {
+    if (!loteSelecionado) return;
+    const eventos = dadosPaginados.currentItems as Evento[];
+    if (eventos.length === 0) return;
+
+    const headers = ["Data", "Codigo", "Produto", "Qtd", "Total", "Status", "NFe Emitida"];
+    
+    const rows = eventos.map((ev) => [
+      formatDate(ev.dataHora),
+      ev.item?.codigoInterno || "",
+      `"${ev.item?.nome || ""}"`,
+      `${ev.quantidade} ${ev.unidade}`,
+      ((ev.custoSnapshot || 0) * ev.quantidade).toFixed(2).replace('.', ','),
+      ev.status.toUpperCase(),
+      ev.nfeEmitida ? "SIM" : "NAO"
+    ]);
+
+    const csvContent = [
+      headers.join(";"),
+      ...rows.map(r => r.join(";"))
+    ].join("\n");
+
+    const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `perdas-${loteSelecionado.data.replace(/\//g, "-")}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   if (loteSelecionado) {
     const eventosDoLote = dadosPaginados.currentItems as Evento[];
     const todosOk =
@@ -295,6 +327,13 @@ export default function EventosPage() {
               onClick={() => setLoteSelecionado(null)}
             >
               <ChevronLeft className="h-4 w-4 mr-1" /> Voltar
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDownloadCSV}
+            >
+              Baixar CSV
             </Button>
             {!todosOk && hasPermission("eventos:aprovar") && (
               <Button
