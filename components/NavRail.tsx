@@ -53,11 +53,6 @@ export function NavRail() {
       items: [
         { icon: Calendar, label: "Eventos", href: "/eventos" },
         { icon: ImageIcon, label: "Galeria", href: "/galeria" },
-      ]
-    },
-    {
-      title: "Integrações",
-      items: [
         { icon: BarChart2, label: "Vendas", href: "/vendas" },
         { icon: Receipt, label: "Importação NFe", href: "/nfe-importacao" },
       ]
