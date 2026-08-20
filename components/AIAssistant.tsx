@@ -11,6 +11,7 @@ import Image from "next/image";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Rnd } from "react-rnd";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { usePathname } from "next/navigation";
 
 interface Message {
   role: "user" | "assistant";
@@ -28,6 +29,8 @@ export function AIAssistant() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const isMobile = useIsMobile();
+  const pathname = usePathname();
+
 
   const suggestions = [
     "Resumo de desempenho da semana",
@@ -300,6 +303,10 @@ export function AIAssistant() {
       </div>
     </div>
   );
+
+  if (pathname === "/eventos/novo") {
+    return null;
+  }
 
   if (isMobile) {
     return (

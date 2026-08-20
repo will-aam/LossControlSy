@@ -180,8 +180,8 @@ export function ItemFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[95vh] h-[95vh] sm:h-auto overflow-y-auto w-[95vw] sm:w-full p-4 sm:p-6">
-        <DialogHeader>
+      <DialogContent className="max-w-none sm:max-w-2xl h-[100dvh] sm:h-auto max-h-[100dvh] sm:max-h-[95vh] w-screen sm:w-full p-0 sm:p-6 flex flex-col gap-0 rounded-none sm:rounded-lg overflow-hidden border-0 sm:border">
+        <DialogHeader className="p-4 sm:p-0 border-b sm:border-none shrink-0 bg-background z-10">
           <DialogTitle>{isEditing ? "Editar Item" : "Novo Item"}</DialogTitle>
           <DialogDescription>
             {isEditing
@@ -190,7 +190,7 @@ export function ItemFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-6 py-4">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-0 grid gap-6 sm:py-4">
           {/* Seção Imagem */}
           <div className="space-y-4 border rounded-lg p-4 bg-muted/10">
             <Label>Imagem do Produto</Label>
@@ -454,7 +454,7 @@ export function ItemFormDialog({
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter className="p-4 sm:p-0 border-t sm:border-none bg-background shrink-0 mt-auto z-10">
           <Button
             variant="outline"
             onClick={() => onOpenChange(false)}

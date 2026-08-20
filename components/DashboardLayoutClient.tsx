@@ -4,18 +4,32 @@ import React from "react";
 import { useSidebar } from "./SidebarProvider";
 import { NavRail } from "./NavRail";
 import { BottomNav } from "./BottomNav";
+import { usePathname } from "next/navigation";
 
 export function DashboardLayoutClient({ children }: { children: React.ReactNode }) {
   const { navAberto } = useSidebar();
+  const pathname = usePathname();
+
+  const isEventoNovo = pathname === "/eventos/novo";
 
   return (
     <div className="min-h-screen bg-background font-sans text-foreground">
       <NavRail />
 
       {/* Adjust padding for Sidebar on Desktop and BottomNav on Mobile */}
-      <div className={`transition-[padding] duration-200 ease-out pb-24 md:pb-0 pl-0 ${navAberto ? "md:pl-56" : "md:pl-16"}`}>
-        <div className="p-2.5 md:p-4">
-          <div className="h-[calc(100vh-1.25rem-4.5rem)] md:h-[calc(100vh-2rem)] flex flex-col overflow-hidden rounded-2xl bg-slate-900/50">
+      <div 
+        className={`transition-[padding] duration-200 ease-out pl-0 ${
+          navAberto ? "md:pl-56" : "md:pl-16"
+        } ${isEventoNovo ? "pb-0" : "pb-24 md:pb-0"}`}
+      >
+        <div className={isEventoNovo ? "p-0 md:p-4" : "p-2.5 md:p-4"}>
+          <div 
+            className={`flex flex-col overflow-hidden ${
+              isEventoNovo 
+                ? "h-[100dvh] md:h-[calc(100vh-2rem)] md:rounded-2xl md:bg-slate-900/50" 
+                : "h-[calc(100vh-1.25rem-4.5rem)] md:h-[calc(100vh-2rem)] rounded-2xl bg-slate-900/50"
+            }`}
+          >
             {children}
           </div>
         </div>

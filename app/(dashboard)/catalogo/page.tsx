@@ -150,7 +150,11 @@ export default function CatalogoPage() {
     if (statusFilter !== "todos") {
       filtered = filtered.filter((i) => i.status === statusFilter);
     }
-    if (categoriaFilter !== "todas") {
+    if (categoriaFilter === "sem_categoria") {
+      filtered = filtered.filter(
+        (i) => !i.categoria || i.categoria.trim() === "" || i.categoria === "Sem Categoria"
+      );
+    } else if (categoriaFilter !== "todas") {
       filtered = filtered.filter((i) => i.categoria === categoriaFilter);
     }
     if (searchQuery) {
@@ -417,6 +421,7 @@ export default function CatalogoPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todas">Todas</SelectItem>
+                <SelectItem value="sem_categoria">Sem Categoria</SelectItem>
                 {categoriasList.map((cat) => (
                   <SelectItem key={cat} value={cat}>
                     {cat}

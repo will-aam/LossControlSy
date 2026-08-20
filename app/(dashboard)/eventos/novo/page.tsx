@@ -48,6 +48,7 @@ import {
   ChevronsUpDown,
   Check,
   Calendar as CalendarIcon,
+  ArrowLeft,
 } from "lucide-react";
 import {
   Dialog,
@@ -262,6 +263,12 @@ export default function EventoForm() {
         onChange={handleFileChange}
       />
 
+      <div className="md:hidden pt-4 px-4 pb-2">
+        <Button variant="ghost" className="pl-0 gap-2 text-muted-foreground hover:text-foreground h-8" onClick={() => router.back()}>
+          <ArrowLeft className="h-4 w-4" /> Voltar
+        </Button>
+      </div>
+
       <PageHeader
         title="Registrar Perda"
         description="Preencha os detalhes do produto e adicione evidências fotográficas."
@@ -296,22 +303,8 @@ export default function EventoForm() {
         </Popover>
       </PageHeader>
 
-      <main className="flex-1 flex flex-col space-y-4 px-4 py-5 md:px-8 md:py-6 overflow-hidden pb-24 md:pb-6 max-w-6xl mx-auto w-full">
-        <div className="flex items-center justify-end px-1">
-          <div className="text-right">
-            <span className="text-xs text-muted-foreground block">
-              Total Estimado
-            </span>
-            <span className="text-xl font-bold text-primary">
-              {formatCurrency(
-                itemsList.reduce(
-                  (acc, cur) => acc + (cur.item.custo || 0) * cur.quantidade,
-                  0,
-                ),
-              )}
-            </span>
-          </div>
-        </div>
+      <main className="flex-1 flex flex-col space-y-4 px-4 py-5 md:px-8 md:py-6 overflow-hidden pb-6 max-w-6xl mx-auto w-full">
+
 
         <div className="flex flex-col xl:flex-row gap-3 xl:items-end items-stretch shrink-0 pb-2">
           <div className="flex-1 w-full relative min-w-50">
@@ -391,8 +384,8 @@ export default function EventoForm() {
             </Popover>
           </div>
 
-          <div className="flex gap-2 w-full md:w-auto">
-            <div className="w-24">
+          <div className="flex gap-2 w-full md:w-auto items-end">
+            <div className="flex-1 md:w-24">
               <label className="text-xs font-medium text-muted-foreground mb-1.5 ml-1 block">
                 Qtd.
               </label>
@@ -406,28 +399,19 @@ export default function EventoForm() {
                 onKeyDown={(e) => e.key === "Enter" && handleAddItem()}
               />
             </div>
-            <div className="w-16">
-              <label className="text-xs font-medium text-muted-foreground mb-1.5 ml-1 block">
-                Unid.
-              </label>
-              <div className="flex h-10 w-full items-center justify-center rounded-md border border-input bg-muted/50 text-sm text-muted-foreground font-medium">
-                {selectedItem ? selectedItem.unidade : "-"}
-              </div>
-            </div>
+            <Button
+              onClick={handleAddItem}
+              disabled={!selectedItem || !quantidade}
+              className="h-10 flex-1 md:w-auto px-6"
+            >
+              Adicionar
+            </Button>
           </div>
-
-          <Button
-            onClick={handleAddItem}
-            disabled={!selectedItem || !quantidade}
-            className="h-10 w-full md:w-auto px-6"
-          >
-            Adicionar
-          </Button>
         </div>
 
-        <div className="flex-1 border border-border/50 rounded-2xl overflow-hidden bg-card/40 backdrop-blur-md relative flex flex-col shadow-sm">
-          <div className={`flex-1 ${customScrollbarClass}`}>
-            <Table className="border-collapse">
+        <div className="flex-1 md:border md:border-border/50 md:rounded-2xl overflow-hidden md:bg-card/40 md:backdrop-blur-md relative flex flex-col md:shadow-sm">
+          <div className={`hidden md:block flex-1 ${customScrollbarClass}`}>
+            <Table className="border-collapse hidden md:table">
               <TableHeader className="sticky top-0 bg-card/40 backdrop-blur-md z-20 shadow-sm border-b border-white/10">
                 <TableRow className="border-none hover:bg-transparent">
                   <TableHead className="w-auto text-slate-300">Produto / Motivo</TableHead>
@@ -505,38 +489,95 @@ export default function EventoForm() {
             </Table>
           </div>
 
+          {/* Mobile Cards */}
+          <div className="md:hidden flex-1 flex flex-col gap-2 py-2 overflow-y-auto">
+            {itemsList.length > 0 ? (
+              itemsList.map((entry) => (
+                <div key={entry.tempId} className="bg-card border border-border/50 rounded-xl p-3 flex flex-col gap-3 shadow-sm relative">
+                  <div className="flex justify-between items-start pr-8">
+                    <div className="flex flex-col">
+                      <span className="font-semibold text-sm text-foreground leading-tight">
+                        {entry.item.nome}
+                      </span>
+                      <span className="text-xs text-muted-foreground mt-0.5">
+                        {entry.motivo}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-2 right-2 h-8 w-8 rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => handleRemoveItem(entry.tempId)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+
+                  <div className="flex justify-between items-center bg-muted/20 p-2 rounded-lg border border-border/30">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Quantidade</span>
+                      <span className="font-bold text-foreground">{entry.quantidade} <span className="text-xs font-normal text-muted-foreground">{entry.unidade}</span></span>
+                    </div>
+                    
+                    <Button
+                      variant={entry.fotoUrl ? "secondary" : "outline"}
+                      size="sm"
+                      className={`h-8 rounded-lg text-xs font-medium gap-1.5 ${
+                        entry.fotoUrl
+                          ? "text-primary border-primary/20 bg-primary/10 hover:bg-primary/20"
+                          : "text-muted-foreground bg-background"
+                      } ${exigirFoto && !entry.fotoUrl ? "animate-pulse border-orange-500/50 text-orange-500" : ""}`}
+                      onClick={() => triggerPhotoInput(entry.tempId)}
+                    >
+                      {entry.fotoUrl ? (
+                        <><CheckCircle2 className="h-3.5 w-3.5" /> Com foto</>
+                      ) : (
+                        <><Camera className="h-3.5 w-3.5" /> Adicionar foto</>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="h-32 flex flex-col items-center justify-center text-muted-foreground gap-2">
+                <div className="bg-muted/30 p-3 rounded-full">
+                  <Plus className="h-6 w-6 text-muted-foreground/50" />
+                </div>
+                <span className="text-sm">Nenhum item adicionado.</span>
+              </div>
+            )}
+          </div>
+
           {itemsList.length > 0 && (
-            <div className="p-3 bg-white/5 border-t border-white/5 flex justify-end gap-3 shrink-0 items-center">
+            <div className="p-4 md:p-3 bg-background border-t md:bg-white/5 md:border-white/5 flex flex-col gap-3 shrink-0 pb-safe md:pb-3 mt-auto">
               {exigirFoto && itemsList.some((i) => !i.fotoUrl) && (
-                <span className="text-xs text-orange-600 font-medium flex items-center mr-auto">
-                  <AlertTriangle className="h-3 w-3 mr-1" />
+                <span className="text-xs text-orange-600 bg-orange-500/10 px-2 py-1 rounded-md font-medium flex items-center justify-center">
+                  <AlertTriangle className="h-4 w-4 mr-1.5" />
                   Fotos pendentes
                 </span>
               )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setItemsList([])}
-                disabled={isSubmitting}
-              >
-                Limpar
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                className="px-8 font-semibold"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="mr-2 h-3 w-3 animate-spin" /> Salvando...
-                  </>
-                ) : (
-                  <>
-                    <Send className="mr-2 h-3 w-3" /> Finalizar
-                  </>
-                )}
-              </Button>
+              <div className="flex gap-3 w-full">
+                <Button
+                  variant="outline"
+                  className="flex-1 h-12 bg-transparent text-foreground"
+                  onClick={() => setItemsList([])}
+                  disabled={isSubmitting}
+                >
+                  Limpar
+                </Button>
+                <Button
+                  className="flex-1 h-12 font-bold text-base"
+                  onClick={handleSubmit}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                  ) : (
+                    "Finalizar"
+                  )}
+                </Button>
+              </div>
             </div>
           )}
         </div>

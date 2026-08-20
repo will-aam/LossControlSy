@@ -48,6 +48,11 @@ export function BottomNav() {
     { icon: User, label: "Perfil", href: "#" },
   ];
 
+  // Hide bottom nav completely on the event creation page to give it full screen
+  if (pathname === "/eventos/novo") {
+    return null;
+  }
+
   return (
     <>
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-background border-t pb-safe">
