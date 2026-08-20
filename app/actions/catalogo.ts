@@ -230,6 +230,9 @@ export async function deleteItem(id: string) {
       };
     }
 
+    // Excluir as vendas (VendaItem) vinculadas a este item primeiro para evitar erro de chave estrangeira (foreign key constraint)
+    await prisma.vendaItem.deleteMany({ where: { itemId: id } });
+
     await prisma.item.delete({ where: { id } });
 
     revalidatePath("/catalogo");
