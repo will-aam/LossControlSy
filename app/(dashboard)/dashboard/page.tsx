@@ -203,15 +203,15 @@ export default function Dashboard() {
         const perdaPct = l.chegou ? (l.perdido / l.chegou) * 100 : 0;
         const giro = l.chegou ? (l.vendido / l.chegou) * 100 : 0;
         const limite = l.limitePerda > 0 ? Math.min(l.limitePerda, limiteGlobal) : limiteGlobal;
-        const status: "ruptura" | "desperdicio" | "ok" =
-          giro > 95 ? "ruptura" : perdaPct > limite ? "desperdicio" : "ok";
+        const status: "estoque_baixo" | "desperdicio" | "ok" =
+          giro > 95 ? "estoque_baixo" : perdaPct > limite ? "desperdicio" : "ok";
         return { ...l, perdaPct, giro, limite, status, faturou: l.vendido * l.precoVenda };
       })
       .filter((l) => (!soAlertas ? true : l.status !== "ok"))
       .sort((a, b) => b.faturou - a.faturou);
   }, [filteredLinhasA, limiteGlobal, soAlertas]);
 
-  const rupturas = tabela.filter((l) => l.status === "ruptura");
+  const rupturas = tabela.filter((l) => l.status === "estoque_baixo");
   const desperdicios = tabela.filter((l) => l.status === "desperdicio");
 
   const inputType = modo === "dia" ? "date" : modo === "semana" ? "week" : "month";
@@ -450,9 +450,46 @@ export default function Dashboard() {
                       <TableHead className="bg-card font-medium text-right">% perda</TableHead>
                       <TableHead className="bg-card font-medium text-right">Saída</TableHead>
                       <TableHead className="bg-card font-medium text-right">Faturou</TableHead>
-                      <TableHead className="bg-card font-medium text-right">Lucro</TableHead>
-                      <TableHead className="bg-card font-medium text-right">Markup</TableHead>
-                      <TableHead className="bg-card font-medium text-right pr-4">Status</TableHead>
+                      <TableHead className="bg-card font-medium text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          Lucro
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <button className="text-muted-foreground hover:text-foreground">
+                                <Info className="h-3 w-3" />
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent side="top" align="center" className="w-64 text-sm p-4 bg-slate-900 border-slate-800 shadow-xl">
+                              <p className="text-xs text-slate-300">
+                                <strong>Lucro Bruto:</strong> Faturamento - ((Qtd Vendida + Qtd Perdida) × Custo unitário).
+                                <br/><br/>
+                                <em>Isso significa que o custo do estoque restante que não foi vendido nem jogado fora não afeta o lucro.</em>
+                              </p>
+                              <PopoverPrimitive.Arrow className="fill-slate-900" width={16} height={8} />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </TableHead>
+                      <TableHead className="bg-card font-medium text-right pr-4">
+                        <div className="flex items-center justify-end gap-1">
+                          Markup
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <button className="text-muted-foreground hover:text-foreground">
+                                <Info className="h-3 w-3" />
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent side="top" align="center" className="w-64 text-sm p-4 bg-slate-900 border-slate-800 shadow-xl">
+                              <p className="text-xs text-slate-300">
+                                <strong>Markup (Multiplicador):</strong> Preço de Venda ÷ Custo.
+                                <br/><br/>
+                                <em>Um markup de 1.50x significa que o produto é vendido 50% mais caro do que o custo de compra.</em>
+                              </p>
+                              <PopoverPrimitive.Arrow className="fill-slate-900" width={16} height={8} />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody className="tabular-nums">
@@ -472,11 +509,8 @@ export default function Dashboard() {
                         </TableCell>
                         <TableCell className="py-2.5 text-right">{l.giro.toFixed(0)}%</TableCell>
                         <TableCell className="py-2.5 text-right">{brl(l.faturou)}</TableCell>
-                        <TableCell className="py-2.5 text-right">{brl(l.faturou - l.chegou * l.custo)}</TableCell>
-                        <TableCell className="py-2.5 text-right">{(l.precoVenda / l.custo).toFixed(2)}x</TableCell>
-                        <TableCell className="py-2.5 text-right pr-4">
-                          <StatusTag status={l.status} />
-                        </TableCell>
+                        <TableCell className="py-2.5 text-right">{brl(l.faturou - (l.vendido * l.custo) - (l.perdido * l.custo))}</TableCell>
+                        <TableCell className="py-2.5 text-right pr-4">{(l.precoVenda / l.custo).toFixed(2)}x</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -499,9 +533,9 @@ export default function Dashboard() {
   );
 }
 
-function StatusTag({ status }: { status: "ruptura" | "desperdicio" | "ok" }) {
+function StatusTag({ status }: { status: "estoque_baixo" | "desperdicio" | "ok" }) {
   const map = {
-    ruptura: ["Ruptura", "text-warning"],
+    estoque_baixo: ["Esgotando", "text-warning"],
     desperdicio: ["Desperdício", "text-negative"],
     ok: ["Ok", "text-muted-foreground"],
   } as const;
