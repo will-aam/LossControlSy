@@ -233,7 +233,7 @@ export default function EvolucoesPage() {
                         axisLine={false}
                         tickFormatter={(val) => `${val}%`}
                       />
-                      <ChartTooltip content={<ChartTooltipContent valueFormatter={(val: any) => `${Number(val).toFixed(2)}%`} className="bg-slate-900 border-slate-800 text-slate-100 shadow-xl" />} />
+                      <ChartTooltip content={<ChartTooltipContent formatter={(val: any) => `${Number(val).toFixed(2)}%`} className="bg-slate-900 border-slate-800 text-slate-100 shadow-xl" />} />
                       
                       <ReferenceLine y={META_PERDA} stroke="hsl(var(--success))" strokeDasharray="3 3" label={{ position: 'top', value: `Meta (${META_PERDA}%)`, fill: 'hsl(var(--success))', fontSize: 11 }} />
                       
@@ -281,7 +281,7 @@ export default function EvolucoesPage() {
                           return `R$${val}`;
                         }}
                       />
-                      <ChartTooltip content={<ChartTooltipContent valueFormatter={(val: any) => formatCurrency(Number(val))} className="bg-slate-900 border-slate-800 text-slate-100 shadow-xl" />} />
+                      <ChartTooltip content={<ChartTooltipContent formatter={(val: any) => formatCurrency(Number(val))} className="bg-slate-900 border-slate-800 text-slate-100 shadow-xl" />} />
                       
                       <Bar dataKey="faturamento" name="Faturamento (R$)" fill="var(--chart-2)" radius={[4, 4, 0, 0]} />
                       <Bar dataKey="custoPerda" name="Custo Perda (R$)" fill="var(--chart-1)" radius={[4, 4, 0, 0]} />
