@@ -33,15 +33,25 @@ export default async function NFeImportacaoPage(props: {
   const pageSize = 10;
   const skip = (page - 1) * pageSize;
 
+  const statusFilter = searchParams?.status as string || "todos";
+
+  // Montar query de busca
+  const whereClause: any = { ownerId: user.ownerId };
+  if (statusFilter === "pendente") {
+    whereClause.itens = { some: { itemId: null } };
+  } else if (statusFilter === "mapeado") {
+    whereClause.itens = { every: { itemId: { not: null } } };
+  }
+
   // Buscar total para paginação
   const totalItems = await prisma.nFeCompra.count({
-    where: { ownerId: user.ownerId }
+    where: whereClause
   });
   const totalPages = Math.ceil(totalItems / pageSize);
 
   // Buscar histórico de NFe paginado
   const historicoRaw = await prisma.nFeCompra.findMany({
-    where: { ownerId: user.ownerId },
+    where: whereClause,
     orderBy: { dataImportacao: "desc" },
     skip,
     take: pageSize,

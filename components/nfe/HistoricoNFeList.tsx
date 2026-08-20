@@ -4,27 +4,65 @@ import React from "react";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { FileText, ArrowRight, CalendarDays, DollarSign, Package, CheckCircle } from "lucide-react";
+import { FileText, ArrowRight, CalendarDays, DollarSign, Package, CheckCircle, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useRouter, useSearchParams } from "next/navigation";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export function HistoricoNFeList({ historico }: { historico: any[] }) {
-  if (!historico || historico.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center p-12 bg-surface border rounded-2xl border-dashed">
-        <div className="w-16 h-16 rounded-full bg-surface-2 flex items-center justify-center mb-4 text-muted-foreground">
-          <FileText size={32} />
-        </div>
-        <p className="text-muted-foreground font-medium text-center">Nenhuma NFe importada ainda.</p>
-        <p className="text-sm text-muted-foreground/70 text-center max-w-sm mt-1">
-          Importe arquivos XML para visualizar o histórico de custos de compras aqui.
-        </p>
-      </div>
-    );
-  }
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const currentStatus = searchParams.get("status") || "todos";
+
+  const handleStatusChange = (val: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (val === "todos") {
+      params.delete("status");
+    } else {
+      params.set("status", val);
+    }
+    params.delete("page"); // reset page when filtering
+    router.push(`?${params.toString()}`);
+  };
 
   return (
-    <div className="w-full">
-      {/* MOBILE: Cards (Escondido em telas md ou maiores) */}
+    <div className="w-full space-y-4">
+      {/* Filtro de Status */}
+      <div className="flex justify-between items-center bg-card/40 backdrop-blur-md p-3 rounded-2xl border border-border/50">
+        <h2 className="text-sm font-semibold text-foreground px-2">Notas Importadas</h2>
+        <Select value={currentStatus} onValueChange={handleStatusChange}>
+          <SelectTrigger className="w-[180px] bg-background">
+            <SelectValue placeholder="Filtrar por Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todas as Notas</SelectItem>
+            <SelectItem value="pendente">Pendente de Mapeamento</SelectItem>
+            <SelectItem value="mapeado">100% Mapeado</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {!historico || historico.length === 0 ? (
+        <div className="flex flex-col items-center justify-center p-12 bg-surface border rounded-2xl border-dashed">
+          <div className="w-16 h-16 rounded-full bg-surface-2 flex items-center justify-center mb-4 text-muted-foreground">
+            <FileText size={32} />
+          </div>
+          <p className="text-muted-foreground font-medium text-center">Nenhuma NFe encontrada.</p>
+          {currentStatus !== "todos" && (
+            <Button variant="link" onClick={() => handleStatusChange("todos")} className="mt-2 text-primary">
+              Limpar Filtros
+            </Button>
+          )}
+        </div>
+      ) : (
+        <>
+          {/* MOBILE: Cards (Escondido em telas md ou maiores) */}
       <div className="grid grid-cols-1 gap-4 md:hidden">
         {historico.map((nfe) => {
           // A principal data exibida deve ser a da Nota (Emissão). 
@@ -161,6 +199,8 @@ export function HistoricoNFeList({ historico }: { historico: any[] }) {
           </table>
         </div>
       </div>
+    </>
+  )}
     </div>
   );
 }
