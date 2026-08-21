@@ -29,7 +29,7 @@ export default async function VendasPage() {
     }
   });
 
-  // Mapeia para o formato que a lista espera
+
   const resumoVendas = vendasDiarias.map((venda: any) => {
     const valorTotal = venda.itens.reduce((acc: any, item: any) => acc + Number(item.valorLiquido), 0);
     return {
@@ -48,17 +48,17 @@ export default async function VendasPage() {
         description="Importe planilhas de vendas e visualize o histórico."
       />
       <main className="flex-1 space-y-6 px-4 py-5 md:px-8 md:py-6 overflow-y-auto">
-        {/* Formulário de Importação (oculto no mobile) */}
+        {}
         <div className="hidden md:block">
           <ImportVendasForm />
         </div>
 
-        {/* Aviso para mobile */}
+        {}
         <div className="md:hidden bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 p-4 rounded-xl text-sm font-medium text-center">
           A importação de planilhas só está disponível pelo computador.
         </div>
 
-        {/* Lista de Histórico */}
+        {}
         <div>
           <HistoricoVendasList vendas={resumoVendas} />
         </div>

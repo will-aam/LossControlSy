@@ -1,4 +1,4 @@
-// componentes/eventos/evento-card.tsx
+
 "use client";
 
 import { useState } from "react";
@@ -31,7 +31,7 @@ import {
   User,
   ImageIcon,
 } from "lucide-react";
-// Importações corrigidas
+
 import { Evento } from "@/lib/types";
 import {
   formatCurrency,
@@ -78,7 +78,7 @@ export function EventoCard({
       <Card className="overflow-hidden">
         <CardContent className="p-0">
           <div className="flex flex-col sm:flex-row">
-            {/* Image/Icon */}
+            {}
             <div className="relative w-full sm:w-32 h-32 sm:h-auto shrink-0 bg-muted">
               {evento.item?.imagemUrl ? (
                 <img
@@ -102,7 +102,7 @@ export function EventoCard({
               )}
             </div>
 
-            {/* Content */}
+            {}
             <div className="flex-1 p-4">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
@@ -159,7 +159,7 @@ export function EventoCard({
                 </DropdownMenu>
               </div>
 
-              {/* Details Row */}
+              {}
               <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
                 <div className="flex items-center gap-1.5 text-muted-foreground">
                   <Clock className="h-3.5 w-3.5" />
@@ -171,7 +171,7 @@ export function EventoCard({
                 </div>
               </div>
 
-              {/* Quantity and Cost */}
+              {}
               <div className="mt-3 flex items-center justify-between">
                 <div>
                   <span className="text-lg font-semibold">
@@ -195,7 +195,7 @@ export function EventoCard({
                 )}
               </div>
 
-              {/* Quick Actions */}
+              {}
               {showActions && evento.status === "enviado" && (
                 <div className="mt-4 flex gap-2">
                   <Button
@@ -222,7 +222,7 @@ export function EventoCard({
         </CardContent>
       </Card>
 
-      {/* Details Dialog */}
+      {}
       <Dialog open={showDetails} onOpenChange={setShowDetails}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -305,7 +305,7 @@ export function EventoCard({
         </DialogContent>
       </Dialog>
 
-      {/* Photos Dialog */}
+      {}
       <Dialog open={showPhotos} onOpenChange={setShowPhotos}>
         <DialogContent className="max-w-lg">
           <DialogHeader>

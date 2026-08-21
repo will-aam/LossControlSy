@@ -35,13 +35,13 @@ export default async function NFeDetalhesPage({ params }: { params: Promise<{ id
 
   if (!nfe) redirect("/nfe-importacao");
 
-  // Buscar catálogo para o combobox
+
   const catalogo = await prisma.item.findMany({
     where: { ownerId: user.ownerId, status: "ativo" },
     select: { id: true, nome: true, codigoInterno: true }
   });
 
-  // Ensure Decimal values are converted to numbers for Client Components
+
   const itens = nfe.itens.map((item: any) => ({
     ...item,
     quantidade: item.quantidade ? Number(item.quantidade) : null,

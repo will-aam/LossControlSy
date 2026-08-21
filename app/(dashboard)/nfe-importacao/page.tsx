@@ -35,7 +35,7 @@ export default async function NFeImportacaoPage(props: {
 
   const statusFilter = searchParams?.status as string || "todos";
 
-  // Montar query de busca
+
   const whereClause: any = { ownerId: user.ownerId };
   if (statusFilter === "pendente") {
     whereClause.itens = { some: { itemId: null } };
@@ -43,13 +43,13 @@ export default async function NFeImportacaoPage(props: {
     whereClause.itens = { every: { itemId: { not: null } } };
   }
 
-  // Buscar total para paginação
+
   const totalItems = await prisma.nFeCompra.count({
     where: whereClause
   });
   const totalPages = Math.ceil(totalItems / pageSize);
 
-  // Buscar histórico de NFe paginado
+
   const historicoRaw = await prisma.nFeCompra.findMany({
     where: whereClause,
     orderBy: { dataImportacao: "desc" },
@@ -81,12 +81,12 @@ export default async function NFeImportacaoPage(props: {
         description="Importe arquivos XML das notas fiscais e mapeie os produtos."
       />
       <main className="flex-1 space-y-6 px-4 py-5 md:px-8 md:py-6 overflow-y-auto">
-        {/* Formulário de Importação (oculto no mobile) */}
+        {}
         <div className="hidden md:block">
           <ImportNFeForm />
         </div>
 
-        {/* Aviso para mobile */}
+        {}
         <div className="md:hidden bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 p-4 rounded-xl text-sm font-medium text-center">
           A importação de XML só está disponível pelo computador.
         </div>

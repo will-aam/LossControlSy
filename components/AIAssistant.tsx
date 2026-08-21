@@ -130,11 +130,11 @@ export function AIAssistant() {
   const toggleMaximize = () => {
     if (rndRef.current) {
       if (!isMaximized) {
-        // Expand and center
+
         rndRef.current.updateSize({ width: 700, height: window.innerHeight * 0.85 });
         rndRef.current.updatePosition({ x: (window.innerWidth - 700) / 2, y: window.innerHeight * 0.05 });
       } else {
-        // Restore to default right side
+
         rndRef.current.updateSize({ width: 400, height: 600 });
         rndRef.current.updatePosition({ x: window.innerWidth - 400 - 24, y: window.innerHeight - 600 - 24 });
       }
@@ -144,7 +144,7 @@ export function AIAssistant() {
 
   const renderContent = () => (
     <div className="flex flex-col h-full bg-background overflow-hidden w-full">
-      {/* Header */}
+      {}
       <div className={`p-4 border-b bg-surface flex flex-row items-center justify-between gap-3 space-y-0 text-left ${!isMobile ? "handle cursor-move" : ""}`}>
         <div className="flex flex-row items-center gap-3">
           <div className="relative w-8 h-8 rounded-full overflow-hidden border">
@@ -167,7 +167,7 @@ export function AIAssistant() {
         )}
       </div>
 
-      {/* Messages Area */}
+      {}
       <div className="flex-1 overflow-y-auto p-4 space-y-5 bg-background">
         {messages.length === 0 ? (
           <div className="flex flex-col h-full">
@@ -180,7 +180,7 @@ export function AIAssistant() {
               </p>
             </div>
 
-            {/* Suggestions */}
+            {}
             <div className="space-y-2 mt-auto pb-4">
               <p className="text-xs text-muted-foreground font-medium px-1">Sugestões prontas:</p>
               <div className="flex flex-wrap gap-2">
@@ -230,7 +230,7 @@ export function AIAssistant() {
                   )}
                 </div>
 
-                {/* Copy Button for Assistant Messages */}
+                {}
                 {msg.role === "assistant" && (
                   <button
                     onClick={() => copyToClipboard(msg.content, i)}
@@ -268,7 +268,7 @@ export function AIAssistant() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
+      {}
       <div className="p-4 border-t">
         <div className="relative flex items-center gap-2">
           <button
@@ -332,13 +332,13 @@ export function AIAssistant() {
 
   const isMounted = typeof window !== "undefined";
 
-  // Renderiza o conteúdo flutuante em um Portal para não sofrer interferência de layout (ex: transform, overflow hidden) de elementos pai como a NavRail
+
   const floatingWindow = isOpen && isMounted ? (
     <Rnd
       ref={rndRef}
       default={{
-        x: Math.max(0, window.innerWidth - 400 - 24), // 24px from right, fallback to 0 if screen is too small
-        y: Math.max(0, window.innerHeight - 600 - 24), // 24px from bottom
+        x: Math.max(0, window.innerWidth - 400 - 24),
+        y: Math.max(0, window.innerHeight - 600 - 24),
         width: 400,
         height: 600,
       }}
@@ -352,7 +352,7 @@ export function AIAssistant() {
     </Rnd>
   ) : null;
 
-  // Desktop Floating Window (Rnd)
+
   return (
     <>
       {floatingWindow && document ? createPortal(floatingWindow, document.body) : null}

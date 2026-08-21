@@ -87,7 +87,7 @@ export default async function VendaDetalhePage({ params }: { params: Promise<{ i
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Insight 1: Faturamento */}
+          {}
           <div className="bg-surface border rounded-2xl p-6 shadow-sm flex items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center text-green-600 dark:text-green-400 shrink-0">
               <TrendingUp className="w-6 h-6" />
@@ -98,7 +98,7 @@ export default async function VendaDetalhePage({ params }: { params: Promise<{ i
             </div>
           </div>
 
-          {/* Insight 2: Total de Itens (Volume) */}
+          {}
           <div className="bg-surface border rounded-2xl p-6 shadow-sm flex items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-400 shrink-0">
               <Package className="w-6 h-6" />
@@ -111,7 +111,7 @@ export default async function VendaDetalhePage({ params }: { params: Promise<{ i
             </div>
           </div>
 
-          {/* Insight 3: Produto Mais Vendido */}
+          {}
           <div className="bg-surface border rounded-2xl p-6 shadow-sm flex items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0">
               <Tag className="w-6 h-6" />

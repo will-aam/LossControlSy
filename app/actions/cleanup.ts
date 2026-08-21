@@ -9,7 +9,7 @@ export async function expireOldFiscalNotes() {
   trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30);
 
   try {
-    // Busca notas com mais de 30 dias que ainda possuem arquivos
+
     const notasParaExpirar = await prisma.notaFiscal.findMany({
       where: {
         dataUpload: { lt: trintaDiasAtras },
@@ -22,7 +22,7 @@ export async function expireOldFiscalNotes() {
     });
 
     for (const nota of notasParaExpirar) {
-      // 1. Deletar arquivos do R2
+
       if (nota.pdfUrl) {
         const key = getKeyFromUrl(nota.pdfUrl);
         if (key) await deleteFileFromStorage(key);
@@ -32,7 +32,7 @@ export async function expireOldFiscalNotes() {
         if (key) await deleteFileFromStorage(key);
       }
 
-      // 2. Limpar dados sensíveis no banco, mantendo o número e ownerId
+
       await prisma.notaFiscal.update({
         where: { id: nota.id },
         data: {

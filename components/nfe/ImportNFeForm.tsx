@@ -38,7 +38,7 @@ export function ImportNFeForm() {
       const res = await importNFeXML(formData);
       if (res.success) {
         toast.success(`NFe importada com sucesso! ${res.count} itens lidos.`);
-        // Redireciona para a tela de mapeamento se houver ID
+
         if (res.nfeId) {
           router.push(`/nfe-importacao/${res.nfeId}`);
         }
@@ -85,7 +85,7 @@ export function ImportNFeForm() {
         )}
       </button>
 
-      {/* Modal de Alerta de Duplicidade */}
+      {}
       <AlertDialog open={!!duplicateNFe} onOpenChange={() => setDuplicateNFe(null)}>
         <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>

@@ -4,14 +4,14 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/session";
 
-// 1. Listar Motivos (Filtra apenas os da loja do usuário logado)
+
 export async function getMotivos() {
   const session = await getSession();
   if (!session) return { success: false, data: [] };
 
   try {
     const motivos = await prisma.motivo.findMany({
-      where: { ownerId: session.ownerId }, // Garante o isolamento dos dados
+      where: { ownerId: session.ownerId },
       orderBy: { nome: "asc" },
     });
     return { success: true, data: motivos };
@@ -20,7 +20,7 @@ export async function getMotivos() {
   }
 }
 
-// 2. Criar Motivo (Vincula obrigatoriamente à loja do usuário)
+
 export async function createMotivo(nome: string) {
   const session = await getSession();
   if (!session) return { success: false, message: "Não autorizado" };
@@ -31,7 +31,7 @@ export async function createMotivo(nome: string) {
   try {
     const nomeFormatado = nome.trim();
 
-    // Verifica se o motivo já existe DENTRO DA MESMA LOJA (Case insensitive)
+
     const existente = await prisma.motivo.findFirst({
       where: {
         nome: { equals: nomeFormatado, mode: "insensitive" },
@@ -43,7 +43,7 @@ export async function createMotivo(nome: string) {
       return { success: true, data: existente };
     }
 
-    // Limite de 15 motivos
+
     const totalMotivos = await prisma.motivo.count({
       where: { ownerId: session.ownerId },
     });
@@ -55,7 +55,7 @@ export async function createMotivo(nome: string) {
       };
     }
 
-    // RESOLVE O ERRO: Agora passamos o ownerId obrigatório
+
     const novo = await prisma.motivo.create({
       data: {
         nome: nomeFormatado,
@@ -71,7 +71,7 @@ export async function createMotivo(nome: string) {
   }
 }
 
-// 3. Atualizar Motivo (Com validação de posse)
+
 export async function updateMotivo(id: string, nome: string) {
   const session = await getSession();
   if (!session) return { success: false, message: "Não autorizado" };
@@ -79,7 +79,7 @@ export async function updateMotivo(id: string, nome: string) {
   try {
     const nomeFormatado = nome.trim();
 
-    // Verifica se o motivo pertence à loja antes de permitir a edição
+
     const motivoAntigo = await prisma.motivo.findUnique({ where: { id } });
     if (!motivoAntigo || motivoAntigo.ownerId !== session.ownerId) {
       return {
@@ -92,35 +92,35 @@ export async function updateMotivo(id: string, nome: string) {
       return { success: true };
     }
 
-    // Verifica se JÁ EXISTE outro motivo com esse novo nome na mesma loja
+
     const motivoExistente = await prisma.motivo.findFirst({
       where: {
         nome: { equals: nomeFormatado, mode: "insensitive" },
         ownerId: session.ownerId,
-        id: { not: id }, // Garante que não é o próprio
+        id: { not: id },
       },
     });
 
     await prisma.$transaction(async (tx) => {
-      // 1. Atualizar todas as Evidencias que usavam o nome antigo
+
       await tx.evidencia.updateMany({
         where: { motivo: motivoAntigo.nome, ownerId: session.ownerId },
         data: { motivo: nomeFormatado },
       });
 
-      // 2. Atualizar todos os Eventos que usavam o nome antigo
+
       await tx.evento.updateMany({
         where: { motivo: motivoAntigo.nome, ownerId: session.ownerId },
         data: { motivo: nomeFormatado },
       });
 
       if (motivoExistente) {
-        // Se existe, a gente MESCLA (deleta o antigo, pois as evidências/eventos já apontam pro novo nome)
+
         await tx.motivo.delete({
           where: { id },
         });
       } else {
-        // Se não existe, apenas renomeamos o atual
+
         await tx.motivo.update({
           where: { id },
           data: { nome: nomeFormatado },
@@ -138,13 +138,13 @@ export async function updateMotivo(id: string, nome: string) {
   }
 }
 
-// 4. Deletar Motivo (Com validação de posse)
+
 export async function deleteMotivo(id: string) {
   const session = await getSession();
   if (!session) return { success: false, message: "Não autorizado" };
 
   try {
-    // Verifica se o motivo pertence à loja antes de permitir a exclusão
+
     const motivo = await prisma.motivo.findUnique({ where: { id } });
     if (!motivo || motivo.ownerId !== session.ownerId) {
       return {

@@ -1,4 +1,4 @@
-// app/(dashboard)/eventos/page.tsx
+
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -33,7 +33,7 @@ import { DateRange } from "react-day-picker";
 import { isWithinInterval, startOfDay, endOfDay } from "date-fns";
 import { Button } from "@/components/ui/button";
 
-// Importando os componentes
+
 import { EventosToolbar } from "@/components/eventos/eventos-toolbar";
 import {
   EventosGrid,
@@ -96,7 +96,7 @@ export default function EventosPage() {
           : undefined,
         criadoPor: ev.criadoPor,
         evidencias: ev.evidencias,
-        nfeEmitida: ev.nfeEmitida, // NOVO
+        nfeEmitida: ev.nfeEmitida,
       }));
 
       setEventosDoBanco(mappedEventos);
@@ -252,7 +252,7 @@ export default function EventosPage() {
     const eventoIds = lote.eventos.map((e) => e.id);
     const newStatus = !lote.nfeEmitida;
     
-    // Update Optimistically
+
     setEventosDoBanco((prev) =>
       prev.map((ev) =>
         eventoIds.includes(ev.id) ? { ...ev, nfeEmitida: newStatus } : ev
@@ -347,7 +347,7 @@ export default function EventosPage() {
         </PageHeader>
         <main className={`flex-1 flex flex-col space-y-4 px-4 py-5 md:px-8 md:py-6 overflow-hidden ${hideScrollClass}`}>
 
-        {/* --- CORREÇÃO AQUI: Wrapper flexível com rolagem (Scroll) --- */}
+        {}
         <div className="flex-1 min-h-0 border rounded-md bg-card relative overflow-hidden shadow-sm">
           <div
             className={`absolute inset-0 overflow-y-auto p-2 ${hideScrollClass}`}
@@ -360,7 +360,7 @@ export default function EventosPage() {
             />
           </div>
         </div>
-        {/* --- FIM DA CORREÇÃO --- */}
+        {}
 
         <PaginationControls
           currentPage={currentPage}
@@ -430,7 +430,7 @@ export default function EventosPage() {
   );
 }
 
-// --- COMPONENTES AUXILIARES DEVIDAMENTE TIPADOS ---
+
 
 interface PaginationControlsProps {
   currentPage: number;

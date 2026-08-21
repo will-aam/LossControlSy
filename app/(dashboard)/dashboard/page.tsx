@@ -79,7 +79,7 @@ type Totais = {
 
 function agregarReais(linhas: ProdutoLinha[], limiteGlobal: number, importados: number): Totais {
   const faturamento = linhas.reduce((s, l) => s + (l.faturamentoReal || (l.vendido * l.precoVenda)), 0);
-  const custoTotal = linhas.reduce((s, l) => s + l.chegou * l.custo, 0); // Custos totais recebidos
+  const custoTotal = linhas.reduce((s, l) => s + l.chegou * l.custo, 0);
   const custoVendido = linhas.reduce((s, l) => s + l.vendido * l.custo, 0);
   const perdaValor = linhas.reduce((s, l) => s + l.perdido * l.custo, 0);
   const chegou = linhas.reduce((s, l) => s + l.chegou, 0);
@@ -110,7 +110,7 @@ function agregarReais(linhas: ProdutoLinha[], limiteGlobal: number, importados: 
 type Modo = "dia" | "semana" | "mes";
 
 function weekStart(value: string) {
-  // value: "2026-W33"
+
   const [y, w] = value.split("-W");
   const jan4 = new Date(Date.UTC(Number(y), 0, 4));
   const dow = (jan4.getUTCDay() + 6) % 7;
@@ -260,7 +260,7 @@ export default function Dashboard() {
       </PageHeader>
 
       <main className="flex-1 overflow-y-auto space-y-6 px-4 py-5 md:px-8 md:py-6">
-        {/* Filtros soltos */}
+        {}
         <DashboardFilters
           modo={modo}
           pa={pa}
@@ -276,7 +276,7 @@ export default function Dashboard() {
         <DashboardKpis A={A} B={B} limiteGlobal={limiteGlobal} />
 
 
-        {/* Gráficos */}
+        {}
         <section className="grid gap-2.5 lg:grid-cols-3">
           <div className="rounded-xl bg-surface p-4 lg:col-span-2 shadow-sm">
             <div className="mb-3 flex items-baseline justify-between">
@@ -376,9 +376,9 @@ export default function Dashboard() {
           </div>
         </section>
 
-        {/* Blocos Integrados de Dados Reais & Desperdício Crítico */}
+        {}
         <div className="grid gap-4 lg:grid-cols-2 xl:gap-6 mt-2">
-          {/* Top 5 Critical Items agora usa os desperdícios vivos! */}
+          {}
           <div className="lg:col-span-1">
             <CriticalItems itens={desperdicios} />
           </div>
@@ -398,7 +398,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Tabela de Produtos */}
+        {}
         <Card className="mt-4 shadow-sm border-border">
           <CardHeader className="flex flex-row items-center justify-between pb-4 gap-3 space-y-0">
             <CardTitle className="text-[13px] font-medium flex items-center gap-1.5">
@@ -429,7 +429,7 @@ export default function Dashboard() {
           </CardHeader>
 
           <CardContent className="p-0">
-            {/* Mobile: lista enxuta */}
+            {}
             <ul className="space-y-2.5 md:hidden px-4 pb-4">
               {tabela.map((l) => (
                 <li key={l.codigo} className="rounded-lg bg-surface-2 px-3 py-2.5">
@@ -448,7 +448,7 @@ export default function Dashboard() {
               ))}
             </ul>
 
-            {/* Desktop: tabela completa */}
+            {}
             <div className="hidden md:block max-h-[500px] overflow-auto relative">
               <table className="w-full caption-bottom text-sm">
                 <TableHeader>

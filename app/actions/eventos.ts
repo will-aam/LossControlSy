@@ -1,4 +1,4 @@
-// app/actions/eventos.ts
+
 "use server";
 
 import { prisma } from "@/lib/prisma";
@@ -25,7 +25,7 @@ async function uploadToR2(base64Image: string): Promise<string | null> {
     const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
     
-    // Validação de segurança: Magic Bytes para verificar o tipo real do arquivo
+
     const header = buffer.toString("hex", 0, 4).toUpperCase();
     let contentType = "";
     let extension = "";
@@ -80,7 +80,7 @@ export async function getEventos() {
         criadoPor: { select: { nome: true, email: true, role: true } },
         evidencias: true,
         notasFiscais: {
-          // NOVO: Traz info da nota vinculada ao item
+
           select: { id: true, numero: true, pdfUrl: true, xmlUrl: true },
         },
       },
@@ -201,7 +201,7 @@ export async function toggleNfeEmitidaLote(eventoIds: string[], nfeEmitida: bool
   const session = auth.session;
 
   try {
-    // Only update events that belong to the user's ownerId for security
+
     await prisma.evento.updateMany({
       where: {
         id: { in: eventoIds },
@@ -220,7 +220,7 @@ export async function toggleNfeEmitidaLote(eventoIds: string[], nfeEmitida: bool
   }
 }
 
-// 5. Buscar Nota do Lote (ATUALIZADO: Detecta Expiração)
+
 export async function getNotaDoLote(dataString: string) {
   const auth = await requireServerPermission("notas:ver");
   if (!auth.success) return auth;
@@ -248,11 +248,11 @@ export async function getNotaDoLote(dataString: string) {
         message: "Nenhuma nota fiscal vinculada a este dia.",
       };
 
-    // NOVO: Se o registro existe mas os arquivos foram apagados pelo Cron
+
     if (!nota.pdfUrl && !nota.xmlUrl && !nota.xmlContent) {
       return {
         success: false,
-        isExpired: true, // Flag para o front-end
+        isExpired: true,
         message: `Nota Fiscal Nº ${nota.numero} expirou e o documento foi removido.`,
       };
     }

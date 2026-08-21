@@ -16,7 +16,7 @@ export function DashboardLayoutClient({ children }: { children: React.ReactNode 
     <div className="min-h-screen bg-background font-sans text-foreground">
       <NavRail />
 
-      {/* Adjust padding for Sidebar on Desktop and BottomNav on Mobile */}
+      {}
       <div 
         className={`transition-[padding] duration-200 ease-out pl-0 ${
           navAberto ? "md:pl-56" : "md:pl-16"

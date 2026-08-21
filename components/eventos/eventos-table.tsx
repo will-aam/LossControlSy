@@ -1,4 +1,4 @@
-// components/eventos/eventos-table.tsx
+
 "use client";
 
 import {

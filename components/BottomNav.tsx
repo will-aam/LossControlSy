@@ -57,7 +57,7 @@ export function BottomNav() {
     { icon: User, label: "Perfil", href: "/perfil", permission: "perfil:ver" },
   ].filter(item => hasPermission(item.permission));
 
-  // Hide bottom nav completely on the event creation page to give it full screen
+
   if (pathname === "/eventos/novo") {
     return null;
   }
@@ -83,7 +83,7 @@ export function BottomNav() {
             );
           })}
 
-          {/* Botão Centralizado de Ação (Eventos) */}
+          {}
           {hasPermission("eventos:criar") && (
             <div className="relative -top-5 flex justify-center w-full">
               <Link
@@ -115,7 +115,7 @@ export function BottomNav() {
             );
           })}
 
-          {/* Botão de Mais Opções */}
+          {}
           {(moreMenuOptions.length > 0 || systemOptions.length > 0) && (
             <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
               <SheetTrigger asChild>

@@ -1,4 +1,4 @@
-// app/actions/auth.ts
+
 "use server";
 
 import { prisma } from "@/lib/prisma";
@@ -13,7 +13,7 @@ import { redirect } from "next/navigation";
 import { User } from "@/lib/types";
 import { revalidatePath } from "next/cache";
 
-// 1. Função de Login
+
 export async function loginAction(email: string, password?: string) {
   if (!password) return { success: false, message: "Senha obrigatória" };
 
@@ -32,8 +32,8 @@ export async function loginAction(email: string, password?: string) {
       return { success: false, message: "Senha incorreta." };
     }
 
-    // NOVO: Descobre a qual loja esse usuário pertence
-    // Se ele for dono (ownerId é null no banco), a loja é o próprio ID dele.
+
+
     const tenantId = user.ownerId || user.id;
 
     await createSession({
@@ -42,7 +42,7 @@ export async function loginAction(email: string, password?: string) {
       role: user.role,
       nome: user.nome,
       avatarUrl: user.avatarUrl,
-      ownerId: tenantId, // Passa a loja para o token JWT
+      ownerId: tenantId,
     });
 
     return { success: true, user };
@@ -52,13 +52,13 @@ export async function loginAction(email: string, password?: string) {
   }
 }
 
-// 2. Função de Logout
+
 export async function logoutAction() {
   await deleteSession();
   redirect("/login");
 }
 
-// 3. Recuperar Sessão
+
 export async function getClientSession() {
   const session = await getSession();
   if (!session) return null;
@@ -69,11 +69,11 @@ export async function getClientSession() {
     email: session.email,
     role: session.role,
     avatarUrl: session.avatarUrl,
-    ownerId: session.ownerId, // Retornamos o ownerId para o frontend também
+    ownerId: session.ownerId,
   } as User & { ownerId: string };
 }
 
-// --- GERENCIAMENTO DE USUÁRIOS (CONFIGURAÇÕES) ---
+
 
 export async function getUsers() {
   const session = await getSession();
@@ -82,12 +82,12 @@ export async function getUsers() {
   }
 
   try {
-    // NOVO: Puxa apenas os usuários da mesma loja
+
     const users = await prisma.user.findMany({
       where: {
         OR: [
-          { ownerId: session.ownerId }, // Funcionários da loja
-          { id: session.ownerId }, // O próprio dono da loja
+          { ownerId: session.ownerId },
+          { id: session.ownerId },
         ],
       },
       orderBy: { nome: "asc" },
@@ -126,7 +126,7 @@ export async function createUser(data: {
         email: data.email,
         role: data.role as any,
         passwordHash,
-        ownerId: session.ownerId, // NOVO: Amarra o novo funcionário à loja do Dono
+        ownerId: session.ownerId,
       },
     });
 
@@ -152,7 +152,7 @@ export async function deleteUser(id: string) {
   }
 
   try {
-    // NOVO: Bloqueia caso tente excluir alguém de outra loja
+
     const userToDelete = await prisma.user.findUnique({ where: { id } });
     if (!userToDelete || userToDelete.ownerId !== session.ownerId) {
       return {

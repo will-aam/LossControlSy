@@ -1,4 +1,4 @@
-// components/relatorios/summary-cards.tsx
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
 import { TrendingDown, AlertCircle, Package, Activity } from "lucide-react";

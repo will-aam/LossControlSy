@@ -1,4 +1,4 @@
-// Dados simulados do dashboard (substituir por dados reais de XML/ERP depois).
+
 
 export type ProdutoLinha = {
   codigo: string;
@@ -9,7 +9,7 @@ export type ProdutoLinha = {
   perdido: number;
   custo: number;
   precoVenda: number;
-  limitePerda: number; // % permitido
+  limitePerda: number;
 };
 
 const CATALOGO: Array<Omit<ProdutoLinha, "chegou" | "vendido" | "perdido">> = [
@@ -27,7 +27,7 @@ const CATALOGO: Array<Omit<ProdutoLinha, "chegou" | "vendido" | "perdido">> = [
   { codigo: "PF-1012", descricao: "Café expresso", categoria: "Bebidas", custo: 0.9, precoVenda: 5.0, limitePerda: 3 },
 ];
 
-// PRNG determinístico para os números não mudarem a cada render/SSR.
+
 function seedFrom(str: string) {
   let h = 2166136261;
   for (let i = 0; i < str.length; i++) {
@@ -51,7 +51,7 @@ export function linhasDoDia(dia: string): ProdutoLinha[] {
   const rnd = seedFrom(dia);
   return CATALOGO.map((p) => {
     const chegou = Math.round(30 + rnd() * 90);
-    const esgotou = rnd() > 0.72; // item que vende quase tudo -> ruptura
+    const esgotou = rnd() > 0.72;
     if (esgotou) {
       const perdido = Math.round(rnd() * 2);
       const vendido = Math.max(0, chegou - perdido);
@@ -75,8 +75,8 @@ export type Totais = {
   perdido: number;
   perdaPct: number;
   perdaValor: number;
-  ruptura: number; // itens que venderam ~tudo (possível falta)
-  excesso: number; // itens acima do limite de perda
+  ruptura: number;
+  excesso: number;
   xmlsImportados: number;
   xmlsPendentes: number;
   itensXml: number;

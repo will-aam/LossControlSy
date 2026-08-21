@@ -434,7 +434,7 @@ export default function ConfiguracoesPage() {
                               size="icon"
                               className="h-8 w-8 text-destructive hover:text-destructive"
                               onClick={() => setUserToDelete(user.id)}
-                              disabled={isSelf} // Não pode se excluir
+                              disabled={isSelf}
                               title={
                                 isSelf
                                   ? "Você não pode excluir sua própria conta"

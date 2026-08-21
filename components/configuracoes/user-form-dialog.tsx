@@ -33,7 +33,7 @@ interface UserFormDialogProps {
     role: UserRole;
     password?: string;
     avatarUrl?: string;
-    ativo?: boolean; // Adicionado
+    ativo?: boolean;
   }) => void;
 }
 
@@ -130,7 +130,7 @@ export function UserFormDialog({
               <SelectContent>
                 <SelectItem value="funcionario">Funcionário</SelectItem>
                 <SelectItem value="gestor">Gestor</SelectItem>
-                {/* Apenas exibe Dono se estiver editando um Dono */}
+                {}
                 {role === "dono" && (
                   <SelectItem value="dono">Proprietário</SelectItem>
                 )}
@@ -138,7 +138,7 @@ export function UserFormDialog({
             </Select>
           </div>
 
-          {/* Campo de Status - Só exibe se for edição e não for o próprio dono se editando */}
+          {}
           {userToEdit && role !== "dono" && (
             <div className="flex items-center justify-between border p-3 rounded-md">
               <div className="space-y-0.5">

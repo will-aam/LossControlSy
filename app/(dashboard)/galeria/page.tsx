@@ -1,4 +1,4 @@
-// app/(dashboard)/galeria/page.tsx
+
 "use client";
 
 import { useState, useMemo, useEffect, useRef } from "react";
@@ -24,7 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-// Importações
+
 import { Evidencia } from "@/lib/types";
 import {
   formatDate,
@@ -66,7 +66,7 @@ import {
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
 
-// Interface ajustada para aceitar dados parciais do banco
+
 export interface EvidenciaDisplay {
   id: string;
   url: string;
@@ -91,11 +91,11 @@ export interface EvidenciaDisplay {
 export default function GaleriaPage() {
   const { hasPermission } = useAuth();
 
-  // Dados
+
   const [evidencias, setEvidencias] = useState<EvidenciaDisplay[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Filtros e Seleção
+
   const [selectedDate, setSelectedDate] = useState<string>("todas");
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -345,7 +345,7 @@ export default function GaleriaPage() {
         description="Visualize evidências de eventos e fotos avulsas."
       >
 
-        {/* BOTÕES DE UPLOAD */}
+        {}
         {hasPermission("galeria:upload") && (
           <div className="flex gap-2">
             <input
@@ -366,7 +366,7 @@ export default function GaleriaPage() {
 
             <Button
               onClick={() => {
-                setPhotoToEdit(null); // Garante que é modo criação
+                setPhotoToEdit(null);
                 setShowUploadDialog(true);
               }}
             >
@@ -378,7 +378,7 @@ export default function GaleriaPage() {
       </PageHeader>
 
       <main className="flex-1 flex flex-col space-y-6 px-4 py-5 md:px-8 md:py-6 overflow-hidden">
-        {/* Filtros */}
+        {}
         <div className="flex flex-col gap-4 sm:flex-row  z-10 py-1">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -408,7 +408,7 @@ export default function GaleriaPage() {
           </Select>
         </div>
 
-        {/* Grid de Fotos - AJUSTADO PARA QUADRADOS PEQUENOS */}
+        {}
         {isLoading ? (
           <div className="flex justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -450,7 +450,7 @@ export default function GaleriaPage() {
           </div>
         )}
 
-        {/* Paginação */}
+        {}
         {!isLoading && filteredEvidencias.length > 0 && (
           <div className="flex items-center justify-between shrink-0 pt-2 border-t mt-auto">
             <p className="text-xs text-muted-foreground">
@@ -482,13 +482,13 @@ export default function GaleriaPage() {
           </div>
         )}
 
-        {/* Modal Visualizador */}
+        {}
         <Dialog open={isViewerOpen} onOpenChange={setIsViewerOpen}>
           <DialogContent className="max-w-4xl p-0 gap-0 overflow-hidden bg-black/95 border-none [&>button]:hidden">
             <DialogTitle className="sr-only">Visualizar Evidência</DialogTitle>
 
             <div className="relative w-full h-full flex flex-col">
-              {/* Header Flutuante */}
+              {}
               <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-start z-50 bg-linear-to-b from-black/80 to-transparent">
                 <div>
                   <h2 className="text-white font-medium text-sm">
@@ -508,7 +508,7 @@ export default function GaleriaPage() {
                 </Button>
               </div>
 
-              {/* Imagem Principal */}
+              {}
               <div className="relative flex-1 bg-black min-h-[50vh] max-h-[80vh] flex items-center justify-center">
                 {selectedPhoto && (
                   <img
@@ -518,7 +518,7 @@ export default function GaleriaPage() {
                   />
                 )}
 
-                {/* Navegação */}
+                {}
                 {filteredEvidencias.length > 1 && (
                   <>
                     <Button
@@ -547,10 +547,10 @@ export default function GaleriaPage() {
                 )}
               </div>
 
-              {/* Footer com Detalhes e Ações */}
+              {}
               <div className="bg-background p-4 border-t flex flex-col gap-3">
                 <div className="flex items-start justify-between">
-                  {/* Informações */}
+                  {}
                   <div className="flex-1">
                     {selectedPhoto?.evento ? (
                       <>
@@ -589,9 +589,9 @@ export default function GaleriaPage() {
                     )}
                   </div>
 
-                  {/* Ações: Editar e Excluir */}
+                  {}
                   <div className="flex gap-2">
-                    {/* Botão EDITAR (Só se tiver permissão e for avulsa ou quiser editar detalhes) */}
+                    {}
                     <Button
                       variant="secondary"
                       size="sm"
@@ -623,12 +623,12 @@ export default function GaleriaPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Modal de Upload/Edição Detalhado */}
+        {}
         <UploadDialog
           open={showUploadDialog}
           onOpenChange={setShowUploadDialog}
           onSave={handleDetailedSave}
-          // Passaremos a foto para edição se houver
+
           editMode={!!photoToEdit}
           initialData={photoToEdit}
         />

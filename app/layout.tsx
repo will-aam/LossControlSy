@@ -10,7 +10,7 @@ const inter = Inter({ subsets: ["latin"] });
 export const viewport: Viewport = {
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#09090b" }, // Ajustado para o fundo dark padrão do shadcn
+    { media: "(prefers-color-scheme: dark)", color: "#09090b" },
   ],
   viewportFit: "cover",
   width: "device-width",
@@ -31,8 +31,8 @@ export const metadata: Metadata = {
     telephone: false,
   },
   icons: {
-    icon: "/icon.png", // Favicon padrão
-    apple: "/apple-touch-icon.png", // <--- O NOME CORRETO É ESSE
+    icon: "/icon.png",
+    apple: "/apple-touch-icon.png",
   },
 };
 

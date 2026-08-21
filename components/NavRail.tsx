@@ -71,7 +71,7 @@ export function NavRail() {
     >
       <nav className="flex-1 w-full space-y-4 mt-4 overflow-y-auto pb-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         {navGroups.map((group, groupIdx) => {
-          // Filtra os itens do grupo
+
           const filteredItems = group.items.filter((item) => {
             if (item.href === "/galeria" && user?.role === "funcionario") {
               return hasPermission(item.permission) && settings?.permitirFuncionarioGaleria === true;
@@ -79,7 +79,7 @@ export function NavRail() {
             return hasPermission(item.permission);
           });
 
-          // Se o grupo não tiver itens permitidos, não o renderiza
+
           if (filteredItems.length === 0) return null;
 
           return (

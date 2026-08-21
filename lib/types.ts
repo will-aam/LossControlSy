@@ -1,5 +1,5 @@
-// lib/types.ts
-// Definições de Tipos do Sistema
+
+
 
 export type UserRole = "dono" | "gestor" | "fiscal" | "funcionario";
 
@@ -52,18 +52,18 @@ export interface Evidencia {
   itemId?: string;
 }
 
-// Interface de Nota Fiscal
+
 export interface NotaFiscal {
   id: string;
   dataUpload: string;
   uploadedBy?: User;
 
-  // Arquivos
+
   pdfUrl?: string | null;
   xmlUrl?: string | null;
   xmlContent?: string | null;
 
-  // Metadados
+
   numero?: string | null;
   serie?: string | null;
   emitente?: string | null;
@@ -74,7 +74,7 @@ export interface NotaFiscal {
   naturezaOperacao?: string | null;
   chaveAcesso?: string | null;
 
-  // Vínculos
+
   eventoId?: string | null;
   observacoes?: string | null;
 }
@@ -92,7 +92,7 @@ export interface Evento {
   criadoPor: User;
   aprovadoPor?: User;
   evidencias: Evidencia[];
-  // NOVO: Adicionado para suportar o vínculo com Notas Fiscais
+
   notasFiscais?: NotaFiscal[];
   nfeEmitida?: boolean;
 }

@@ -43,7 +43,7 @@ export function DashboardFilters({
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [pendingLimite, setPendingLimite] = useState<number | null>(null);
 
-  // Sincronizar estado local se o global mudar de fora
+
   useEffect(() => {
     setLocalLimite(limiteGlobal);
   }, [limiteGlobal]);
@@ -64,7 +64,7 @@ export function DashboardFilters({
   };
 
   const cancelarAlteracao = () => {
-    setLocalLimite(limiteGlobal); // Volta pro valor original se cancelar
+    setLocalLimite(limiteGlobal);
     setIsAlertOpen(false);
     setPendingLimite(null);
   };
@@ -114,7 +114,7 @@ export function DashboardFilters({
         />
       </label>
 
-      {/* MODAL DE CONFIRMAÇÃO DO LIMITE DE PERDA */}
+      {}
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -42,17 +42,17 @@ export function ItemFormDialog({
   const isEditing = !!item;
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Estados do Formulário
+
   const [formData, setFormData] = useState<Partial<Item>>({});
 
-  // Estados de Salvamento
+
   const [isSaving, setIsSaving] = useState(false);
 
-  // Estado para Categorias
+
   const [categorias, setCategorias] = useState<string[]>([]);
   const [loadingCategorias, setLoadingCategorias] = useState(false);
 
-  // Estados da Imagem
+
   const [imageTab, setImageTab] = useState<"url" | "upload">("upload");
   const [previewUrl, setPreviewUrl] = useState<string>("");
 
@@ -87,7 +87,7 @@ export function ItemFormDialog({
     setLoadingCategorias(false);
   };
 
-  // Resetar ou Preencher dados ao abrir
+
   useEffect(() => {
     if (open) {
       if (item) {
@@ -160,7 +160,7 @@ export function ItemFormDialog({
   };
 
   const handleSave = async () => {
-    // Validação básica
+
     if (!formData.nome || !formData.categoria || !formData.precoVenda) {
       return;
     }
@@ -168,8 +168,8 @@ export function ItemFormDialog({
     setIsSaving(true);
     try {
       await onSave(formData);
-      // Não fechamos aqui, o pai fecha após sucesso, ou fechamos se o pai retornar void
-      // Mas para garantir fluidez na UI:
+
+
       onOpenChange(false);
     } catch (error) {
       console.error("Erro ao salvar", error);
@@ -191,11 +191,11 @@ export function ItemFormDialog({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto p-4 sm:p-0 grid gap-6 sm:py-4">
-          {/* Seção Imagem */}
+          {}
           <div className="space-y-4 border rounded-lg p-4 bg-muted/10">
             <Label>Imagem do Produto</Label>
             <div className="flex flex-col sm:flex-row gap-4 items-start">
-              {/* Preview Area */}
+              {}
               <div className="h-32 w-32 shrink-0 rounded-md border border-dashed bg-muted flex items-center justify-center overflow-hidden relative group self-center sm:self-start">
                 {previewUrl ? (
                   <>
@@ -219,7 +219,7 @@ export function ItemFormDialog({
                 )}
               </div>
 
-              {/* Controles de Upload */}
+              {}
               <div className="flex-1 w-full">
                 <Tabs
                   value={imageTab}
@@ -394,7 +394,7 @@ export function ItemFormDialog({
             />
           </div>
 
-          {/* Vínculos de Fornecedores */}
+          {}
           {isEditing && (
             <div className="border-t pt-4 mt-2">
               <Label className="mb-2 block flex items-center gap-2 text-muted-foreground"><Link2 size={16} /> Códigos de Fornecedor (XML)</Label>

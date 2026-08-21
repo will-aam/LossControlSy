@@ -1,8 +1,8 @@
 import * as pdfjsLib from "pdfjs-dist";
 import { TextItem } from "pdfjs-dist/types/src/display/api";
 
-// Configurar o Worker do PDF.js (Essencial para Next.js)
-// Usamos um CDN público para garantir que o worker carregue sem configuração complexa de Webpack
+
+
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
 interface ExtractedData {
@@ -17,10 +17,10 @@ interface ExtractedData {
 
 export async function parsePdfInvoice(file: File): Promise<ExtractedData> {
   try {
-    // 1. Converter File para ArrayBuffer
+
     const arrayBuffer = await file.arrayBuffer();
 
-    // 2. Carregar o documento PDF
+
     const loadingTask = pdfjsLib.getDocument(arrayBuffer);
     const pdf = await loadingTask.promise;
 
@@ -59,25 +59,25 @@ export async function parsePdfInvoice(file: File): Promise<ExtractedData> {
       data.numero = numeroMatch[1];
     }
 
-    // --- Extração de SÉRIE ---
+
     const serieMatch = fullText.match(/SÉRIE\s*:?\s*(\d{1,3})/i);
     if (serieMatch) {
       data.serie = serieMatch[1];
     }
 
-    // --- Extração de DATA DE EMISSÃO ---
-    // Procura padrão dd/mm/aaaa
+
+
     const dataMatch = fullText.match(
       /DATA\s*dA\s*EMISS[ÃA]O.*?(\d{2}\/\d{2}\/\d{4})/i,
     );
     if (dataMatch) {
-      // Converter para formato ISO (yyyy-mm-dd) para o input date
+
       const [dia, mes, ano] = dataMatch[1].split("/");
       data.dataEmissao = `${ano}-${mes}-${dia}`;
     }
 
-    // --- Extração de CHAVE DE ACESSO ---
-    // Procura por 44 dígitos numéricos (geralmente com espaços no PDF)
+
+
     const chaveMatch = fullText.match(
       /(\d{4}\s?\d{4}\s?\d{4}\s?\d{4}\s?\d{4}\s?\d{4}\s?\d{4}\s?\d{4}\s?\d{4}\s?\d{4}\s?\d{4})/,
     );

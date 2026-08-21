@@ -36,20 +36,20 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-// Tipos e Utils
+
 import { Item } from "@/lib/types";
 import { formatCurrency } from "@/lib/utils";
 import { useAuth } from "@/lib/auth-context";
-import { parseItemsCSV, parsePrecosCSV } from "@/lib/csv-parser"; // <--- Importei o parser
+import { parseItemsCSV, parsePrecosCSV } from "@/lib/csv-parser";
 
-// Novos Actions e Componentes
+
 import {
   getItens,
   deleteItem,
   toggleItemStatus,
   createItem,
   updateItem,
-  importarItens, // <--- Importei a nova action (criaremos no próximo passo)
+  importarItens,
   atualizarPrecosLote,
   CreateItemData,
 } from "@/app/actions/catalogo";
@@ -85,35 +85,35 @@ const hideScrollClass =
 export default function CatalogoPage() {
   const { hasPermission } = useAuth();
 
-  // Estados de Dados
+
   const [items, setItems] = useState<Item[]>([]);
   const [categoriasList, setCategoriasList] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Estados de Filtro
+
   const [searchQuery, setSearchQuery] = useState("");
   const [categoriaFilter, setCategoriaFilter] = useState<string>("todas");
   const [statusFilter, setStatusFilter] = useState<
     "todos" | "ativo" | "inativo"
   >("ativo");
 
-  // Estados de Ação
+
   const [showNewItemDialog, setShowNewItemDialog] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
-  // Paginação
+
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Importação
+
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Atualização de Preços
+
   const [isUpdatingPrecos, setIsUpdatingPrecos] = useState(false);
   const fileInputPrecosRef = useRef<HTMLInputElement>(null);
 
-  // Carrega Itens e Categorias ao iniciar
+
   useEffect(() => {
     loadData();
   }, []);
@@ -121,13 +121,13 @@ export default function CatalogoPage() {
   const loadData = async () => {
     setIsLoading(true);
 
-    // 1. Busca Categorias
+
     const catResult = await getCategorias();
     if (catResult.success && catResult.data) {
       setCategoriasList(catResult.data.map((c: any) => c.nome));
     }
 
-    // 2. Busca Itens
+
     const itemResult = await getItens();
     if (itemResult.success) {
       const mappedItems: Item[] = (itemResult.data as any[]).map((i) => ({
@@ -195,7 +195,7 @@ export default function CatalogoPage() {
     [items],
   );
 
-  // --- FUNÇÃO DE IMPORTAÇÃO ATUALIZADA ---
+
   const handleFileUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
@@ -206,7 +206,7 @@ export default function CatalogoPage() {
     toast.info("Lendo arquivo CSV...");
 
     try {
-      // 1. Processa o CSV no Front-end (usando seu parser)
+
       const parsedItems = await parseItemsCSV(file);
 
       if (parsedItems.length === 0) {
@@ -217,15 +217,15 @@ export default function CatalogoPage() {
 
       toast.loading(`Importando ${parsedItems.length} itens para o banco...`);
 
-      // 2. Envia para o Back-end (Server Action)
+
       const result = await importarItens(parsedItems);
 
       if (result.success) {
-        toast.dismiss(); // Remove o loading
+        toast.dismiss();
         toast.success(
           `${result.count} itens importados/atualizados com sucesso!`,
         );
-        loadData(); // Recarrega a tabela
+        loadData();
       } else {
         toast.dismiss();
         toast.error(result.message || "Erro ao importar itens.");
@@ -363,7 +363,7 @@ export default function CatalogoPage() {
         description="Gerencie os produtos disponíveis"
       >
         <div className="flex gap-2">
-          {/* BOTÃO IMPORTAR */}
+          {}
           {hasPermission("catalogo:importar") && (
             <>
               <input
@@ -389,7 +389,7 @@ export default function CatalogoPage() {
             </>
           )}
 
-          {/* BOTÃO ATUALIZAR PREÇOS */}
+          {}
           {hasPermission("catalogo:editar") && (
             <>
               <input
@@ -415,7 +415,7 @@ export default function CatalogoPage() {
             </>
           )}
 
-          {/* BOTÃO NOVO ITEM */}
+          {}
           {hasPermission("catalogo:criar") && (
             <Button onClick={() => setShowNewItemDialog(true)}>
               <Plus className="mr-2 h-4 w-4" /> Novo Item

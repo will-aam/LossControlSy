@@ -5,13 +5,13 @@ import { Search, Package, X, Check, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-// REMOVIDO: import { Item } from "@/lib/mock-data";
-import { Item } from "@/lib/types"; // Importa o tipo correto
-// REMOVIDO: import { StorageService } from "@/lib/storage";
-import { getItens } from "@/app/actions/catalogo"; // Importa a action do banco
+
+import { Item } from "@/lib/types";
+
+import { getItens } from "@/app/actions/catalogo";
 import { cn } from "@/lib/utils";
 
-// Função auxiliar para remover acentos
+
 function normalizeText(text: string) {
   return text
     .normalize("NFD")
@@ -98,7 +98,7 @@ export function ItemSearch({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Lógica de Filtragem (só roda quando debouncedQuery muda)
+
   const filteredItems = useMemo(() => {
     if (!debouncedQuery) return [];
 
@@ -163,7 +163,7 @@ export function ItemSearch({
     );
   }
 
-  // --- MODO: BUSCA ---
+
   return (
     <div className={cn("relative h-10", className)} ref={containerRef}>
       <div className="relative h-full">
@@ -187,11 +187,7 @@ export function ItemSearch({
 
       {isOpen && inputValue.length > 0 && (
         <div className="absolute top-[calc(100%+4px)] left-0 right-0 z-50 rounded-md border bg-popover shadow-md overflow-hidden">
-          {/* CORREÇÃO DO SCROLL:
-              - max-h-60: Limita altura (aprox 240px)
-              - overflow-y-auto: Habilita scroll nativo vertical
-              - overscroll-contain: Evita rolar a página inteira junto
-          */}
+          {}
           <div className="max-h-60 overflow-y-auto overscroll-contain py-1">
             {isLoading ? (
               <div className="p-4 text-center text-sm text-muted-foreground">

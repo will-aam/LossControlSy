@@ -1,4 +1,4 @@
-// app/(dashboard)/relatorios/page.tsx
+
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
@@ -262,7 +262,7 @@ export default function RelatoriosPage() {
     );
 
     const diasValidos = Math.max(1, stats.diffDias + 1);
-    const mediaQtdDia = totalQtd / diasValidos; // Removido o Math.round() para permitir decimais precisos
+    const mediaQtdDia = totalQtd / diasValidos;
 
     return {
       totalCusto,

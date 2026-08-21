@@ -19,7 +19,7 @@ export async function getDadosEvolucao(
     const [anoFim, mesFim] = dataFimStr.split("-").map(Number);
     const maxDate = endOfMonth(new Date(anoFim, mesFim - 1, 15));
 
-    // Filtros base
+
     const whereEvento: any = {
       ownerId: session.ownerId,
       dataHora: { gte: minDate, lte: maxDate },
@@ -40,7 +40,7 @@ export async function getDadosEvolucao(
       };
     }
 
-    // 1. Fetch Eventos
+
     const eventos = await prisma.evento.findMany({
       where: whereEvento,
       include: {
@@ -48,7 +48,7 @@ export async function getDadosEvolucao(
       },
     });
 
-    // 2. Fetch Vendas
+
     const vendas = await prisma.vendaDiaria.findMany({
       where: whereVenda,
       include: {
@@ -60,7 +60,7 @@ export async function getDadosEvolucao(
       },
     });
 
-    // 3. Aggregate by Month
+
     const monthsMap: Record<
       string,
       { label: string; mesIso: string; custoPerda: number; faturamento: number; taxaPerda: number; statusAumento: "aumentou" | "diminuiu" | "manteve" | "N/A" }
@@ -74,7 +74,7 @@ export async function getDadosEvolucao(
       currentD.setMonth(currentD.getMonth() + 1);
     }
 
-    // Aggregate Perdas
+
     for (const ev of eventos) {
       if (produtoId && ev.itemId !== produtoId) continue;
       const key = format(ev.dataHora, "yyyy-MM");
@@ -83,7 +83,7 @@ export async function getDadosEvolucao(
       }
     }
 
-    // Aggregate Vendas
+
     for (const venda of vendas) {
       const key = format(venda.data, "yyyy-MM");
       if (monthsMap[key]) {
@@ -94,7 +94,7 @@ export async function getDadosEvolucao(
       }
     }
 
-    // Calculate Taxa de Perda and Variation
+
     const historico = Object.values(monthsMap);
     let taxaAnterior = -1;
 
@@ -102,7 +102,7 @@ export async function getDadosEvolucao(
       if (data.faturamento > 0) {
         data.taxaPerda = (data.custoPerda / data.faturamento) * 100;
       } else if (data.custoPerda > 0) {
-        data.taxaPerda = 100; // If loss but no sales
+        data.taxaPerda = 100;
       }
 
       if (taxaAnterior !== -1) {
@@ -117,7 +117,7 @@ export async function getDadosEvolucao(
       taxaAnterior = data.taxaPerda;
     }
 
-    // Fetch products for the dropdown filter
+
     const produtos = await prisma.item.findMany({
       where: { ownerId: session.ownerId },
       select: { id: true, nome: true, codigoInterno: true },

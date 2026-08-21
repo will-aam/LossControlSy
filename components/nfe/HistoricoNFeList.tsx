@@ -27,13 +27,13 @@ export function HistoricoNFeList({ historico }: { historico: any[] }) {
     } else {
       params.set("status", val);
     }
-    params.delete("page"); // reset page when filtering
+    params.delete("page");
     router.push(`?${params.toString()}`);
   };
 
   return (
     <div className="w-full space-y-4">
-      {/* Filtro de Status */}
+      {}
       <div className="flex justify-between items-center bg-card/40 backdrop-blur-md p-3 rounded-2xl border border-border/50">
         <h2 className="text-sm font-semibold text-foreground px-2">Notas Importadas</h2>
         <Select value={currentStatus} onValueChange={handleStatusChange}>
@@ -62,11 +62,11 @@ export function HistoricoNFeList({ historico }: { historico: any[] }) {
         </div>
       ) : (
         <>
-          {/* MOBILE: Cards (Escondido em telas md ou maiores) */}
+          {}
       <div className="grid grid-cols-1 gap-4 md:hidden">
         {historico.map((nfe) => {
-          // A principal data exibida deve ser a da Nota (Emissão). 
-          // Se não existir, caímos para a de importação.
+
+
           const dataPrincipal = nfe.dataEmissao ? new Date(nfe.dataEmissao) : new Date(nfe.dataImportacao);
           const total = nfe.totalCount || 0;
           const mapped = nfe.mappedCount || 0;
@@ -139,7 +139,7 @@ export function HistoricoNFeList({ historico }: { historico: any[] }) {
         })}
       </div>
 
-      {/* DESKTOP: Tabela (Escondida no mobile) */}
+      {}
       <div className="hidden md:block bg-card/40 backdrop-blur-md p-2 rounded-2xl shadow-sm border border-border/50">
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left border-collapse">

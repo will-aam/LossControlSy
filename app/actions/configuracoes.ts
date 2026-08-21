@@ -1,4 +1,4 @@
-// app/actions/configuracoes.ts
+
 "use server";
 
 import { prisma } from "@/lib/prisma";
@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 import { UserRole } from "@/lib/types";
 import { requireServerPermission, checkServerPermission } from "@/lib/server-permissions";
 
-// --- CONFIGURAÇÕES GERAIS ---
+
 
 export async function getSettings() {
   try {
@@ -15,12 +15,12 @@ export async function getSettings() {
     if (!session) return { success: false, message: "Não autorizado" };
 
 
-    // Busca configurações vinculadas ao dono da loja (ownerId da sessão)
+
     let config = await prisma.configuracao.findUnique({
       where: { donoId: session.ownerId },
     });
 
-    // Se não existir (primeiro acesso da loja), cria com valores padrão
+
     if (!config && session.role === "dono") {
       config = await prisma.configuracao.create({
         data: {
@@ -31,7 +31,7 @@ export async function getSettings() {
       });
     }
 
-    // Conversão do Decimal para Number para o frontend
+
     const plainConfig = config
       ? {
           ...config,
@@ -91,7 +91,7 @@ export async function saveSettings(data: {
   }
 }
 
-// --- GERENCIAMENTO DE USUÁRIOS (MULTI-TENANCY) ---
+
 
 export async function getUsers() {
   const auth = await requireServerPermission("usuarios:gerenciar");
@@ -99,12 +99,12 @@ export async function getUsers() {
   const session = auth.session;
 
   try {
-    // Filtra para mostrar apenas o dono da loja e sua respectiva equipe
+
     const users = await prisma.user.findMany({
       where: {
         OR: [
-          { id: session.ownerId }, // O dono da loja
-          { ownerId: session.ownerId }, // A equipe da loja
+          { id: session.ownerId },
+          { ownerId: session.ownerId },
         ],
       },
       orderBy: { nome: "asc" },
@@ -139,7 +139,7 @@ export async function saveUser(data: {
 
   try {
     if (data.id) {
-      // EDIÇÃO: Verifica se o usuário pertence ao "quadrado" desta loja
+
       const existingUser = await prisma.user.findUnique({
         where: { id: data.id },
       });
@@ -152,7 +152,7 @@ export async function saveUser(data: {
         return { success: false, message: "Acesso negado a este usuário." };
       }
 
-      // Proteção para a conta do Dono
+
       if (existingUser.id === session.ownerId) {
         if (data.role !== "dono") {
           return {
@@ -184,7 +184,7 @@ export async function saveUser(data: {
         data: updateData,
       });
     } else {
-      // CRIAÇÃO: Novo funcionário para esta loja
+
       const exists = await prisma.user.findUnique({
         where: { email: data.email },
       });
@@ -201,7 +201,7 @@ export async function saveUser(data: {
           role: data.role,
           passwordHash,
           ativo: true,
-          ownerId: session.ownerId, // Amarra ao dono da unidade logada
+          ownerId: session.ownerId,
         },
       });
     }
@@ -227,13 +227,13 @@ export async function deleteUser(id: string) {
   }
 
   try {
-    // Verifica se o alvo pertence à loja antes de deletar
+
     const targetUser = await prisma.user.findUnique({ where: { id } });
     if (!targetUser || targetUser.ownerId !== session.ownerId) {
       return { success: false, message: "Usuário não pertence à sua equipe." };
     }
 
-    // Transferir autoria dos registros para o dono antes de excluir
+
     await prisma.$transaction([
       prisma.evento.updateMany({
         where: { criadoPorId: id },

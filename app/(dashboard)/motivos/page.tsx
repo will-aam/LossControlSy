@@ -1,4 +1,4 @@
-// app/(dashboard)/motivo/page.tsx
+
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth-context";
-// Actions do Banco de Dados
+
 import {
   getMotivos,
   createMotivo,
@@ -54,7 +54,7 @@ import { PageHeader } from "@/components/PageHeader";
 const hideScrollClass =
   "[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]";
 
-// Tipo local
+
 type MotivoData = {
   id: string;
   nome: string;
@@ -189,7 +189,7 @@ export default function MotivosPage() {
 
       <main className={`flex flex-col flex-1 space-y-6 px-4 py-5 md:px-8 md:py-6 overflow-hidden ${hideScrollClass}`}>
 
-        {/* Filtros */}
+        {}
         <div className="flex items-center shrink-0  z-10 py-1">
           <div className="relative w-full max-w-md">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -202,7 +202,7 @@ export default function MotivosPage() {
           </div>
         </div>
 
-        {/* Grid de "Nuvenzinhas" (Badges) */}
+        {}
         <div className="flex-1 overflow-y-auto border rounded-md p-6 bg-card shadow-sm">
           {isLoading ? (
             <div className="flex justify-center items-center h-40">
@@ -220,7 +220,7 @@ export default function MotivosPage() {
                     {motivo.nome}
                   </span>
 
-                  {/* Ações (Menu) */}
+                  {}
                   {(hasPermission("motivos:editar") ||
                     hasPermission("motivos:excluir")) && (
                       <DropdownMenu>
@@ -266,7 +266,7 @@ export default function MotivosPage() {
           )}
         </div>
 
-        {/* Dialog Criar/Editar */}
+        {}
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent>
             <DialogHeader>
@@ -315,7 +315,7 @@ export default function MotivosPage() {
           </DialogContent>
         </Dialog>
 
-        {/* Alerta de Exclusão */}
+        {}
         <AlertDialog
           open={!!motivoToDelete}
           onOpenChange={(open) => !open && setMotivoToDelete(null)}

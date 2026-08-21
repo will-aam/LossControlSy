@@ -20,7 +20,7 @@ export function UploadZone({ onFilesSelected, isUploading }: UploadZoneProps) {
   const [xmlFile, setXmlFile] = useState<File | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
 
-  // Função para ler o XML e extrair dados básicos
+
   const parseXML = async (file: File) => {
     try {
       const text = await file.text();
@@ -33,7 +33,7 @@ export function UploadZone({ onFilesSelected, isUploading }: UploadZoneProps) {
       const total = xmlDoc.getElementsByTagName("total")[0];
 
       const dados: Partial<NotaFiscal> = {
-        xmlContent: text, // Salva o conteúdo texto para buscas futuras
+        xmlContent: text,
       };
 
       if (infNFe) {
@@ -107,10 +107,10 @@ export function UploadZone({ onFilesSelected, isUploading }: UploadZoneProps) {
   const removeFile = (type: "xml" | "pdf") => {
     if (type === "xml") {
       setXmlFile(null);
-      onFilesSelected(null, pdfFile, {}); // Limpa dados do XML também
+      onFilesSelected(null, pdfFile, {});
     } else {
       setPdfFile(null);
-      onFilesSelected(xmlFile, null, {}); // Mantém dados do XML
+      onFilesSelected(xmlFile, null, {});
     }
   };
 
@@ -146,7 +146,7 @@ export function UploadZone({ onFilesSelected, isUploading }: UploadZoneProps) {
         )}
       </div>
 
-      {/* Lista de Arquivos Selecionados */}
+      {}
       {(xmlFile || pdfFile) && (
         <div className="grid gap-2">
           {xmlFile && (
