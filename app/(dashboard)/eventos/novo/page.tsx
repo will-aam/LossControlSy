@@ -61,6 +61,7 @@ import {
 import { toast } from "sonner";
 import { PageHeader } from "@/components/PageHeader";
 import { cn } from "@/lib/utils";
+import { MobileHeaderMenu } from "@/components/MobileHeaderMenu";
 
 const numberInputClass =
   "text-lg h-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none";
@@ -263,10 +264,17 @@ export default function EventoForm() {
         onChange={handleFileChange}
       />
 
-      <div className="md:hidden pt-4 px-4 pb-2">
-        <Button variant="ghost" className="pl-0 gap-2 text-muted-foreground hover:text-foreground h-8" onClick={() => router.back()}>
-          <ArrowLeft className="h-4 w-4" /> Voltar
-        </Button>
+      <div className="md:hidden pt-4 px-4 pb-2 flex justify-between items-center">
+        {hasPermission("dashboard:ver") ? (
+          <Button variant="ghost" className="pl-0 gap-2 text-muted-foreground hover:text-foreground h-8" onClick={() => router.back()}>
+            <ArrowLeft className="h-4 w-4" /> Voltar
+          </Button>
+        ) : (
+          <div className="text-lg font-bold text-foreground ml-1">
+            Nova Perda
+          </div>
+        )}
+        <MobileHeaderMenu />
       </div>
 
       <PageHeader
