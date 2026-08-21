@@ -18,6 +18,7 @@ import {
   Calendar,
   Receipt,
   TrendingUp,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
@@ -26,7 +27,7 @@ import { useAuth } from "@/lib/auth-context";
 export function BottomNav() {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const { hasPermission, settings, user } = useAuth();
+  const { hasPermission, settings, user, logout } = useAuth();
 
   const mainNavItems = [
     { icon: LayoutDashboard, label: "Início", href: "/dashboard", permission: "dashboard:ver" },
@@ -171,6 +172,18 @@ export function BottomNav() {
                           <span className="text-sm font-medium">{item.label}</span>
                         </Link>
                       ))}
+                      <button
+                        onClick={async () => {
+                          setIsMenuOpen(false);
+                          await logout();
+                        }}
+                        className="w-full flex items-center gap-3 p-3 rounded-xl text-destructive hover:bg-destructive/10 transition-colors"
+                      >
+                        <div className="w-8 h-8 rounded-full bg-surface flex items-center justify-center">
+                          <LogOut size={18} />
+                        </div>
+                        <span className="text-sm font-medium">Sair do sistema</span>
+                      </button>
                     </div>
                   </div>
                 )}

@@ -14,7 +14,8 @@ import {
   Image as ImageIcon,
   PlusCircle,
   Receipt,
-  TrendingUp
+  TrendingUp,
+  LogOut
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -25,7 +26,7 @@ import { useAuth } from "@/lib/auth-context";
 export function NavRail() {
   const pathname = usePathname();
   const { navAberto: aberto } = useSidebar();
-  const { hasPermission, settings, user } = useAuth();
+  const { hasPermission, settings, user, logout } = useAuth();
 
   const navGroups = [
     {
@@ -144,6 +145,20 @@ export function NavRail() {
             {aberto && <span className="font-medium">Perfil</span>}
           </Link>
         )}
+        
+        <button 
+          onClick={async () => await logout()}
+          className={cn(
+            "p-3 rounded-xl text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors flex items-center",
+            aberto ? "justify-start gap-3 w-full" : "justify-center"
+          )}
+          title="Sair do sistema"
+        >
+          <div className="w-8 h-8 rounded-full bg-surface-3 flex items-center justify-center">
+            <LogOut size={16} />
+          </div>
+          {aberto && <span className="font-medium">Sair</span>}
+        </button>
       </div>
     </aside>
   );
