@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
 import {
   Bar,
   BarChart,
@@ -146,6 +148,15 @@ function rotulo(modo: Modo, valor: string) {
 const delta = (a: number, b: number) => (b === 0 ? (a === 0 ? 0 : 100) : ((a - b) / Math.abs(b)) * 100);
 
 export default function Dashboard() {
+  const { hasPermission, isLoading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoading && !hasPermission("dashboard:ver")) {
+      router.replace("/eventos/novo");
+    }
+  }, [hasPermission, isLoading, router]);
+
   const [modo, setModo] = useState<Modo>("semana");
   const [pa, setPa] = useState("2026-W33");
   const [pb, setPb] = useState("2026-W32");
