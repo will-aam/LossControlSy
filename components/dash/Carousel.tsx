@@ -17,7 +17,7 @@ export function Carousel({ children, gridClass }: { children: ReactNode[]; gridC
       <div
         ref={ref}
         onScroll={onScroll}
-        className={`-mx-4 flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:mx-0 md:grid md:overflow-visible md:px-0 ${gridClass}`}
+        className={`flex snap-x snap-mandatory gap-2.5 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:grid md:overflow-visible ${gridClass}`}
       >
         {children.map((c, i) => (
           <div key={i} className="w-[86%] shrink-0 snap-start md:w-auto">
