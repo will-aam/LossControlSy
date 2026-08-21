@@ -1,18 +1,18 @@
-// app/actions/categorias.ts
+
 "use server";
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/session";
 
-// 1. Listar Categorias (Filtradas por loja)
+
 export async function getCategorias() {
   const session = await getSession();
   if (!session) return { success: false, data: [] };
 
   try {
     const categorias = await prisma.categoria.findMany({
-      where: { ownerId: session.ownerId }, // NOVO: Filtro de isolamento
+      where: { ownerId: session.ownerId },
       orderBy: { nome: "asc" },
     });
     return { success: true, data: categorias };
@@ -22,7 +22,7 @@ export async function getCategorias() {
   }
 }
 
-// 2. Criar Categoria
+
 export async function createCategoria(nome: string) {
   const session = await getSession();
   if (!session) return { success: false, message: "Não autorizado" };
@@ -30,8 +30,8 @@ export async function createCategoria(nome: string) {
   if (!nome) return { success: false, message: "Nome é obrigatório" };
 
   try {
-    // NOVO: Verifica duplicidade apenas na mesma loja
-    // Usamos findFirst porque a constraint agora é composta (nome + ownerId)
+
+
     const existe = await prisma.categoria.findFirst({
       where: {
         nome: { equals: nome, mode: "insensitive" },
@@ -46,7 +46,7 @@ export async function createCategoria(nome: string) {
       };
     }
 
-    // RESOLVE O ERRO: Passamos o ownerId obrigatório definido no schema
+
     await prisma.categoria.create({
       data: {
         nome,
@@ -63,13 +63,13 @@ export async function createCategoria(nome: string) {
   }
 }
 
-// 3. Atualizar Categoria
+
 export async function updateCategoria(id: string, nome: string) {
   const session = await getSession();
   if (!session) return { success: false, message: "Não autorizado" };
 
   try {
-    // Validação de posse: garante que a categoria pertence à loja do usuário
+
     const categoria = await prisma.categoria.findUnique({ where: { id } });
     if (!categoria || categoria.ownerId !== session.ownerId) {
       return {
@@ -90,13 +90,13 @@ export async function updateCategoria(id: string, nome: string) {
   }
 }
 
-// 4. Deletar Categoria
+
 export async function deleteCategoria(id: string) {
   const session = await getSession();
   if (!session) return { success: false, message: "Não autorizado" };
 
   try {
-    // Validação de posse
+
     const categoria = await prisma.categoria.findUnique({ where: { id } });
     if (!categoria || categoria.ownerId !== session.ownerId) {
       return {
@@ -105,7 +105,7 @@ export async function deleteCategoria(id: string) {
       };
     }
 
-    // Segurança: Verifica itens vinculados
+
     const itensVinculados = await prisma.item.count({
       where: { categoriaId: id },
     });

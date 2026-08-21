@@ -22,7 +22,7 @@ function extractTagValue(xml: string, tag: string): string | null {
 
 export async function recalcularCustosItem(itemId: string, ownerId: string) {
   try {
-    // Buscar todos os itens de nota fiscal vinculados a este produto
+
     const nfeItens = await prisma.nFeCompraItem.findMany({
       where: {
         itemId: itemId,
@@ -37,8 +37,8 @@ export async function recalcularCustosItem(itemId: string, ownerId: string) {
     });
 
     if (nfeItens.length === 0) {
-      // Se não tiver notas, não mexe no custo unitário atual,
-      // ou zera o custo médio (ou não mexe). Por segurança, vamos apenas zerar o custo médio
+
+
       await prisma.item.update({
         where: { id: itemId },
         data: { custoMedio: 0 }
@@ -46,10 +46,10 @@ export async function recalcularCustosItem(itemId: string, ownerId: string) {
       return;
     }
 
-    // O último custo é o da nota mais recente
+
     const ultimoCusto = nfeItens[0].valorUnitario || 0;
 
-    // Calcular o custo médio ponderado
+
     let somaValores = 0;
     let somaQuantidades = 0;
 
@@ -64,7 +64,7 @@ export async function recalcularCustosItem(itemId: string, ownerId: string) {
 
     const custoMedio = somaQuantidades > 0 ? (somaValores / somaQuantidades) : 0;
 
-    // Atualiza o item
+
     await prisma.item.update({
       where: { id: itemId },
       data: {
@@ -90,21 +90,21 @@ export async function importNFeXML(formData: FormData) {
 
     const xmlText = await file.text();
 
-    // Validar se é NFe
+
     if (!xmlText.includes("<nfeProc") && !xmlText.includes("<NFe")) {
       return { success: false, error: "Arquivo não parece ser um XML de NFe válido." };
     }
 
-    // Extrair dados do cabeçalho
+
     const numero = extractTagValue(xmlText, "nNF");
-    const emitente = extractTagValue(xmlText, "xNome"); // do grupo <emit>
+    const emitente = extractTagValue(xmlText, "xNome");
     const dataEmissaoRaw = extractTagValue(xmlText, "dhEmi") || extractTagValue(xmlText, "dEmi");
     const valorTotalRaw = extractTagValue(xmlText, "vNF");
     
     const dataEmissao = dataEmissaoRaw ? new Date(dataEmissaoRaw) : null;
     const valorTotal = valorTotalRaw ? parseFloat(valorTotalRaw) : 0;
 
-    // Verificar se a nota já foi importada (evitar duplicidade)
+
     if (numero) {
       const existeNfe = await prisma.nFeCompra.findFirst({
         where: {
@@ -119,7 +119,7 @@ export async function importNFeXML(formData: FormData) {
       }
     }
 
-    // Extrair os itens (grupo <det>)
+
     const detGroups = xmlText.split(/<det /i).slice(1);
     const itensNFe: NFeItemExtracted[] = [];
 
@@ -212,14 +212,14 @@ export async function mapItemToCatalog(nfeItemId: string, catalogItemId: string,
     const user = await getSession();
     if (!user || !user.ownerId) return { success: false, error: "Não autorizado." };
 
-    // 1. Atualizar a tabela NFeCompraItem
+
     const updatedItem = await prisma.nFeCompraItem.update({
       where: { id: nfeItemId },
       data: { itemId: catalogItemId }
     });
 
-    // 2. Salvar a associação para compras futuras
-    // Usa upsert para não criar duplicidade caso aconteça condição de corrida
+
+
     await prisma.itemFornecedor.upsert({
       where: {
         itemId_codigoFornecedor: {
@@ -234,20 +234,20 @@ export async function mapItemToCatalog(nfeItemId: string, catalogItemId: string,
       }
     });
 
-    // 3. Atualizar TODOS os itens de notas passadas que tinham esse código
-    // (Opcional, mas muito bom UX para o usuário)
+
+
     await prisma.nFeCompraItem.updateMany({
       where: {
         codigoFornecedor: codigoFornecedor,
-        nfeCompra: { ownerId: user.ownerId }, // apenas notas da loja
-        itemId: null // que ainda não estão mapeados
+        nfeCompra: { ownerId: user.ownerId },
+        itemId: null
       },
       data: {
         itemId: catalogItemId
       }
     });
 
-    // 4. Recalcular Custos
+
     await recalcularCustosItem(catalogItemId, user.ownerId);
 
     revalidatePath("/nfe-importacao");
@@ -263,7 +263,7 @@ export async function unmapItemFromCatalog(nfeItemId: string, catalogItemId: str
     const user = await getSession();
     if (!user || !user.ownerId) return { success: false, error: "Não autorizado." };
 
-    // 1. Remover a associação da tabela ItemFornecedor
+
     await prisma.itemFornecedor.deleteMany({
       where: {
         itemId: catalogItemId,
@@ -271,13 +271,13 @@ export async function unmapItemFromCatalog(nfeItemId: string, catalogItemId: str
       }
     });
 
-    // 2. Atualizar NFeCompraItem atual e remover o mapeamento
+
     const updatedItem = await prisma.nFeCompraItem.update({
       where: { id: nfeItemId },
       data: { itemId: null }
     });
 
-    // 3. (Opcional mas útil) Remover também das outras notas com o mesmo mapeamento errado
+
     await prisma.nFeCompraItem.updateMany({
       where: {
         codigoFornecedor: codigoFornecedor,
@@ -289,7 +289,7 @@ export async function unmapItemFromCatalog(nfeItemId: string, catalogItemId: str
       }
     });
 
-    // 4. Recalcular Custos
+
     await recalcularCustosItem(catalogItemId, user.ownerId);
 
     revalidatePath("/nfe-importacao");
@@ -306,7 +306,7 @@ export async function deleteNFeImport(id: string) {
     const user = await getSession();
     if (!user || !user.ownerId) return { success: false, error: "Não autorizado." };
 
-    // Buscar os itens mapeados antes de deletar a nota, para poder recalcular o custo deles
+
     const nfe = await prisma.nFeCompra.findUnique({
       where: { id: id, ownerId: user.ownerId },
       include: { itens: true }
@@ -326,7 +326,7 @@ export async function deleteNFeImport(id: string) {
       }
     });
 
-    // Recalcular custos dos itens afetados
+
     for (const itemId of Array.from(mappedItemIds)) {
       await recalcularCustosItem(itemId, user.ownerId);
     }

@@ -4,14 +4,14 @@ const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID;
 const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
 const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
 
-// Verificação de segurança para desenvolvimento
+
 if (!R2_ACCOUNT_ID || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY) {
   console.warn(
     "⚠️ AVISO: Credenciais do Cloudflare R2 não encontradas no .env",
   );
 }
 
-// Inicializa o cliente S3 apontando para o Cloudflare R2
+
 export const r2 = new S3Client({
   region: "auto",
   endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,

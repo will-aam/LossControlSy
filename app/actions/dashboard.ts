@@ -1,4 +1,4 @@
-// app/actions/dashboard.ts
+
 "use server";
 
 import { prisma } from "@/lib/prisma";
@@ -17,14 +17,14 @@ export async function getDashboardStats() {
     const inicioSemana = new Date(hoje);
     inicioSemana.setDate(hoje.getDate() - 7);
 
-    // O mês atual
+
     const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
 
-    // Pegamos a menor data (semana ou mês) para buscar todos os eventos de uma vez
+
     const dataMinima = inicioSemana < inicioMes ? inicioSemana : inicioMes;
 
-    // Busca no banco SOMENTE os campos que importam para os cálculos,
-    // e apenas do período necessário, ignorando rascunhos e rejeitados.
+
+
     const eventos = await prisma.evento.findMany({
       where: {
         ownerId: session.ownerId,
@@ -56,7 +56,7 @@ export async function getDashboardStats() {
       },
     });
 
-    // --- CÁLCULOS NO SERVIDOR ---
+
     const perdasHoje = { qtd: 0, custo: 0 };
     const perdasSemana = { qtd: 0, custo: 0 };
     const perdasMes = { qtd: 0, custo: 0, venda: 0 };
@@ -68,7 +68,7 @@ export async function getDashboardStats() {
     > = {};
     const tendenciaMap: Record<string, { custo: number; venda: number }> = {};
 
-    // Inicializa últimos 7 dias para o gráfico
+
     for (let i = 6; i >= 0; i--) {
       const d = new Date();
       d.setDate(d.getDate() - i);
@@ -76,7 +76,7 @@ export async function getDashboardStats() {
       tendenciaMap[diaKey] = { custo: 0, venda: 0 };
     }
 
-    // Processa os eventos
+
     eventos.forEach((ev) => {
       const dataEv = new Date(ev.dataHora);
       const quantidade = Number(ev.quantidade) || 0;
@@ -125,7 +125,7 @@ export async function getDashboardStats() {
       }
     });
 
-    // Formatações finais para os componentes
+
     const perdasPorCategoria = Object.entries(perdasPorCatMap)
       .map(([cat, val]) => ({ categoria: cat, custo: val }))
       .sort((a, b) => b.custo - a.custo)
@@ -148,7 +148,7 @@ export async function getDashboardStats() {
       }),
     );
 
-    // Devolvemos apenas os totais enxutos
+
     return {
       success: true,
       data: {
@@ -182,30 +182,30 @@ export async function getRealDashboardMetrics(diasIsoA: string[], diasIsoB: stri
     const minDate = new Date(`${minDateStr}T00:00:00Z`);
     const maxDate = new Date(`${maxDateStr}T23:59:59Z`);
 
-    // Fetch all catalog items
+
     const itens = await prisma.item.findMany({
       where: { ownerId: session.ownerId },
       select: { id: true, codigoInterno: true, nome: true, custo: true, precoVenda: true, categoria: { select: { nome: true } } }
     });
 
-    // Fetch NFEs for "XMLs importados" and their items for "chegou"
+
     const nfes = await prisma.nFeCompra.findMany({
       where: { ownerId: session.ownerId, dataEmissao: { gte: minDate, lte: maxDate } },
       include: { itens: true }
     });
 
-    // Fetch Vendas
+
     const vendas = await prisma.vendaDiaria.findMany({
       where: { ownerId: session.ownerId, data: { gte: minDate, lte: maxDate } },
       include: { itens: true }
     });
 
-    // Fetch Eventos
+
     const eventos = await prisma.evento.findMany({
       where: { ownerId: session.ownerId, dataHora: { gte: minDate, lte: maxDate }, status: { notIn: ["rascunho", "rejeitado"] } }
     });
 
-    // Grouping by Date -> ItemId
+
     const dailyData: Record<string, Record<string, { chegou: number, vendido: number, perdido: number, faturamentoReal: number }>> = {};
     const globalXmlCount: Record<string, number> = {};
 
@@ -214,7 +214,7 @@ export async function getRealDashboardMetrics(diasIsoA: string[], diasIsoB: stri
       globalXmlCount[d] = 0;
     }
 
-    // Populate NFEs
+
     for (const nfe of nfes) {
       if (!nfe.dataEmissao) continue;
       const dateStr = nfe.dataEmissao.toISOString().split("T")[0];
@@ -228,7 +228,7 @@ export async function getRealDashboardMetrics(diasIsoA: string[], diasIsoB: stri
       }
     }
 
-    // Populate Vendas
+
     for (const venda of vendas) {
       const dateStr = venda.data.toISOString().split("T")[0];
       if (!dailyData[dateStr]) continue;
@@ -240,7 +240,7 @@ export async function getRealDashboardMetrics(diasIsoA: string[], diasIsoB: stri
       }
     }
 
-    // Populate Eventos
+
     for (const evento of eventos) {
       if (!evento.itemId) continue;
       const dateStr = evento.dataHora.toISOString().split("T")[0];
@@ -250,7 +250,7 @@ export async function getRealDashboardMetrics(diasIsoA: string[], diasIsoB: stri
       dailyData[dateStr][evento.itemId].perdido += Number(evento.quantidade || 0);
     }
 
-    // Convert Item Map to base object
+
     const catalogMap: Record<string, any> = {};
     for (const item of itens) {
       catalogMap[item.id] = {
@@ -259,7 +259,7 @@ export async function getRealDashboardMetrics(diasIsoA: string[], diasIsoB: stri
         categoria: item.categoria?.nome || "Sem Categoria",
         custo: Number(item.custo || 0),
         precoVenda: Number(item.precoVenda || 0),
-        limitePerda: 0 // Will be calculated dynamically in UI with limiteGlobal
+        limitePerda: 0
       };
     }
 
@@ -298,7 +298,7 @@ export async function getRealDashboardMetrics(diasIsoA: string[], diasIsoB: stri
     const resA = buildLinhasParaDias(diasIsoA);
     const resB = buildLinhasParaDias(diasIsoB);
 
-    // Also build 'serie' data for charts
+
     const serie = diasIsoA.map((d, i) => {
       const dB = diasIsoB[i];
       let fatA = 0;

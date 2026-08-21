@@ -15,7 +15,7 @@ export async function getRelatorioGeral(
     const minDate = new Date(`${startDateStr}T00:00:00Z`);
     const maxDate = new Date(`${endDateStr}T23:59:59Z`);
 
-    // 1. Fetch Eventos (Perdas)
+
     const eventos = await prisma.evento.findMany({
       where: {
         ownerId: session.ownerId,
@@ -31,7 +31,7 @@ export async function getRelatorioGeral(
       orderBy: { dataHora: "desc" },
     });
 
-    // 2. Fetch Vendas
+
     const vendas = await prisma.vendaDiaria.findMany({
       where: {
         ownerId: session.ownerId,
@@ -46,14 +46,14 @@ export async function getRelatorioGeral(
       },
     });
 
-    // 3. Aggregate Data
-    // We want to combine this to get top items with Taxa de Perda
+
+
     const itemMap: Record<
       string,
       { item: any; qtdPerda: number; custoPerda: number; qtdVenda: number; faturamento: number }
     > = {};
 
-    // Process Eventos
+
     for (const ev of eventos) {
       if (!ev.item) continue;
       const itemId = ev.item.id;
@@ -64,7 +64,7 @@ export async function getRelatorioGeral(
       itemMap[itemId].custoPerda += Number(ev.custoSnapshot || 0) * Number(ev.quantidade);
     }
 
-    // Process Vendas
+
     for (const venda of vendas) {
       for (const vi of venda.itens) {
         if (!vi.item) continue;
@@ -77,13 +77,13 @@ export async function getRelatorioGeral(
       }
     }
 
-    // Convert to array and calculate Taxa de Perda
+
     const combinedItens = Object.values(itemMap).map((stat) => {
       let taxaPerda = 0;
       if (stat.faturamento > 0) {
         taxaPerda = (stat.custoPerda / stat.faturamento) * 100;
       } else if (stat.custoPerda > 0) {
-        taxaPerda = 100; // If there is loss but 0 sales, consider it 100%
+        taxaPerda = 100;
       }
 
       return {
@@ -95,8 +95,8 @@ export async function getRelatorioGeral(
     return {
       success: true,
       data: JSON.parse(JSON.stringify({
-        eventos, // Return raw events for the client side charts
-        combinedItens, // Return combined sales/losses for the Top Itens table
+        eventos,
+        combinedItens,
       })),
     };
   } catch (error) {

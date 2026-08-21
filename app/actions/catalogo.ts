@@ -1,14 +1,14 @@
-// app/actions/catalogo.ts
+
 "use server";
 
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { ItemUnidade } from "@prisma/client";
 import { Item } from "@/lib/types";
-import { getSession } from "@/lib/session"; // NOVO
+import { getSession } from "@/lib/session";
 import { recalcularCustosItem } from "./nfe-import";
 
-// Tipo para criação de item
+
 export type CreateItemData = {
   nome: string;
   codigoBarras?: string;
@@ -20,7 +20,7 @@ export type CreateItemData = {
   fotoUrl?: string;
 };
 
-// Helper de Unidade
+
 function parseUnidade(unidade: string): ItemUnidade {
   const u = unidade.toUpperCase();
   if (Object.values(ItemUnidade).includes(u as ItemUnidade)) {
@@ -29,21 +29,21 @@ function parseUnidade(unidade: string): ItemUnidade {
   return "UN";
 }
 
-// Helper para gerar código interno
+
 function generateInternalCode() {
   return `ITEM-${Math.floor(Math.random() * 1000000)
     .toString()
     .padStart(6, "0")}`;
 }
 
-// 1. Listar Itens (Filtrados por loja)
+
 export async function getItens() {
   const session = await getSession();
   if (!session) return { success: false, data: [] };
 
   try {
     const itens = await prisma.item.findMany({
-      where: { ownerId: session.ownerId }, // NOVO: Filtro de isolamento
+      where: { ownerId: session.ownerId },
       orderBy: { nome: "asc" },
       include: {
         categoria: true,
@@ -65,7 +65,7 @@ export async function getItens() {
   }
 }
 
-// 2. Criar Item
+
 export async function createItem(data: CreateItemData) {
   const session = await getSession();
   if (!session) return { success: false, message: "Não autorizado" };
@@ -75,7 +75,7 @@ export async function createItem(data: CreateItemData) {
   }
 
   try {
-    // Verifica Código de Barras apenas NA MESMA LOJA
+
     if (data.codigoBarras) {
       const existeCodigo = await prisma.item.findFirst({
         where: {
@@ -93,7 +93,7 @@ export async function createItem(data: CreateItemData) {
 
     let finalCodigoInterno = data.codigoInterno;
 
-    // Verifica Código Interno apenas NA MESMA LOJA
+
     if (finalCodigoInterno) {
       const existeInterno = await prisma.item.findFirst({
         where: {
@@ -122,7 +122,7 @@ export async function createItem(data: CreateItemData) {
         categoriaId: data.categoriaId,
         imagemUrl: data.fotoUrl || null,
         status: "ativo",
-        ownerId: session.ownerId, // NOVO: Amarra o item à loja
+        ownerId: session.ownerId,
       },
     });
 
@@ -134,13 +134,13 @@ export async function createItem(data: CreateItemData) {
   }
 }
 
-// 3. Atualizar Item
+
 export async function updateItem(id: string, data: Partial<CreateItemData>) {
   const session = await getSession();
   if (!session) return { success: false, message: "Não autorizado" };
 
   try {
-    // Validação de posse
+
     const itemExistente = await prisma.item.findUnique({ where: { id } });
     if (!itemExistente || itemExistente.ownerId !== session.ownerId) {
       return {
@@ -188,7 +188,7 @@ export async function updateItem(id: string, data: Partial<CreateItemData>) {
   }
 }
 
-// 4. Alternar Status
+
 export async function toggleItemStatus(id: string) {
   const session = await getSession();
   if (!session) return { success: false, message: "Não autorizado" };
@@ -216,7 +216,7 @@ export async function toggleItemStatus(id: string) {
   }
 }
 
-// 5. Deletar Item
+
 export async function deleteItem(id: string) {
   const session = await getSession();
   if (!session) return { success: false, message: "Não autorizado" };
@@ -230,7 +230,7 @@ export async function deleteItem(id: string) {
       };
     }
 
-    // Excluir as vendas (VendaItem) vinculadas a este item primeiro para evitar erro de chave estrangeira (foreign key constraint)
+
     await prisma.vendaItem.deleteMany({ where: { itemId: id } });
 
     await prisma.item.delete({ where: { id } });
@@ -243,7 +243,7 @@ export async function deleteItem(id: string) {
   }
 }
 
-// 6. IMPORTAÇÃO EM MASSA (AJUSTADA PARA MULTI-TENANT)
+
 export async function importarItens(itensImportados: Item[]) {
   const session = await getSession();
   if (!session) return { success: false, message: "Não autorizado" };
@@ -262,7 +262,7 @@ export async function importarItens(itensImportados: Item[]) {
         const catExistente = await prisma.categoria.findFirst({
           where: {
             nome: { equals: nomeCategoria, mode: "insensitive" },
-            ownerId: session.ownerId, // Busca apenas categorias da própria loja
+            ownerId: session.ownerId,
           },
         });
 
@@ -273,7 +273,7 @@ export async function importarItens(itensImportados: Item[]) {
             data: {
               nome: nomeCategoria,
               status: "ativa",
-              ownerId: session.ownerId, // Cria categoria vinculada à loja
+              ownerId: session.ownerId,
             },
           });
           categoriaId = novaCat.id;
@@ -281,11 +281,11 @@ export async function importarItens(itensImportados: Item[]) {
         categoriaCache.set(nomeCategoria, categoriaId);
       }
 
-      // Upsert agora precisa considerar o ownerId na chave única composta
+
       await prisma.item.upsert({
         where: {
           codigoInterno_ownerId: {
-            // NOVO: Usa a chave composta definida no schema
+
             codigoInterno: item.codigoInterno,
             ownerId: session.ownerId,
           },
@@ -306,7 +306,7 @@ export async function importarItens(itensImportados: Item[]) {
           unidade: parseUnidade(item.unidade),
           categoriaId: categoriaId,
           status: "ativo",
-          ownerId: session.ownerId, // Vincula à loja
+          ownerId: session.ownerId,
         },
       });
 
@@ -321,7 +321,7 @@ export async function importarItens(itensImportados: Item[]) {
   }
 }
 
-// 7. Obter Fornecedores (XML) vinculados ao Item
+
 export async function getItemFornecedores(itemId: string) {
   const session = await getSession();
   if (!session) return { success: false, data: [] };
@@ -330,7 +330,7 @@ export async function getItemFornecedores(itemId: string) {
     const fornecedores = await prisma.itemFornecedor.findMany({
       where: {
         itemId: itemId,
-        item: { ownerId: session.ownerId } // Garantir posse
+        item: { ownerId: session.ownerId }
       }
     });
 
@@ -341,7 +341,7 @@ export async function getItemFornecedores(itemId: string) {
   }
 }
 
-// 8. Desvincular Fornecedor (XML) do Item
+
 export async function deleteItemFornecedor(fornecedorId: string) {
   const session = await getSession();
   if (!session) return { success: false, message: "Não autorizado" };
@@ -358,7 +358,7 @@ export async function deleteItemFornecedor(fornecedorId: string) {
 
     await prisma.itemFornecedor.delete({ where: { id: fornecedorId } });
 
-    // Atualiza NFeCompraItem relacionados
+
     await prisma.nFeCompraItem.updateMany({
       where: {
         codigoFornecedor: fornecedor.codigoFornecedor,
@@ -378,7 +378,7 @@ export async function deleteItemFornecedor(fornecedorId: string) {
   }
 }
 
-// 9. Adicionar Fornecedor (XML) Manualmente ao Item
+
 export async function createItemFornecedor(itemId: string, codigoFornecedor: string) {
   const session = await getSession();
   if (!session) return { success: false, message: "Não autorizado" };
@@ -396,7 +396,7 @@ export async function createItemFornecedor(itemId: string, codigoFornecedor: str
       return { success: false, message: "Item não encontrado ou sem permissão." };
     }
 
-    // Usa upsert para não dar erro se já existir
+
     await prisma.itemFornecedor.upsert({
       where: {
         itemId_codigoFornecedor: {
@@ -411,12 +411,12 @@ export async function createItemFornecedor(itemId: string, codigoFornecedor: str
       }
     });
 
-    // Atualizar TODOS os itens de notas passadas que tinham esse código
+
     await prisma.nFeCompraItem.updateMany({
       where: {
         codigoFornecedor: codigoFornecedor,
-        nfeCompra: { ownerId: session.ownerId }, // apenas notas da loja
-        itemId: null // que ainda não estão mapeados
+        nfeCompra: { ownerId: session.ownerId },
+        itemId: null
       },
       data: {
         itemId: itemId
@@ -433,7 +433,7 @@ export async function createItemFornecedor(itemId: string, codigoFornecedor: str
   }
 }
 
-// 10. ATUALIZAÇÃO EM MASSA DE PREÇOS
+
 export async function atualizarPrecosLote(itensParaAtualizar: { codigoInterno: string; precoVenda: number }[]) {
   const session = await getSession();
   if (!session) return { success: false, message: "Não autorizado" };
@@ -441,7 +441,7 @@ export async function atualizarPrecosLote(itensParaAtualizar: { codigoInterno: s
   try {
     let count = 0;
     
-    // Process in a loop to find items by codigoInterno and ownerId, then update
+
     for (const item of itensParaAtualizar) {
       const dbItem = await prisma.item.findFirst({
         where: {

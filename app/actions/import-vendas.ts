@@ -105,10 +105,10 @@ export async function importVendasCSV(formData: FormData) {
           vendaDiariaCache[dateKey] = vendaDiariaId;
         }
 
-      } else { // mode === "isolado"
-        codItem = cols[2];           // C
-        qtdStr = cols[4];            // E
-        valLiquidoStr = cols[7];     // H
+      } else {
+        codItem = cols[2];
+        qtdStr = cols[4];
+        valLiquidoStr = cols[7];
 
         if (!codItem) continue;
         vendaDiariaId = vendaDiariaIdIsolado!;

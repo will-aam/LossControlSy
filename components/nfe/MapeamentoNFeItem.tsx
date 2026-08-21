@@ -80,7 +80,7 @@ export function MapeamentoNFeItem({
       "p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors",
       isPendente ? "bg-orange-500/5 hover:bg-orange-500/10" : "bg-transparent hover:bg-surface-2"
     )}>
-      {/* Dados do Fornecedor */}
+      {}
       <div className="flex-1">
         <div className="flex items-center gap-2 mb-1">
           {isPendente && (
@@ -100,7 +100,7 @@ export function MapeamentoNFeItem({
         </div>
       </div>
 
-      {/* Ação de Mapeamento */}
+      {}
       <div className="flex-shrink-0 w-full md:w-auto md:min-w-[300px]">
         {isMapping ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground p-2 border rounded-xl bg-surface opacity-70">

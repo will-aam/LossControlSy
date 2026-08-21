@@ -1,4 +1,4 @@
-// components/relatorios/details-tables.tsx
+
 "use client";
 
 import {
@@ -20,7 +20,7 @@ interface DetailsTablesProps {
 export function DetailsTables({ topItens, topMotivos }: DetailsTablesProps) {
   return (
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6 mt-6">
-      {/* Top Itens */}
+      {}
       <Card className="flex flex-col shadow-sm">
         <CardHeader className="px-4 md:px-6">
           <CardTitle className="text-lg md:text-xl flex items-center gap-2">
@@ -86,7 +86,7 @@ export function DetailsTables({ topItens, topMotivos }: DetailsTablesProps) {
         </CardContent>
       </Card>
 
-      {/* Top Motivos */}
+      {}
       <Card className="flex flex-col shadow-sm">
         <CardHeader className="px-4 md:px-6">
           <CardTitle className="text-lg md:text-xl flex items-center gap-2">

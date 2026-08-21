@@ -1,11 +1,11 @@
-// lib/session.ts
+
 import "server-only";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { UserRole } from "@prisma/client";
 import { createHash } from "crypto";
 
-// Força erro se não tiver secret em produção
+
 const secretKey = process.env.SESSION_SECRET;
 if (!secretKey) {
   throw new Error("A variável de ambiente SESSION_SECRET não está definida.");
@@ -19,7 +19,7 @@ export type SessionPayload = {
   role: UserRole;
   nome: string;
   avatarUrl?: string | null;
-  ownerId: string; // NOVO: Guarda o ID da Loja/Dono na sessão
+  ownerId: string;
   expiresAt: Date;
 };
 
@@ -29,7 +29,7 @@ export async function createSession(user: {
   role: UserRole;
   nome: string;
   avatarUrl?: string | null;
-  ownerId: string; // NOVO: Exige o ID da Loja/Dono ao criar a sessão
+  ownerId: string;
 }) {
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   const session = await new SignJWT({ ...user, expiresAt })
@@ -79,10 +79,10 @@ export async function verifyPassword(
   password: string,
   hash: string,
 ): Promise<boolean> {
-  // Se for um hash legado (SHA-256 tem 64 caracteres hexadecimais), tratamos temporariamente para não quebrar logins antigos, mas o ideal é resetar.
-  // Como estamos corrigindo a falha, vamos suportar a nova comparação.
+
+
   if (hash.length === 64 && !hash.startsWith("$2a$")) {
-     // Comparação legada INSEGURA (apenas para transição)
+
      const crypto = await import("crypto");
      const legacyHash = crypto.createHash("sha256").update(password).digest("hex");
      return legacyHash === hash;

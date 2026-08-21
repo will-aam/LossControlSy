@@ -81,7 +81,7 @@ export function EventosGrid({ lotes, onSelect, onToggleNfe }: EventosGridProps) 
             onClick={() => onSelect(lote)}
           >
             <div className="flex items-center gap-4">
-              {/* Ícone de NFe Emitida */}
+              {}
               <div
                 onClick={(e) => handleIconClick(e, lote)}
                 className={cn(

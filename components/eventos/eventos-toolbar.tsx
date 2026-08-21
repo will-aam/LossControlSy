@@ -1,4 +1,4 @@
-// componentes/eventos/eventos-toolbar.tsx
+
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -48,7 +48,7 @@ export function EventosToolbar({
   dateRange,
   setDateRange,
 }: EventosToolbarProps) {
-  // Componente interno para o filtro de data
+
   const DateFilter = () => (
     <Popover>
       <PopoverTrigger asChild>
@@ -122,7 +122,7 @@ export function EventosToolbar({
 
   return (
     <div className="flex flex-col gap-4 shrink-0">
-      {/* Linha Superior: Título */}
+      {}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">
@@ -134,9 +134,9 @@ export function EventosToolbar({
         </div>
       </div>
 
-      {/* Linha Inferior: Filtros */}
+      {}
       <div className="flex flex-col md:flex-row gap-3 items-end z-10 py-1">
-        {/* Busca Global */}
+        {}
         <div className="flex-1 w-full">
           <span className="text-xs font-medium mb-1.5 block text-muted-foreground ml-1">
             Buscar
@@ -152,7 +152,7 @@ export function EventosToolbar({
           </div>
         </div>
 
-        {/* Filtro de Status */}
+        {}
         <div className="w-full md:w-48">
           <span className="text-xs font-medium mb-1.5 block text-muted-foreground ml-1">
             Status
@@ -170,7 +170,7 @@ export function EventosToolbar({
           </Select>
         </div>
 
-        {/* Filtro de Data */}
+        {}
         <div className="w-full md:w-auto min-w-35">
           <span className="text-xs font-medium mb-1.5 block text-muted-foreground ml-1">
             Período
@@ -178,7 +178,7 @@ export function EventosToolbar({
           <DateFilter />
         </div>
 
-        {/* Botão Limpar */}
+        {}
         {(dateRange || globalSearch || statusFilter !== "todos") && (
           <Button
             variant="ghost"

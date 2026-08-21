@@ -60,7 +60,7 @@ export function UploadDialog({
 }: UploadDialogProps) {
   const [isUploading, setIsUploading] = useState(false);
 
-  // No modo detalhado/edição, é apenas 1 arquivo
+
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string>("");
 
@@ -74,7 +74,7 @@ export function UploadDialog({
   >([]);
   const [openEventos, setOpenEventos] = useState(false);
 
-  // Motivos (Select/Combobox)
+
   const [motivos, setMotivos] = useState<{ id: string; nome: string }[]>([]);
   const [selectedMotivo, setSelectedMotivo] = useState("");
   const [openMotivo, setOpenMotivo] = useState(false);
@@ -99,16 +99,16 @@ export function UploadDialog({
         }
       });
 
-      // 2. Carregar Motivos
+
       loadMotivos();
 
-      // 3. Preencher se for Edição
+
       if (editMode && initialData) {
         setPreview(initialData.url);
-        // Se já tem evento, seleciona
+
         if (initialData.evento) {
           setSelectedEventoId(initialData.evento.id);
-          // A data será atualizada pelo useEffect do selectedEventoId
+
         } else {
           setSelectedEventoId("none");
           setDate(new Date(initialData.dataUpload));
@@ -138,7 +138,7 @@ export function UploadDialog({
       const evento = eventosList.find((e) => e.id === selectedEventoId);
       if (evento) {
         setDate(evento.dataOriginal);
-        // Se não tiver motivo selecionado, tenta sugerir algo ou deixa vazio
+
         if (!selectedMotivo) setSelectedMotivo("Registro vinculado");
       }
     }
@@ -157,13 +157,13 @@ export function UploadDialog({
   };
 
   const handleSaveAction = async () => {
-    // Validação
+
     if (!editMode && !file) {
       toast.error("Selecione uma foto.");
       return;
     }
     if (selectedEventoId === "none" && !editMode) {
-      // No modo criação detalhada, evento é obrigatório segundo sua regra
+
       toast.error("Selecione um evento para vincular.");
       return;
     }
@@ -172,7 +172,7 @@ export function UploadDialog({
     toast.info(editMode ? "Atualizando..." : "Enviando...");
 
     try {
-      // 1. Processar Motivo (Criar se não existir)
+
       let motivoFinal = selectedMotivo.trim();
       if (motivoFinal) {
         const existe = motivos.find(
@@ -184,7 +184,7 @@ export function UploadDialog({
         }
       }
 
-      // 2. Preparar Imagem (apenas se for novo upload)
+
       let base64String = "";
       if (file) {
         base64String = await compressImage(file);
@@ -198,7 +198,7 @@ export function UploadDialog({
         eventoId: selectedEventoId === "none" ? undefined : selectedEventoId,
       });
 
-      // Limpeza (se não for fechar automático pelo pai)
+
       if (!editMode) {
         setFile(null);
         setPreview("");
@@ -228,7 +228,7 @@ export function UploadDialog({
         </DialogHeader>
 
         <div className="space-y-4 py-2">
-          {/* 1. SELEÇÃO DE EVENTO (Obrigatório na criação, Opcional na edição) */}
+          {}
           <div className="flex flex-col space-y-2">
             <Label>
               Evento / Perda <span className="text-red-500">*</span>
@@ -254,13 +254,13 @@ export function UploadDialog({
                   <CommandList>
                     <CommandEmpty>Nenhum evento encontrado.</CommandEmpty>
                     <CommandGroup>
-                      {/* Opção de "Sem Vínculo" apenas na edição ou se permitido */}
+                      {}
                       <CommandItem
                         value="none"
                         onSelect={() => {
                           setSelectedEventoId("none");
                           setOpenEventos(false);
-                          // Destrava a data para hoje
+
                           setDate(new Date());
                         }}
                       >
@@ -302,14 +302,14 @@ export function UploadDialog({
             </Popover>
           </div>
 
-          {/* 2. DATA (Automática do evento ou manual se avulso) */}
+          {}
           <div className="flex flex-col space-y-2">
             <Label>Data da Ocorrência</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant={"outline"}
-                  disabled={selectedEventoId !== "none"} // Trava se tiver evento
+                  disabled={selectedEventoId !== "none"}
                   className={cn(
                     "w-full justify-start text-left font-normal",
                     !date && "text-muted-foreground",
@@ -341,17 +341,17 @@ export function UploadDialog({
             )}
           </div>
 
-          {/* 3. FOTO (Preview ou Upload) */}
+          {}
           <div className="flex flex-col space-y-2">
             <Label>Evidência Fotográfica</Label>
 
-            {/* Área de Preview/Upload */}
+            {}
             <div
               className={cn(
                 "border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center cursor-pointer transition-colors relative overflow-hidden h-48",
                 !file && !preview ? "hover:bg-muted/50" : "border-primary/50",
               )}
-              onClick={() => !editMode && fileInputRef.current?.click()} // Só clica se não for edição (você disse "não trocar a foto")
+              onClick={() => !editMode && fileInputRef.current?.click()}
             >
               {preview ? (
                 <div className="relative w-full h-full flex items-center justify-center group">
@@ -378,7 +378,7 @@ export function UploadDialog({
                 </>
               )}
 
-              {/* Input escondido - desativado em modo edição */}
+              {}
               {!editMode && (
                 <input
                   type="file"
@@ -396,7 +396,7 @@ export function UploadDialog({
             )}
           </div>
 
-          {/* 4. MOTIVO (SELECT/COMBOBOX) */}
+          {}
           <div className="flex flex-col space-y-2">
             <Label>Motivo / Observação</Label>
             <Popover open={openMotivo} onOpenChange={setOpenMotivo}>
@@ -429,7 +429,7 @@ export function UploadDialog({
                           key={motivo.id}
                           value={motivo.nome}
                           onSelect={(currentValue) => {
-                            // Garante que pega o nome original com case correto
+
                             const original =
                               motivos.find(
                                 (m) =>

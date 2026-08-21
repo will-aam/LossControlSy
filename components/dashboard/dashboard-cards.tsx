@@ -53,7 +53,7 @@ export function DashboardCards({ stats }: { stats: DashboardStats }) {
     },
   ];
 
-  // Rotação automática (Mobile)
+
   useEffect(() => {
     const interval = setInterval(() => {
       setActiveCardIndex((prev) => (prev + 1) % 4);
@@ -63,7 +63,7 @@ export function DashboardCards({ stats }: { stats: DashboardStats }) {
 
   return (
     <>
-      {/* MOBILE: DECK */}
+      {}
       <div className="block md:hidden py-4 px-2">
         <div
           className="relative w-full h-40"
@@ -131,7 +131,7 @@ export function DashboardCards({ stats }: { stats: DashboardStats }) {
         </p>
       </div>
 
-      {/* DESKTOP: GRID */}
+      {}
       <div className="hidden md:grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {cardsData.map((card, index) => (
           <Card key={index} className={`border-l-4 ${card.borderColor}`}>

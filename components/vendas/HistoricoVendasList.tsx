@@ -40,7 +40,7 @@ export function HistoricoVendasList({ vendas }: { vendas: VendaResumo[] }) {
     return dateStr.includes(searchTerm);
   });
 
-  // Paginação
+
   const totalPages = Math.ceil(filteredVendas.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedVendas = filteredVendas.slice(startIndex, startIndex + itemsPerPage);
@@ -100,7 +100,7 @@ export function HistoricoVendasList({ vendas }: { vendas: VendaResumo[] }) {
           </div>
         ) : (
           <>
-            {/* Visualização em Tabela para Desktop */}
+            {}
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-sm text-left">
                 <thead className="bg-surface-2/50 text-muted-foreground border-b">
@@ -158,7 +158,7 @@ export function HistoricoVendasList({ vendas }: { vendas: VendaResumo[] }) {
               </table>
             </div>
 
-            {/* Visualização em Cards para Mobile */}
+            {}
             <div className="md:hidden flex flex-col gap-4 p-4 bg-background/50">
               {paginatedVendas.map((v) => (
                 <Link 
@@ -231,7 +231,7 @@ export function HistoricoVendasList({ vendas }: { vendas: VendaResumo[] }) {
         </div>
       )}
 
-      {/* Modal de Confirmação de Exclusão */}
+      {}
       <AlertDialog open={!!vendaToDelete} onOpenChange={(open) => !open && setVendaToDelete(null)}>
         <AlertDialogContent className="sm:max-w-md">
           <AlertDialogHeader>
@@ -245,7 +245,7 @@ export function HistoricoVendasList({ vendas }: { vendas: VendaResumo[] }) {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction 
               onClick={(e) => {
-                e.preventDefault(); // Impede fechar imediatamente, até o load terminar
+                e.preventDefault();
                 confirmDelete();
               }} 
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"

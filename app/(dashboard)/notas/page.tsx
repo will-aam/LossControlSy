@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { NotaFiscal } from "@/lib/types";
 import { formatCurrency, formatDate } from "@/lib/utils";
-// Actions
+
 import { getPresignedUploadUrl } from "@/app/actions/storage";
 import {
   getNotas,
@@ -84,36 +84,36 @@ import { PageHeader } from "@/components/PageHeader";
 export default function NotasFiscaisPage() {
   const { user, hasPermission } = useAuth();
   const [notas, setNotas] = useState<NotaFiscal[]>([]);
-  // Armazena datas únicas de lotes (YYYY-MM-DD)
+
   const [lotesDisponiveis, setLotesDisponiveis] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Estados de controle e UI
+
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [notaToDelete, setNotaToDelete] = useState<string | null>(null);
 
-  // Controle de Upload Rápido
+
   const quickUploadInputRef = useRef<HTMLInputElement>(null);
   const [quickUploadTarget, setQuickUploadTarget] = useState<{
     id: string;
     type: "xml" | "pdf";
   } | null>(null);
 
-  // Filtros e Paginação
+
   const [searchTerm, setSearchTerm] = useState("");
   const [orderBy, setOrderBy] = useState("date_desc");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Estados do formulário de upload (Nova Nota)
+
   const [xmlFile, setXmlFile] = useState<File | null>(null);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<Partial<NotaFiscal>>({});
-  // Vinculamos a uma DATA string (YYYY-MM-DD)
+
   const [selectedLoteDate, setSelectedLoteDate] = useState<string>("none");
 
-  // Carregar dados
+
   useEffect(() => {
     loadData();
   }, []);
@@ -121,7 +121,7 @@ export default function NotasFiscaisPage() {
   const loadData = async () => {
     setIsLoading(true);
 
-    // Carrega Notas
+
     const notasResult = await getNotas();
     if (notasResult.success && notasResult.data) {
       const mappedNotas: NotaFiscal[] = (notasResult.data as any[]).map(
@@ -134,7 +134,7 @@ export default function NotasFiscaisPage() {
           serie: n.serie,
           valorTotal: Number(n.valorTotal),
           dataEmissao: n.dataEmissao,
-          dataReferencia: n.dataReferencia, // Importante para depuração
+          dataReferencia: n.dataReferencia,
           cnpjEmitente: n.cnpjEmitente,
           chaveAcesso: n.chaveAcesso,
           xmlContent: n.xmlContent,
@@ -145,19 +145,19 @@ export default function NotasFiscaisPage() {
       setNotas(mappedNotas);
     }
 
-    // Carrega Eventos para extrair as Datas (Lotes)
+
     const eventosResult = await getEventos();
     if (eventosResult.success && eventosResult.data) {
       const datasSet = new Set<string>();
       (eventosResult.data as any[]).forEach((e) => {
         if (e.status !== "rascunho") {
-          // CORREÇÃO CRÍTICA: Usa 'en-CA' para garantir YYYY-MM-DD respeitando o fuso local do navegador
-          // Isso resolve o problema de 31/01 virar 01/02 na lista
+
+
           const dataIso = new Date(e.dataHora).toISOString().split("T")[0];
           datasSet.add(dataIso);
         }
       });
-      // Ordena decrescente
+
       setLotesDisponiveis(Array.from(datasSet).sort().reverse());
     }
     setIsLoading(false);
@@ -177,7 +177,7 @@ export default function NotasFiscaisPage() {
     return publicUrl;
   };
 
-  // Upload Rápido
+
   const handleQuickUploadClick = (id: string, type: "xml" | "pdf") => {
     setQuickUploadTarget({ id, type });
     if (quickUploadInputRef.current) {
@@ -235,9 +235,9 @@ export default function NotasFiscaisPage() {
     setPdfFile(pdf);
     setParsedData((prev) => ({ ...prev, ...data }));
 
-    // Tenta preencher a data do lote automaticamente
+
     if (data.dataEmissao) {
-      // CORREÇÃO CRÍTICA: Mesma lógica de leitura local para o auto-fill
+
       const dateObj = new Date(data.dataEmissao);
       const dataNota = dateObj.toISOString().split("T")[0];
 
@@ -268,15 +268,15 @@ export default function NotasFiscaisPage() {
         ? new Date(parsedData.dataEmissao)
         : undefined;
 
-      // === CORREÇÃO CRÍTICA NA HORA DE SALVAR ===
-      // Definimos a Data de Referência (Lote)
+
+
       let dataRef: Date | undefined = undefined;
 
       if (selectedLoteDate !== "none") {
-        // selectedLoteDate vem como "YYYY-MM-DD" (ex: 2024-02-02)
-        // Adicionamos "T12:00:00.000Z" para FORÇAR que seja Meio-Dia UTC.
-        // Isso evita que o fuso horário local altere o dia ao salvar no banco.
-        // O Banco vai receber exatamente dia 02 às 12h UTC.
+
+
+
+
         dataRef = new Date(`${selectedLoteDate}T12:00:00.000Z`);
       }
 
@@ -288,8 +288,8 @@ export default function NotasFiscaisPage() {
         cnpjEmitente: parsedData.cnpjEmitente,
         valorTotal: parsedData.valorTotal,
 
-        dataEmissao: dataFinalEmissao, // Data da nota (pode ser diferente do lote)
-        dataReferencia: dataRef, // Data do lote (usada para busca)
+        dataEmissao: dataFinalEmissao,
+        dataReferencia: dataRef,
         naturezaOperacao: parsedData.naturezaOperacao,
 
         chaveAcesso: parsedData.chaveAcesso,
@@ -339,15 +339,15 @@ export default function NotasFiscaisPage() {
 
     let href = urlOrContent;
 
-    // Se for URL http (R2), precisamos assinar
+
     if (urlOrContent.startsWith("http")) {
       toast.loading("Gerando link seguro...");
-      // A função getDownloadLink agora usa o novo getKeyFromUrl corrigido
+
       const signedUrl = await getDownloadLink(urlOrContent);
       toast.dismiss();
 
       if (signedUrl) {
-        // CORREÇÃO: Abre em nova guia direto
+
         window.open(signedUrl, "_blank");
         return;
       } else {
@@ -357,7 +357,7 @@ export default function NotasFiscaisPage() {
         return;
       }
     } else {
-      // Se for conteúdo XML texto (base64 ou raw), cria blob e abre
+
       const blob = new Blob([urlOrContent], { type: "text/xml" });
       href = URL.createObjectURL(blob);
       window.open(href, "_blank");
@@ -430,7 +430,7 @@ export default function NotasFiscaisPage() {
                     variant="outline"
                     onClick={() => setIsUploadOpen(false)}
                     disabled={isUploading}
-                    className="px-6" // Aumenta um pouco a largura para melhor clique
+                    className="px-6"
                   >
                     Cancelar
                   </Button>

@@ -22,7 +22,7 @@ export function formatQuantity(value: number | undefined | null) {
   }).format(value);
 }
 
-// --- CORREÇÃO APLICADA AQUI ---
+
 export function formatDate(dateString: string): string {
   if (!dateString) return "-";
   try {
@@ -30,15 +30,15 @@ export function formatDate(dateString: string): string {
       day: "2-digit",
       month: "2-digit",
       year: "numeric",
-      timeZone: "UTC", // <--- ISSO É ESSENCIAL PARA CORRIGIR O ERRO DE DATAS
+      timeZone: "UTC",
     }).format(new Date(dateString));
   } catch (e) {
     return dateString;
   }
 }
 
-// Para DATA E HORA, geralmente queremos ver no horário local do usuário,
-// então mantemos sem o 'timeZone: UTC' (ou adicionamos se você quiser hora UTC também).
+
+
 export function formatDateTime(dateString: string): string {
   if (!dateString) return "-";
   try {
@@ -48,14 +48,14 @@ export function formatDateTime(dateString: string): string {
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
-      // timeZone: "UTC", // <--- Deixe comentado se quiser ver a hora local (Brasília)
+
     }).format(new Date(dateString));
   } catch (e) {
     return dateString;
   }
 }
 
-// ... restante do arquivo (getStatusColor, getStatusLabel, etc) permanece igual ...
+
 export function getStatusColor(status: EventoStatus): string {
   const colors: Record<EventoStatus, string> = {
     rascunho: "bg-muted text-muted-foreground",
@@ -120,7 +120,7 @@ export function getKeyFromUrl(url: string): string | null {
   try {
     if (!url.startsWith("http")) return null;
     const urlObj = new URL(url);
-    let path = urlObj.pathname.substring(1); // remove a barra inicial
+    let path = urlObj.pathname.substring(1);
 
     if (urlObj.hostname.endsWith("r2.cloudflarestorage.com")) {
       const parts = path.split("/");

@@ -1,4 +1,4 @@
-// components/relatorios/charts-overview.tsx
+
 "use client";
 
 import {
@@ -34,7 +34,7 @@ export function ChartsOverview({
 }: ChartsOverviewProps) {
   return (
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 md:gap-6">
-      {/* Gráfico de Evolução (Linha/Barra) */}
+      {}
       <Card className="flex flex-col shadow-sm">
         <CardHeader className="px-4 md:px-6">
           <CardTitle className="text-lg md:text-xl">
@@ -47,7 +47,7 @@ export function ChartsOverview({
           </CardDescription>
         </CardHeader>
         <CardContent className="flex-1 px-2 md:px-6 pb-4">
-          {/* CORREÇÃO AQUI: Altura definida para 300px */}
+          {}
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart
@@ -132,7 +132,7 @@ export function ChartsOverview({
         </CardContent>
       </Card>
 
-      {/* Gráfico de Dia da Semana */}
+      {}
       <Card className="flex flex-col shadow-sm">
         <CardHeader className="px-4 md:px-6">
           <CardTitle className="text-lg md:text-xl">
@@ -143,7 +143,7 @@ export function ChartsOverview({
           </CardDescription>
         </CardHeader>
         <CardContent className="flex-1 px-2 md:px-6 pb-4">
-          {/* CORREÇÃO AQUI: Altura definida para 300px */}
+          {}
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart

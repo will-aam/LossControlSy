@@ -33,9 +33,9 @@ const categoryColors = [
 ];
 
 interface DashboardChartsProps {
-  // A série diária reagirá à data (diasA)
+
   serieDiaria: any[]; 
-  // A lista de produtos filtrados reagirá à busca e à data
+
   produtosFiltrados: any[]; 
 }
 
@@ -44,15 +44,15 @@ export function DashboardCharts({
   produtosFiltrados,
 }: DashboardChartsProps) {
   
-  // 1. Mapear série diária para o gráfico de tendência
-  // O gráfico espera 'dia', 'custo' (perda) e 'venda' (faturamento)
+
+
   const tendencia = serieDiaria.map(d => ({
     dia: d.dia,
     custo: d.Perda,
     venda: d.Faturamento
   }));
 
-  // 2. Calcular Top Categorias com base nos produtos filtrados (reage à busca!)
+
   const catMap: Record<string, number> = {};
   produtosFiltrados.forEach(p => {
     const perdaValor = p.perdido * p.custo;
@@ -83,7 +83,7 @@ export function DashboardCharts({
   return (
     <div className="h-full">
 
-      {/* Gráfico de Barras (Categorias) */}
+      {}
       <div className="rounded-xl bg-surface p-4 shadow-sm flex flex-col h-full">
         <div className="mb-3 flex items-baseline justify-between">
           <h2 className="text-[13px] font-medium flex items-center gap-1.5">

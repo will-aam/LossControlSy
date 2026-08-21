@@ -5,15 +5,6 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/*
- * Design system definition.
- *
- * The @theme inline block maps CSS custom properties to Tailwind utility
- * classes (e.g. --color-primary -> bg-primary, text-primary).
- *
- * The :root and .dark blocks define the actual color values using oklch.
- * All colors MUST use oklch format.
- */
 
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
@@ -119,8 +110,7 @@
     @apply font-sans;
   }
 
-  /* === SCROLLBARS INTERNAS (TABELAS, DIVS) === */
-  html,
+    html,
   body {
     scrollbar-width: none;
     -ms-overflow-style: none;
@@ -156,7 +146,6 @@
   }
 }
 
-/* === EFEITO GLASS (AZUL FOSCO MINIMALISTA) EM CARDS, SUPERFÍCIES E TABELAS === */
 .bg-surface,
 .bg-surface-2,
 .bg-surface-3,
@@ -164,15 +153,12 @@
 .card,
 [data-slot="card"] {
   background-color: rgba(37, 99, 235, 0.06) !important;
-  /* Azul fosco e bem suave (flat) */
-  backdrop-filter: blur(12px) !important;
+    backdrop-filter: blur(12px) !important;
   -webkit-backdrop-filter: blur(12px) !important;
   border: none !important;
   box-shadow: none !important;
-  /* Remove o efeito 3D / sombreado */
-}
+  }
 
-/* Aplicando na tabela e removendo linhas gerais */
 table {
   border-collapse: collapse !important;
 }
@@ -185,27 +171,21 @@ table td,
 }
 
 
-/* Linhas divisórias BEM suaves entre as linhas (rows) da tabela */
 table tr,
 [data-slot="table-row"] {
   border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
 }
 
-/* Remove a linha divisória do último item para ficar limpo no final do card */
 table tr:last-child,
 [data-slot="table-row"]:last-child {
   border-bottom: none !important;
 }
 
-/* Efeito de hover suave para linhas da tabela */
 table tbody tr:hover,
 [data-slot="table-row"]:hover {
   background-color: rgba(59, 130, 246, 0.1) !important;
 }
 
-/* 
-  Estilos de animação para a AIAssistant 
-*/
 @media (min-width: 768px) {
   @keyframes float {
     0% {

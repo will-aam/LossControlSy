@@ -1,10 +1,10 @@
-// lib/pdf-generator.ts
+
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { formatCurrency, formatDate } from "./utils";
 import { Evento } from "./types";
 
-// --- TIPOS ---
+
 interface ReportData {
   summary: {
     totalCusto: number;
@@ -17,7 +17,7 @@ interface ReportData {
   periodoTexto: string;
 }
 
-// --- CONFIGURAÇÕES VISUAIS (THEME) ---
+
 const COLORS = {
   primary: [79, 70, 229] as [number, number, number],
   secondary: [100, 116, 139] as [number, number, number],
@@ -32,12 +32,12 @@ const COLORS = {
 const COMPANY_NAME = "Jardins Delicatessen";
 const FOOTER_TEXT = "Relatório gerado automaticamente pelo sistema.";
 
-// --- HELPERS DE FORMATAÇÃO ---
+
 const formatQuantityPDF = (value: number) => {
   return value.toLocaleString("pt-BR", { maximumFractionDigits: 3 });
 };
 
-// --- HELPERS VISUAIS ---
+
 const addModernHeader = (doc: jsPDF, title: string, subtitle?: string) => {
   const pageWidth = doc.internal.pageSize.width;
 
@@ -108,7 +108,7 @@ const drawKpiCard = (
   return height;
 };
 
-// Melhoria: Adicionado "Total Pages" dinâmico
+
 const addFooter = (doc: jsPDF, pageNum: number, totalPages: number) => {
   const pageHeight = doc.internal.pageSize.height;
   const pageWidth = doc.internal.pageSize.width;
@@ -117,7 +117,7 @@ const addFooter = (doc: jsPDF, pageNum: number, totalPages: number) => {
   doc.setTextColor(...COLORS.secondary);
   doc.text(FOOTER_TEXT, 14, pageHeight - 10);
 
-  // Agora exibe ex: "Página 1 de 3"
+
   doc.text(
     `Página ${pageNum} de ${totalPages}`,
     pageWidth - 14,
@@ -131,7 +131,7 @@ const addFooter = (doc: jsPDF, pageNum: number, totalPages: number) => {
   doc.line(14, pageHeight - 15, pageWidth - 14, pageHeight - 15);
 };
 
-// --- 1. RELATÓRIO GERENCIAL (DASHBOARD) ---
+
 export const generateReportPDF = (data: ReportData) => {
   const doc = new jsPDF();
 
@@ -233,7 +233,7 @@ export const generateReportPDF = (data: ReportData) => {
     },
   });
 
-  // Removido o @ts-ignore usando casting no objeto interno do doc
+
   finalY = (doc as any).lastAutoTable.finalY + 15;
 
   if (finalY > 220) {
@@ -291,7 +291,7 @@ export const generateReportPDF = (data: ReportData) => {
     alternateRowStyles: { fillColor: COLORS.background },
   });
 
-  // A MÁGICA DO RODAPÉ AQUI: Roda em todas as páginas criadas no final
+
   const totalPages = (doc.internal as any).getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
@@ -301,7 +301,7 @@ export const generateReportPDF = (data: ReportData) => {
   doc.save(`relatorio_gerencial_${new Date().toISOString().split("T")[0]}.pdf`);
 };
 
-// --- 2. RELATÓRIO DE EVENTOS (LOTE/INDIVIDUAL) ---
+
 export const generateEventPDF = (
   eventos: Evento[],
   titulo: string = "Relatório de Lote",
@@ -406,7 +406,7 @@ export const generateEventPDF = (
   doc.line(120, signY, 190, signY);
   doc.text("Auditoria / Conferência", 155, signY + 5, { align: "center" });
 
-  // A MÁGICA DO RODAPÉ AQUI TAMBÉM
+
   const totalPages = (doc.internal as any).getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
     doc.setPage(i);
@@ -421,7 +421,7 @@ export const generateEventPDF = (
   doc.save(nomeArquivo);
 };
 
-// --- 3. RELATÓRIO DE EVOLUÇÃO ---
+
 export const generateEvolucaoPDF = (data: {
   historico: any[];
   produtoNome: string;

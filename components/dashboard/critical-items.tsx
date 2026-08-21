@@ -17,7 +17,7 @@ interface CriticalItemsProps {
 }
 
 export function CriticalItems({ itens }: CriticalItemsProps) {
-  // Pegamos apenas o Top 5 para não poluir
+
   const topItens = itens.slice(0, 5);
 
   return (
@@ -46,7 +46,7 @@ export function CriticalItems({ itens }: CriticalItemsProps) {
           <div className="divide-y divide-border">
             {topItens.map((entry, index) => {
               const custoPerda = entry.perdido * entry.custo;
-              // Para a barra visual, vamos usar a % de perda, limitando a 100% para evitar quebra de UI
+
               const pctVisual = Math.min(entry.perdaPct, 100);
 
               return (
@@ -82,7 +82,7 @@ export function CriticalItems({ itens }: CriticalItemsProps) {
                       </div>
                     </div>
                   </div>
-                  {/* Barra de Progresso Visual */}
+                  {}
                   <div className="mt-2 ml-11">
                     <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
                       <div

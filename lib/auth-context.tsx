@@ -1,4 +1,4 @@
-// lib/auth-context.tsx
+
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
@@ -13,9 +13,9 @@ import { getSettings } from "@/app/actions/configuracoes";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
-// --- Definição dos Menus (Sidebar) com Permissões Explicitas ---
+
 interface NavItemWithPermission extends NavItem {
-  permission: Permission; // Define qual permissão exata é necessária
+  permission: Permission;
 }
 
 const ALL_NAV_ITEMS: NavItemWithPermission[] = [
@@ -111,7 +111,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  // --- 1. Carregar Sessão ao Iniciar ---
+
   useEffect(() => {
     const initAuth = async () => {
       try {
@@ -135,11 +135,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initAuth();
   }, []);
 
-  // --- 2. Atualizar Menu quando Usuário/Settings mudar ---
+
   useEffect(() => {
     if (user) {
-      // É preciso criar a checagem com o state atual aqui,
-      // pois checkPermission usa o estado settings e user.
+
+
       const isAllowed = (permission: string) => {
         if (user.role === "dono") return true;
         if (settings?.permissoes && settings.permissoes[user.role]) {
@@ -149,7 +149,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
 
       const filteredNav = ALL_NAV_ITEMS.filter((item) => {
-        // Regra especial para Galeria (Funcionario depende de Config)
+
         if (item.href === "/galeria" && user.role === "funcionario") {
           const temPermissaoBase = isAllowed(item.permission);
           return (
@@ -166,7 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user, settings]);
 
-  // --- Ações de Auth ---
+
   const login = async (email: string, password?: string) => {
     setIsLoading(true);
     try {
@@ -187,9 +187,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await loadSettings();
         toast.success(`Bem-vindo, ${userData.nome.split(" ")[0]}!`);
 
-        // --- REDIRECIONAMENTO BASEADO NO CARGO ---
-        // Se for funcionário, manda para "Registrar Perda"
-        // Se for gestor/dono/fiscal, manda para "Dashboard"
+
+
+
         if (userData.role === "funcionario") {
           router.push("/eventos/novo");
         } else {
@@ -214,15 +214,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const checkPermission = (permission: string) => {
     if (!user) return false;
-    // Dono always has full access
+
     if (user.role === "dono") return true;
     
-    // Check custom permissions in settings
+
     if (settings?.permissoes && settings.permissoes[user.role]) {
       return settings.permissoes[user.role].includes(permission);
     }
     
-    // Fallback to defaults
+
     return hasPermission(user.role, permission as Permission);
   };
 

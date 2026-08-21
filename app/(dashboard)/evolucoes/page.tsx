@@ -23,7 +23,7 @@ import {
 } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent } from "@/components/ui/chart";
 
-// A mock function for generateEvolucaoPDF that we'll implement later
+
 import { generateEvolucaoPDF } from "@/lib/pdf-generator";
 
 const chartConfigPerda = {
@@ -40,7 +40,7 @@ export default function EvolucoesPage() {
   const [historico, setHistorico] = useState<any[]>([]);
   const [produtos, setProdutos] = useState<any[]>([]);
   
-  // Períodos customizados
+
   const hoje = new Date();
   const mesAnterior = new Date();
   mesAnterior.setMonth(hoje.getMonth() - 1);
@@ -55,7 +55,7 @@ export default function EvolucoesPage() {
   const [produtoId, setProdutoId] = useState<string>("todos");
   const [comboOpen, setComboOpen] = useState(false);
   
-  // Limite esperado de perda (%)
+
   const META_PERDA = 2;
 
   useEffect(() => {
@@ -113,7 +113,7 @@ export default function EvolucoesPage() {
       </PageHeader>
 
       <main className="flex-1 space-y-6 px-4 py-5 md:px-8 md:py-6 overflow-y-auto">
-        {/* FILTROS */}
+        {}
         <div className="flex flex-col sm:flex-row gap-4 mb-6">
           <div className="flex-1 max-w-sm">
             <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 block">
@@ -193,7 +193,7 @@ export default function EvolucoesPage() {
           </div>
         </div>
 
-        {/* LOADING & EMPTY STATE */}
+        {}
         {isLoading ? (
           <div className="flex flex-col items-center justify-center min-h-[40vh] gap-4">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -207,7 +207,7 @@ export default function EvolucoesPage() {
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
-            {/* GRÁFICO 1: TAXA DE PERDA */}
+            {}
             <Card className="shadow-sm">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg">Taxa de Perda Histórica (%)</CardTitle>
@@ -253,7 +253,7 @@ export default function EvolucoesPage() {
               </CardContent>
             </Card>
 
-            {/* GRÁFICO 2: FATURAMENTO VS PERDA */}
+            {}
             <Card className="shadow-sm">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg">Faturamento vs Perda (R$)</CardTitle>
@@ -293,7 +293,7 @@ export default function EvolucoesPage() {
               </CardContent>
             </Card>
 
-            {/* TABELA DE DETALHAMENTO (OCUPA LARGURA TOTAL) */}
+            {}
             <Card className="shadow-sm lg:col-span-2">
               <CardHeader className="pb-2">
                 <CardTitle className="text-lg">Detalhamento Financeiro</CardTitle>

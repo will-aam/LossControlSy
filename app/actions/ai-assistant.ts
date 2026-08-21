@@ -4,7 +4,7 @@ import { GoogleGenAI, Type, Tool } from "@google/genai";
 import { prisma } from "@/lib/prisma";
 import { requireServerPermission } from "@/lib/server-permissions";
 
-// Palavras-chave para detectar uma saudação simples
+
 const GREETINGS = ["oi", "olá", "ola", "tudo bem", "bom dia", "boa tarde", "boa noite", "fala ai", "oii", "hello", "hi"];
 
 export async function askAssistant(userMessage: string) {
@@ -21,7 +21,7 @@ export async function askAssistant(userMessage: string) {
 
     const msgLower = userMessage.trim().toLowerCase();
     
-    // --- OPÇÃO 1: Short-Circuit para Saudações (Resposta Imediata sem BD) ---
+
     if (msgLower.length < 20 && GREETINGS.some(g => msgLower.includes(g))) {
       const ai = new GoogleGenAI({ apiKey });
       const response = await ai.models.generateContent({
@@ -34,11 +34,11 @@ export async function askAssistant(userMessage: string) {
       return { success: true, text: response.text };
     }
 
-    // --- OPÇÃO 2: Resumo Agregado Rápido (Redução de 99% do tamanho do payload) ---
-    const dateLimit = new Date();
-    dateLimit.setMonth(dateLimit.getMonth() - 1); // Últimos 30 dias
 
-    // O Promise.all agora faz apenas agregações leves, que retornam números ao invés de milhares de registros.
+    const dateLimit = new Date();
+    dateLimit.setMonth(dateLimit.getMonth() - 1);
+
+
     const [totalItens, totalCategorias, perdasAggregate, vendasAggregate] = await Promise.all([
       prisma.item.count({ where: { ownerId: session.ownerId, status: "ativo" } }),
       prisma.categoria.count({ where: { ownerId: session.ownerId, status: "ativa" } }),
@@ -56,7 +56,7 @@ export async function askAssistant(userMessage: string) {
       resumo_rapido: `A loja possui ${totalItens} itens ativos e ${totalCategorias} categorias. Nos últimos 30 dias, ocorreram ${perdasAggregate._count.id} registros de perdas e importamos vendas em ${vendasAggregate} dias diferentes.`
     };
 
-    // --- OPÇÃO 3: Ferramentas (Function Calling) ---
+
     const tools: Tool[] = [{
       functionDeclarations: [
         {
@@ -108,7 +108,7 @@ ${JSON.stringify(contextData)}
 
     let response = await chat.sendMessage({ message: userMessage });
 
-    // Loop de execução de funções caso a IA decida chamar alguma ferramenta
+
     if (response.functionCalls && response.functionCalls.length > 0) {
       const calls = response.functionCalls;
       const functionResponses = [];
@@ -116,7 +116,7 @@ ${JSON.stringify(contextData)}
       for (const call of calls) {
          if (call.name === "buscarTopPerdas") {
            const args = call.args as any;
-           const limit = Math.min(Number(args?.limite) || 5, 20); // max 20
+           const limit = Math.min(Number(args?.limite) || 5, 20);
            
            const perdas = await prisma.evento.findMany({
               where: { ownerId: session.ownerId, status: { notIn: ["rascunho", "rejeitado"] } },
@@ -158,7 +158,7 @@ ${JSON.stringify(contextData)}
          }
       }
 
-      // Envia as respostas das funções de volta para a IA analisar
+
       if (functionResponses.length > 0) {
         response = await chat.sendMessage({ message: functionResponses as any });
       }

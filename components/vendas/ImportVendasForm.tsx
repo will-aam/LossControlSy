@@ -13,8 +13,8 @@ import { toast } from "sonner";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-const COLUNAS_LOTE = [0, 1, 2, 5, 8]; // A(Data), B(Cód), C(Desc), F(Qtd), I(ValLíq)
-const COLUNAS_ISOLADO = [0, 2, 3, 4, 7]; // A(CódSub), C(Cód), D(Desc), E(Qtd), H(ValLíq)
+const COLUNAS_LOTE = [0, 1, 2, 5, 8];
+const COLUNAS_ISOLADO = [0, 2, 3, 4, 7];
 
 type ImportMode = "lote" | "isolado";
 
@@ -169,9 +169,9 @@ export function ImportVendasForm() {
           </TabsList>
         </div>
 
-        {/* ========================================================= */}
-        {/* TAB 1: MÚLTIPLOS DIAS (LOTE) */}
-        {/* ========================================================= */}
+        {}
+        {}
+        {}
         <TabsContent value="lote" className="space-y-6 mt-0">
           <div className="bg-surface border rounded-2xl p-6 shadow-sm flex flex-col space-y-4">
             <div className="flex items-center gap-3">
@@ -187,7 +187,7 @@ export function ImportVendasForm() {
             <div className="pt-2 flex-1 flex flex-col">
               <div className="relative border-2 border-dashed rounded-xl p-6 flex flex-col items-center justify-center text-center hover:bg-surface-2 transition-colors min-h-[160px]">
                 <input
-                  key={mode} // force re-render when switching tabs to clear input
+                  key={mode}
                   type="file"
                   accept=".csv"
                   onChange={handleFileChange}
@@ -213,9 +213,9 @@ export function ImportVendasForm() {
         </TabsContent>
 
 
-        {/* ========================================================= */}
-        {/* TAB 2: DIA ÚNICO (ISOLADO) */}
-        {/* ========================================================= */}
+        {}
+        {}
+        {}
         <TabsContent value="isolado" className="space-y-6 mt-0">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="bg-surface border rounded-2xl p-6 shadow-sm flex flex-col space-y-4">
@@ -300,7 +300,7 @@ export function ImportVendasForm() {
       </Tabs>
 
 
-      {/* Preview Section (Comum para os dois modos) */}
+      {}
       {csvPreview && (
         <div className="bg-surface border rounded-2xl p-6 shadow-sm space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="flex items-start justify-between">
@@ -322,7 +322,7 @@ export function ImportVendasForm() {
 
           <div className={`grid grid-cols-1 ${mode === 'lote' ? 'md:grid-cols-2' : ''} gap-4 pb-2`}>
             
-            {/* Tabela de Resumo (APENAS MODO LOTE) */}
+            {}
             {mode === "lote" && (
               <div className="border rounded-xl overflow-hidden shadow-sm bg-background flex flex-col">
                 <div className="bg-muted px-4 py-2 font-semibold text-sm border-b">
@@ -353,7 +353,7 @@ export function ImportVendasForm() {
               </div>
             )}
 
-            {/* Tabela de Amostra CSV */}
+            {}
             <div className="border rounded-xl overflow-hidden shadow-sm bg-background flex flex-col">
               <div className="bg-muted px-4 py-2 font-semibold text-sm border-b flex justify-between">
                 <span>Amostra das Linhas (Preview)</span>
@@ -417,7 +417,7 @@ export function ImportVendasForm() {
         </div>
       )}
 
-      {/* Botão de Submit */}
+      {}
       <div className="flex justify-end pt-2">
         <Button
           size="lg"

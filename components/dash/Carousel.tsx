@@ -1,6 +1,5 @@
 import { useRef, useState, type ReactNode } from "react";
 
-/** Carrossel manual (scroll-snap) no mobile; no desktop vira grade. */
 export function Carousel({ children, gridClass }: { children: ReactNode[]; gridClass: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [ativo, setAtivo] = useState(0);

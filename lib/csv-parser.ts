@@ -1,5 +1,5 @@
-// lib/csv-parser.ts
-import { Item } from "@/lib/types"; // Importação corrigida
+
+import { Item } from "@/lib/types";
 
 export async function parseItemsCSV(file: File): Promise<Item[]> {
   return new Promise((resolve, reject) => {
@@ -12,7 +12,7 @@ export async function parseItemsCSV(file: File): Promise<Item[]> {
         return;
       }
 
-      // Divide por quebra de linha (suporta Windows \r\n e Unix \n)
+
       const lines = text.split(/\r?\n/).filter((line) => line.trim() !== "");
       const newItems: Item[] = [];
 
@@ -32,9 +32,9 @@ export async function parseItemsCSV(file: File): Promise<Item[]> {
         // Função para converter valores monetários BR (ex: "1.200,50" ou "1,624375")
         const parseMoney = (val: string) => {
           if (!val) return 0;
-          // 1. Remove R$ e espaços
-          // 2. Remove pontos de milhar (apenas se houver vírgula depois)
-          // 3. Troca a vírgula decimal por ponto
+
+
+
           const cleanVal = val
             .replace("R$", "")
             .trim()
@@ -51,18 +51,18 @@ export async function parseItemsCSV(file: File): Promise<Item[]> {
           ? (rawUnidade as Item["unidade"])
           : "UN";
 
-        // Mapeamento exato para o arquivo itens-gama-jardins.csv
+
         const item: Item = {
           id: Math.random().toString(36).substr(2, 9),
-          // Coluna 0: cod_item
+
           codigoInterno: cols[0]?.trim() || `IMP-${i}`,
-          // Coluna 1: des_item
+
           nome: cols[1]?.trim().toUpperCase() || "ITEM SEM NOME",
-          // Coluna 2: categoria
-          categoria: cols[2]?.trim().replace(/^\*/, "") || "Geral", // Remove asterisco se tiver (ex: *PADARIA)
-          // Coluna 3: sgl_unidade
+
+          categoria: cols[2]?.trim().replace(/^\*/, "") || "Geral",
+
           unidade: unidadeValida,
-          // Coluna 4: cod_barra (Se vazio, usa o código interno ou vazio)
+
           codigoBarras: cols[4]?.trim() || "",
           // Coluna 5: val_custo_unitario
           custo: parseMoney(cols[5]),

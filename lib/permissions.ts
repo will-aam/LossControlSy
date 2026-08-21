@@ -1,9 +1,9 @@
-// lib/permissions.ts
-// RBAC - Role Based Access Control
+
+
 import { UserRole } from "./types";
 
 export type Permission =
-  // Eventos
+
   | "eventos:criar"
   | "eventos:ver_todos"
   | "eventos:aprovar"
@@ -12,13 +12,13 @@ export type Permission =
   | "eventos:excluir"
   | "eventos:menu"
 
-  // Motivos
+
   | "motivos:ver"
   | "motivos:criar"
   | "motivos:editar"
   | "motivos:excluir"
 
-  // Catálogo
+
   | "catalogo:ver"
   | "catalogo:criar"
   | "catalogo:editar"
@@ -26,23 +26,23 @@ export type Permission =
   | "catalogo:importar"
   | "catalogo:excluir"
 
-  // Categorias
+
   | "categorias:ver"
   | "categorias:criar"
   | "categorias:editar"
   | "categorias:excluir"
 
-  // Galeria
+
   | "galeria:ver"
   | "galeria:upload"
   | "galeria:excluir"
 
-  // Notas Fiscais
+
   | "notas:ver"
   | "notas:upload"
   | "notas:excluir"
 
-  // Outros
+
   | "relatorios:ver"
   | "evolucoes:ver"
   | "vendas:ver"

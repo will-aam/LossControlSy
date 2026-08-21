@@ -1,4 +1,4 @@
-// app/actions/galeria.ts
+
 "use server";
 
 import { prisma } from "@/lib/prisma";
@@ -8,13 +8,13 @@ import { r2 } from "@/lib/r2";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { randomUUID } from "crypto";
 
-// Função helper de upload para o R2
+
 async function uploadToR2(base64Image: string): Promise<string | null> {
   try {
     const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
 
-    // Validação de segurança: Magic Bytes
+
     const header = buffer.toString("hex", 0, 4).toUpperCase();
     let contentType = "";
     let extension = "";
@@ -102,7 +102,7 @@ export async function getEvidencias() {
   }
 }
 
-// 2. Criar Evidência
+
 export async function createEvidenciaAvulsa(data: {
   url: string;
   motivo?: string;
@@ -127,7 +127,7 @@ export async function createEvidenciaAvulsa(data: {
         motivo: data.motivo || "Upload Galeria",
         dataUpload: dataFinal,
         userId: session.id,
-        ownerId: session.ownerId, // NOVO: Amarra a foto à loja
+        ownerId: session.ownerId,
         eventoId: data.eventoId || null,
       },
     });
@@ -140,13 +140,13 @@ export async function createEvidenciaAvulsa(data: {
   }
 }
 
-// 3. Excluir Evidência (Com validação de posse)
+
 export async function deleteEvidencia(id: string) {
   const session = await getSession();
   if (!session) return { success: false, message: "Não autorizado" };
 
   try {
-    // Verifica se a foto pertence à loja
+
     const evidencia = await prisma.evidencia.findUnique({ where: { id } });
     if (!evidencia || evidencia.ownerId !== session.ownerId) {
       return {
@@ -163,14 +163,14 @@ export async function deleteEvidencia(id: string) {
   }
 }
 
-// 4. Buscar Eventos para Vínculo (Filtrados por loja)
+
 export async function buscarEventosParaVinculo() {
   const session = await getSession();
   if (!session) return { success: false, data: [] };
 
   try {
     const eventos = await prisma.evento.findMany({
-      where: { ownerId: session.ownerId }, // NOVO: Só permite vincular a eventos da própria loja
+      where: { ownerId: session.ownerId },
       take: 50,
       orderBy: { dataHora: "desc" },
       include: {
@@ -193,7 +193,7 @@ export async function buscarEventosParaVinculo() {
   }
 }
 
-// 5. Atualizar Evidência (Com validação de posse)
+
 export async function updateEvidencia(
   id: string,
   data: {
@@ -206,7 +206,7 @@ export async function updateEvidencia(
   if (!session) return { success: false, message: "Não autorizado" };
 
   try {
-    // Verifica posse
+
     const evidencia = await prisma.evidencia.findUnique({ where: { id } });
     if (!evidencia || evidencia.ownerId !== session.ownerId) {
       return {

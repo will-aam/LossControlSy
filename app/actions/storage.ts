@@ -1,4 +1,4 @@
-// app/actions/storage.ts
+
 "use server";
 
 import { r2 } from "@/lib/r2";
@@ -12,21 +12,18 @@ import { randomUUID } from "crypto";
 
 const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME;
 
-/**
- * Gera URL para Upload (PUT) com isolamento por LOJA (ownerId)
- */
 export async function getPresignedUploadUrl(
   fileName: string,
   contentType: string,
-  ownerId: string, // NOVO: Agora o ownerId é obrigatório para organizar as pastas
+  ownerId: string,
   folder: string = "geral",
 ) {
   if (!R2_BUCKET_NAME) {
     throw new Error("R2_BUCKET_NAME não definido no .env");
   }
 
-  // ESTRUTURA MULTI-TENANT: "ID_DA_LOJA/pasta/uuid-nome.ext"
-  // Isso garante que os arquivos de cada loja fiquem em "gavetas" separadas no R2
+
+
   const uniqueFileName = `${ownerId}/${folder}/${randomUUID()}-${fileName.replace(/\s+/g, "_")}`;
 
   const command = new PutObjectCommand({
@@ -37,7 +34,7 @@ export async function getPresignedUploadUrl(
 
   const signedUrl = await getSignedUrl(r2, command, { expiresIn: 3600 });
 
-  // Constrói a URL pública baseada no domínio configurado
+
   const publicDomain = process.env.R2_PUBLIC_DOMAIN?.replace(/\/$/, "");
   const publicUrl = `${publicDomain}/${uniqueFileName}`;
 

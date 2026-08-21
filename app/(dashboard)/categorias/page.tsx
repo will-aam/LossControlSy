@@ -13,9 +13,9 @@ export default function CategoriasPage() {
       />
       <main className="flex-1 space-y-6 px-4 py-5 md:px-8 md:py-6 overflow-y-auto">
 
-        {/* Área de Conteúdo */}
+        {}
         <div className="space-y-6">
-          {/* Card Explicativo (Estilo do Exemplo) */}
+          {}
           <div className="bg-muted/30 p-4 rounded-lg border-l-4 border-l-primary/50 flex flex-col gap-1">
             <h3 className="font-semibold text-sm flex items-center gap-2">
               <FolderTree className="h-4 w-4" /> Gestão de Categorias
@@ -26,7 +26,7 @@ export default function CategoriasPage() {
             </p>
           </div>
 
-          {/* O Gerenciador Real */}
+          {}
           <CategoriesManager />
         </div>
       </main>

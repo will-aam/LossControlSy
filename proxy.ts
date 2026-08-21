@@ -13,7 +13,7 @@ const publicRoutes = ["/login", "/public"];
 export async function proxy(req: NextRequest) {
   const path = req.nextUrl.pathname;
 
-  // 1. Verificação extra para arquivos estáticos na raiz (caso o matcher deixe passar algo)
+
   if (
     path.endsWith(".png") ||
     path.endsWith(".jpg") ||
@@ -24,15 +24,15 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // 2. Verificar se é rota pública
+
   const isPublicRoute = publicRoutes.some(
     (route) => path === route || path.startsWith(route),
   );
 
-  // 3. Ler o Cookie de Sessão
+
   const session = req.cookies.get("session_token")?.value;
 
-  // 4. Validar Sessão e obter o CARGO do usuário
+
   let isAuthenticated = false;
   let userRole = "";
 
@@ -45,23 +45,23 @@ export async function proxy(req: NextRequest) {
       isAuthenticated = true;
       userRole = payload.role as string;
     } catch (error) {
-      // Token inválido ou expirado
+
     }
   }
 
-  // CENÁRIO A: Usuário NÃO logado tentando acessar rota protegida
+
   if (!isPublicRoute && !isAuthenticated) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  // CENÁRIO B: Usuário JÁ logado tentando acessar Login
+
   if (path === "/login" && isAuthenticated) {
-    // SE FOR FUNCIONÁRIO: Manda para Registrar Perda (pois não tem acesso ao dashboard)
+
     if (userRole === "funcionario") {
       return NextResponse.redirect(new URL("/eventos/novo", req.url));
     }
 
-    // OUTROS (Gestor, Dono, Fiscal): Mandam para o Dashboard
+
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
@@ -69,7 +69,7 @@ export async function proxy(req: NextRequest) {
 }
 
 export const config = {
-  // Mantive o matcher otimizado que definimos antes
+
   matcher: [
     "/((?!api|_next/static|_next/image|favicon.ico|sw.js|sw.js.map|manifest.json|.*\\.png$|.*\\.svg$).*)",
   ],

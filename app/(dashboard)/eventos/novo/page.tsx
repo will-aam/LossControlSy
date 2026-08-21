@@ -1,4 +1,4 @@
-// app/(dashboard)/eventos/novo/page.tsx
+
 "use client";
 
 import { useState, useEffect, useRef } from "react";
@@ -29,7 +29,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { ItemSearch } from "@/components/forms/item-search";
 import { Item } from "@/lib/types";
-import { formatCurrency, compressImage } from "@/lib/utils"; // <--- Importei compressImage
+import { formatCurrency, compressImage } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useAuth } from "@/lib/auth-context";
@@ -497,7 +497,7 @@ export default function EventoForm() {
             </Table>
           </div>
 
-          {/* Mobile Cards */}
+          {}
           <div className="md:hidden flex-1 flex flex-col gap-2 py-2 overflow-y-auto">
             {itemsList.length > 0 ? (
               itemsList.map((entry) => (
