@@ -7,9 +7,10 @@ import { createHash } from "crypto";
 
 // Força erro se não tiver secret em produção
 const secretKey = process.env.SESSION_SECRET;
-const encodedKey = new TextEncoder().encode(
-  secretKey || "default-dev-secret-key-change-me", // <--- TEM QUE SER IGUAL AO MIDDLEWARE
-);
+if (!secretKey) {
+  throw new Error("A variável de ambiente SESSION_SECRET não está definida.");
+}
+const encodedKey = new TextEncoder().encode(secretKey);
 const COOKIE_NAME = "session_token";
 
 export type SessionPayload = {
@@ -67,14 +68,24 @@ export async function deleteSession() {
   cookieStore.delete(COOKIE_NAME);
 }
 
+import bcrypt from "bcryptjs";
+
 export async function hashPassword(password: string): Promise<string> {
-  return createHash("sha256").update(password).digest("hex");
+  const salt = await bcrypt.genSalt(10);
+  return bcrypt.hash(password, salt);
 }
 
 export async function verifyPassword(
   password: string,
   hash: string,
 ): Promise<boolean> {
-  const newHash = await hashPassword(password);
-  return newHash === hash;
+  // Se for um hash legado (SHA-256 tem 64 caracteres hexadecimais), tratamos temporariamente para não quebrar logins antigos, mas o ideal é resetar.
+  // Como estamos corrigindo a falha, vamos suportar a nova comparação.
+  if (hash.length === 64 && !hash.startsWith("$2a$")) {
+     // Comparação legada INSEGURA (apenas para transição)
+     const crypto = await import("crypto");
+     const legacyHash = crypto.createHash("sha256").update(password).digest("hex");
+     return legacyHash === hash;
+  }
+  return bcrypt.compare(password, hash);
 }

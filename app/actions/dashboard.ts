@@ -3,10 +3,14 @@
 
 import { prisma } from "@/lib/prisma";
 
-import { getSession } from "@/lib/session";
+import { requireServerPermission } from "@/lib/server-permissions";
 
 export async function getDashboardStats() {
   try {
+    const auth = await requireServerPermission("dashboard:ver");
+    if (!auth.success) return { success: false, error: auth.message };
+    const session = auth.session;
+
     const hoje = new Date();
     const inicioHoje = new Date(hoje.setHours(0, 0, 0, 0));
 
@@ -23,6 +27,7 @@ export async function getDashboardStats() {
     // e apenas do período necessário, ignorando rascunhos e rejeitados.
     const eventos = await prisma.evento.findMany({
       where: {
+        ownerId: session.ownerId,
         dataHora: {
           gte: dataMinima,
         },
@@ -163,10 +168,9 @@ export async function getDashboardStats() {
 
 export async function getRealDashboardMetrics(diasIsoA: string[], diasIsoB: string[]) {
   try {
-    const session = await getSession();
-    if (!session || !session.ownerId) {
-      return { success: false, error: "Usuário não autenticado." };
-    }
+    const auth = await requireServerPermission("dashboard:ver");
+    if (!auth.success) return { success: false, error: auth.message };
+    const session = auth.session;
 
     const allDias = [...new Set([...diasIsoA, ...diasIsoB])].sort();
     if (allDias.length === 0) {

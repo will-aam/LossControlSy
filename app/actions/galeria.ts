@@ -14,7 +14,23 @@ async function uploadToR2(base64Image: string): Promise<string | null> {
     const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
     const buffer = Buffer.from(base64Data, "base64");
 
-    const fileName = `galeria/${randomUUID()}.jpg`;
+    // Validação de segurança: Magic Bytes
+    const header = buffer.toString("hex", 0, 4).toUpperCase();
+    let contentType = "";
+    let extension = "";
+
+    if (header.startsWith("FFD8FF")) {
+      contentType = "image/jpeg";
+      extension = "jpg";
+    } else if (header === "89504E47") {
+      contentType = "image/png";
+      extension = "png";
+    } else {
+      console.error("Upload rejeitado: O arquivo enviado não é uma imagem JPEG ou PNG válida.");
+      return null;
+    }
+
+    const fileName = `galeria/${randomUUID()}.${extension}`;
 
     const bucketName = process.env.R2_BUCKET_NAME;
     const publicDomain = process.env.R2_PUBLIC_DOMAIN;
@@ -31,7 +47,7 @@ async function uploadToR2(base64Image: string): Promise<string | null> {
         Bucket: bucketName,
         Key: fileName,
         Body: buffer,
-        ContentType: "image/jpeg",
+        ContentType: contentType,
       }),
     );
 

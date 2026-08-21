@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 
-const SECRET_KEY =
-  process.env.SESSION_SECRET || "default-dev-secret-key-change-me";
+const SECRET_KEY = process.env.SESSION_SECRET;
+if (!SECRET_KEY) {
+  throw new Error("A variável de ambiente SESSION_SECRET não está definida.");
+}
 const key = new TextEncoder().encode(SECRET_KEY);
 
 const publicRoutes = ["/login", "/public"];

@@ -2,17 +2,16 @@
 
 import { GoogleGenAI, Type, Tool } from "@google/genai";
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/session";
+import { requireServerPermission } from "@/lib/server-permissions";
 
 // Palavras-chave para detectar uma saudação simples
 const GREETINGS = ["oi", "olá", "ola", "tudo bem", "bom dia", "boa tarde", "boa noite", "fala ai", "oii", "hello", "hi"];
 
 export async function askAssistant(userMessage: string) {
   try {
-    const session = await getSession();
-    if (!session || !session.ownerId) {
-      return { success: false, error: "Usuário não autenticado." };
-    }
+    const auth = await requireServerPermission("iris:ver");
+    if (!auth.success) return { success: false, error: auth.message };
+    const session = auth.session;
 
     const apiKey = process.env.GEMINI_API_KEY;
 

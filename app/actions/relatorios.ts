@@ -1,14 +1,15 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
-import { getSession } from "@/lib/session";
+import { requireServerPermission } from "@/lib/server-permissions";
 
 export async function getRelatorioGeral(
   startDateStr: string,
   endDateStr: string
 ) {
-  const session = await getSession();
-  if (!session) return { success: false, data: null };
+  const auth = await requireServerPermission("relatorios:ver");
+  if (!auth.success) return { success: false, data: null, message: auth.message };
+  const session = auth.session;
 
   try {
     const minDate = new Date(`${startDateStr}T00:00:00Z`);
