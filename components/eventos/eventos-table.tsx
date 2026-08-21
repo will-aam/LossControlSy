@@ -77,7 +77,7 @@ export function EventosTable({
                 <TableCell className="text-xs whitespace-nowrap text-muted-foreground">
                   {formatDate(evento.dataHora)}
                 </TableCell>
-                <TableCell 
+                <TableCell
                   className="font-mono text-xs text-muted-foreground cursor-pointer transition-colors hover:text-foreground"
                   title="Clique para copiar"
                   onClick={() => {
@@ -104,7 +104,7 @@ export function EventosTable({
                   <Select
                     value={
                       evento.status === "enviado" ||
-                      evento.status === "rascunho"
+                        evento.status === "rascunho"
                         ? "pendente"
                         : evento.status
                     }
@@ -119,9 +119,8 @@ export function EventosTable({
                     <SelectTrigger
                       className={`h-8 w-full ${getStatusColor(
                         evento.status as EventoStatus,
-                      )} border-transparent text-xs ${
-                        isLocked ? "opacity-70 cursor-not-allowed" : ""
-                      }`}
+                      )} border-transparent text-xs ${isLocked ? "opacity-70 cursor-not-allowed" : ""
+                        }`}
                     >
                       <SelectValue />
                     </SelectTrigger>
@@ -139,11 +138,10 @@ export function EventosTable({
                     <Button
                       variant="ghost"
                       size="icon"
-                      className={`h-8 w-8 ${
-                        isLocked
+                      className={`h-8 w-8 ${isLocked
                           ? "opacity-50 cursor-not-allowed text-muted-foreground"
                           : "text-destructive hover:text-destructive hover:bg-destructive/10"
-                      }`}
+                        }`}
                       disabled={isLocked}
                       onClick={() => !isLocked && onDelete(evento.id)}
                       title="Excluir evento"

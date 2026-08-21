@@ -4,6 +4,7 @@
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { getSession } from "@/lib/session";
+import { requireServerPermission, checkServerPermission } from "@/lib/server-permissions";
 import { EventoStatus } from "@prisma/client";
 import { r2 } from "@/lib/r2";
 import { PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
@@ -48,12 +49,14 @@ async function uploadToR2(base64Image: string): Promise<string | null> {
 
 // 1. Listar Eventos (ATUALIZADO: Inclui Notas Fiscais)
 export async function getEventos() {
-  const session = await getSession();
+  const { session, hasAccess } = await checkServerPermission("eventos:ver_todos");
   if (!session) return { success: false, data: [] };
 
   try {
     const eventos = await prisma.evento.findMany({
-      where: { ownerId: session.ownerId },
+      where: hasAccess 
+        ? { ownerId: session.ownerId } 
+        : { ownerId: session.ownerId, criadoPorId: session.id },
       orderBy: { dataHora: "desc" },
       include: {
         item: { include: { categoria: true } },
@@ -90,9 +93,9 @@ export async function getEventos() {
 }
 
 export async function createEvento(data: CreateEventoData) {
-  const session = await getSession();
-  if (!session || !session.id)
-    return { success: false, message: "Não autorizado." };
+  const auth = await requireServerPermission("eventos:criar");
+  if (!auth.success) return auth;
+  const session = auth.session;
   try {
     const item = await prisma.item.findUnique({ where: { id: data.itemId } });
     if (!item || item.ownerId !== session.ownerId)
@@ -140,8 +143,11 @@ export async function createEvento(data: CreateEventoData) {
 }
 
 export async function updateEventoStatus(id: string, novoStatus: EventoStatus) {
-  const session = await getSession();
-  if (!session) return { success: false, message: "Não autorizado" };
+  const auth = await requireServerPermission(
+    ["aprovado", "rejeitado"].includes(novoStatus) ? "eventos:aprovar" : "eventos:editar"
+  );
+  if (!auth.success) return auth;
+  const session = auth.session;
   try {
     await prisma.evento.update({
       where: { id, ownerId: session.ownerId },
@@ -160,8 +166,9 @@ export async function updateEventoStatus(id: string, novoStatus: EventoStatus) {
 }
 
 export async function deleteEvento(id: string) {
-  const session = await getSession();
-  if (!session) return { success: false, message: "Não autorizado" };
+  const auth = await requireServerPermission("eventos:excluir");
+  if (!auth.success) return auth;
+  const session = auth.session;
   try {
     await prisma.evento.delete({ where: { id, ownerId: session.ownerId } });
     revalidatePath("/eventos");
@@ -172,8 +179,9 @@ export async function deleteEvento(id: string) {
 }
 
 export async function toggleNfeEmitidaLote(eventoIds: string[], nfeEmitida: boolean) {
-  const session = await getSession();
-  if (!session) return { success: false, message: "Não autorizado" };
+  const auth = await requireServerPermission("eventos:editar");
+  if (!auth.success) return auth;
+  const session = auth.session;
 
   try {
     // Only update events that belong to the user's ownerId for security
@@ -197,8 +205,9 @@ export async function toggleNfeEmitidaLote(eventoIds: string[], nfeEmitida: bool
 
 // 5. Buscar Nota do Lote (ATUALIZADO: Detecta Expiração)
 export async function getNotaDoLote(dataString: string) {
-  const session = await getSession();
-  if (!session) return { success: false, message: "Não autorizado" };
+  const auth = await requireServerPermission("notas:ver");
+  if (!auth.success) return auth;
+  const session = auth.session;
 
   try {
     const start = new Date(`${dataString}T00:00:00.000Z`);

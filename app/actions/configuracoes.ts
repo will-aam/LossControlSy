@@ -5,13 +5,15 @@ import { prisma } from "@/lib/prisma";
 import { getSession, hashPassword } from "@/lib/session";
 import { revalidatePath } from "next/cache";
 import { UserRole } from "@/lib/types";
+import { requireServerPermission, checkServerPermission } from "@/lib/server-permissions";
 
 // --- CONFIGURAÇÕES GERAIS ---
 
 export async function getSettings() {
   try {
-    const session = await getSession();
-    if (!session) return { success: false, message: "Não autorizado" };
+    const auth = await requireServerPermission("configuracoes:ver");
+    if (!auth.success) return auth;
+    const session = auth.session;
 
     // Busca configurações vinculadas ao dono da loja (ownerId da sessão)
     let config = await prisma.configuracao.findUnique({
@@ -52,15 +54,9 @@ export async function saveSettings(data: {
   limiteDiario?: number;
   permissoes?: any;
 }) {
-  const session = await getSession();
-
-  // Apenas o proprietário da loja pode alterar as regras globais da unidade
-  if (!session || session.role !== "dono") {
-    return {
-      success: false,
-      message: "Apenas o proprietário pode alterar configurações.",
-    };
-  }
+  const auth = await requireServerPermission("configuracoes:ver");
+  if (!auth.success) return auth;
+  const session = auth.session;
 
   try {
     const dataToUpdate = {
@@ -98,8 +94,9 @@ export async function saveSettings(data: {
 // --- GERENCIAMENTO DE USUÁRIOS (MULTI-TENANCY) ---
 
 export async function getUsers() {
-  const session = await getSession();
-  if (!session) return { success: false, message: "Sem permissão" };
+  const auth = await requireServerPermission("usuarios:gerenciar");
+  if (!auth.success) return auth;
+  const session = auth.session;
 
   try {
     // Filtra para mostrar apenas o dono da loja e sua respectiva equipe
@@ -136,14 +133,9 @@ export async function saveUser(data: {
   avatarUrl?: string;
   ativo?: boolean;
 }) {
-  const session = await getSession();
-
-  if (!session || session.role !== "dono") {
-    return {
-      success: false,
-      message: "Apenas o proprietário pode gerenciar a equipe.",
-    };
-  }
+  const auth = await requireServerPermission("usuarios:gerenciar");
+  if (!auth.success) return auth;
+  const session = auth.session;
 
   try {
     if (data.id) {
@@ -223,10 +215,9 @@ export async function saveUser(data: {
 }
 
 export async function deleteUser(id: string) {
-  const session = await getSession();
-  if (!session || session.role !== "dono") {
-    return { success: false, message: "Sem permissão" };
-  }
+  const auth = await requireServerPermission("usuarios:gerenciar");
+  if (!auth.success) return auth;
+  const session = auth.session;
 
   if (session.id === id) {
     return {
