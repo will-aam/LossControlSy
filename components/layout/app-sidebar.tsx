@@ -17,6 +17,7 @@ import {
   LogOut,
   PanelLeftClose,
   PanelLeftOpen,
+  User,
 } from "lucide-react";
 
 import {
@@ -49,6 +50,7 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   BarChart3,
   Settings,
   Tags,
+  User,
 };
 
 const roleColors: Record<UserRole, string> = {
@@ -167,13 +169,14 @@ export function AppSidebar() {
           {/* Botão de Logout */}
           <Button
             variant="ghost"
-            size="icon"
             onClick={handleLogout}
-            className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 h-9 w-9 shrink-0 group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:mt-0"
+            className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 flex items-center justify-center h-9 px-2 group-data-[collapsible=icon]:w-full group-data-[collapsible=icon]:h-10 group-data-[collapsible=icon]:p-0"
             title="Sair do sistema"
           >
             <LogOut className="h-5 w-5" />
-            <span className="sr-only">Sair</span>
+            <span className="ml-2 font-medium group-data-[collapsible=icon]:hidden">
+              Sair
+            </span>
           </Button>
         </div>
       </SidebarFooter>

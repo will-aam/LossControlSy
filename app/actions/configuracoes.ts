@@ -11,9 +11,9 @@ import { requireServerPermission, checkServerPermission } from "@/lib/server-per
 
 export async function getSettings() {
   try {
-    const auth = await requireServerPermission("configuracoes:ver");
-    if (!auth.success) return auth;
-    const session = auth.session;
+    const session = await getSession();
+    if (!session) return { success: false, message: "Não autorizado" };
+
 
     // Busca configurações vinculadas ao dono da loja (ownerId da sessão)
     let config = await prisma.configuracao.findUnique({

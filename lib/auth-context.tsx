@@ -68,6 +68,12 @@ const ALL_NAV_ITEMS: NavItemWithPermission[] = [
     permission: "relatorios:ver",
   },
   {
+    title: "Meu Perfil",
+    href: "/perfil",
+    icon: "User",
+    permission: "perfil:ver",
+  },
+  {
     title: "Configurações",
     href: "/configuracoes",
     icon: "Settings",
@@ -132,19 +138,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // --- 2. Atualizar Menu quando Usuário/Settings mudar ---
   useEffect(() => {
     if (user) {
+      // É preciso criar a checagem com o state atual aqui,
+      // pois checkPermission usa o estado settings e user.
+      const isAllowed = (permission: string) => {
+        if (user.role === "dono") return true;
+        if (settings?.permissoes && settings.permissoes[user.role]) {
+          return settings.permissoes[user.role].includes(permission);
+        }
+        return hasPermission(user.role, permission as Permission);
+      };
+
       const filteredNav = ALL_NAV_ITEMS.filter((item) => {
         // Regra especial para Galeria (Funcionario depende de Config)
         if (item.href === "/galeria" && user.role === "funcionario") {
-          // Verifica se tem a permissão base E a configuração ativa
-          const temPermissaoBase = hasPermission(user.role, item.permission);
+          const temPermissaoBase = isAllowed(item.permission);
           return (
             temPermissaoBase && settings?.permitirFuncionarioGaleria === true
           );
         }
 
-        // Regra padrão: Verifica se o usuário tem a permissão exigida pelo item
-        // Como o funcionario NÃO TEM "dashboard:ver", o item "Visão Geral" será removido aqui
-        return hasPermission(user.role, item.permission);
+        return isAllowed(item.permission);
       });
 
       setNavItems(filteredNav);
