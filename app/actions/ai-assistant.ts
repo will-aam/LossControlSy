@@ -1,8 +1,11 @@
 "use server";
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type, Tool } from "@google/genai";
 import { prisma } from "@/lib/prisma";
 import { getSession } from "@/lib/session";
+
+// Palavras-chave para detectar uma saudação simples
+const GREETINGS = ["oi", "olá", "ola", "tudo bem", "bom dia", "boa tarde", "boa noite", "fala ai", "oii", "hello", "hi"];
 
 export async function askAssistant(userMessage: string) {
   try {
@@ -17,80 +20,152 @@ export async function askAssistant(userMessage: string) {
       return { success: false, error: "Chave da API do Gemini não configurada." };
     }
 
-    // 1. Fetch real DB data for context using ownerId limit
-    // Busca apenas o último mês (30 dias) para manter a IA muito rápida.
-    const dateLimit = new Date();
-    dateLimit.setMonth(dateLimit.getMonth() - 1);
+    const msgLower = userMessage.trim().toLowerCase();
+    
+    // --- OPÇÃO 1: Short-Circuit para Saudações (Resposta Imediata sem BD) ---
+    if (msgLower.length < 20 && GREETINGS.some(g => msgLower.includes(g))) {
+      const ai = new GoogleGenAI({ apiKey });
+      const response = await ai.models.generateContent({
+        model: 'gemini-3.6-flash',
+        contents: userMessage,
+        config: {
+          systemInstruction: "Você é a Iris, a assistente inteligente de gestão. O usuário está apenas te cumprimentando. Responda de forma extremamente amigável, em apenas 1 ou 2 frases curtas, perguntando como pode ajudar na gestão da loja hoje."
+        }
+      });
+      return { success: true, text: response.text };
+    }
 
-    const [itens, categorias, motivos, eventos, vendas, compras] = await Promise.all([
-      prisma.item.findMany({
-        where: { ownerId: session.ownerId },
-        select: { nome: true, custo: true, custoMedio: true, precoVenda: true, status: true, categoria: { select: { nome: true } } }
-      }),
-      prisma.categoria.findMany({
-        where: { ownerId: session.ownerId },
-        select: { nome: true, status: true }
-      }),
-      prisma.motivo.findMany({
-        where: { ownerId: session.ownerId },
-        select: { nome: true }
-      }),
-      prisma.evento.findMany({
+    // --- OPÇÃO 2: Resumo Agregado Rápido (Redução de 99% do tamanho do payload) ---
+    const dateLimit = new Date();
+    dateLimit.setMonth(dateLimit.getMonth() - 1); // Últimos 30 dias
+
+    // O Promise.all agora faz apenas agregações leves, que retornam números ao invés de milhares de registros.
+    const [totalItens, totalCategorias, perdasAggregate, vendasAggregate] = await Promise.all([
+      prisma.item.count({ where: { ownerId: session.ownerId, status: "ativo" } }),
+      prisma.categoria.count({ where: { ownerId: session.ownerId, status: "ativa" } }),
+      prisma.evento.aggregate({
         where: { ownerId: session.ownerId, dataHora: { gte: dateLimit }, status: { notIn: ["rascunho", "rejeitado"] } },
-        select: { dataHora: true, motivo: true, quantidade: true, custoSnapshot: true, precoVendaSnapshot: true, status: true, item: { select: { nome: true } } }
+        _count: { id: true }
       }),
-      prisma.vendaDiaria.findMany({
-        where: { ownerId: session.ownerId, data: { gte: dateLimit } },
-        select: { data: true, itens: { select: { quantidade: true, valorLiquido: true, item: { select: { nome: true } } } } }
-      }),
-      prisma.nFeCompra.findMany({
-        where: { ownerId: session.ownerId, dataEmissao: { gte: dateLimit } },
-        select: { dataEmissao: true, valorTotal: true, emitente: true, itens: { select: { quantidade: true, valorUnitario: true, descricaoFornecedor: true, item: { select: { nome: true } } } } }
+      prisma.vendaDiaria.count({
+        where: { ownerId: session.ownerId, data: { gte: dateLimit } }
       })
     ]);
 
-    // Format payload to be extremely concise to save tokens
     const contextData = {
       periodo: "Últimos 30 dias",
-      categorias: categorias.map(c => c.nome),
-      motivos: motivos.map(m => m.nome),
-      itens: itens.map(i => ({ n: i.nome, c: Number(i.custo), cm: Number(i.custoMedio), pv: Number(i.precoVenda), cat: i.categoria?.nome, st: i.status })),
-      eventosPerda: eventos.map(e => ({ d: e.dataHora.toISOString().split("T")[0], m: e.motivo, q: Number(e.quantidade), c: Number(e.custoSnapshot), pv: Number(e.precoVendaSnapshot), i: e.item?.nome })),
-      vendas: vendas.map(v => ({ d: v.data.toISOString().split("T")[0], i: v.itens.map(vi => ({ q: Number(vi.quantidade), v: Number(vi.valorLiquido), n: vi.item.nome })) })),
-      comprasNFe: compras.map(c => ({ d: c.dataEmissao?.toISOString().split("T")[0], v: Number(c.valorTotal), e: c.emitente, i: c.itens.map(ci => ({ q: Number(ci.quantidade), vu: Number(ci.valorUnitario), n: ci.item?.nome || ci.descricaoFornecedor })) }))
+      resumo_rapido: `A loja possui ${totalItens} itens ativos e ${totalCategorias} categorias. Nos últimos 30 dias, ocorreram ${perdasAggregate._count.id} registros de perdas e importamos vendas em ${vendasAggregate} dias diferentes.`
     };
 
-    // 2. Initialize Gemini new SDK
-    const ai = new GoogleGenAI({ apiKey });
+    // --- OPÇÃO 3: Ferramentas (Function Calling) ---
+    const tools: Tool[] = [{
+      functionDeclarations: [
+        {
+          name: "buscarTopPerdas",
+          description: "Busca os últimos registros de perda ou descarte de produtos da loja. Use quando o usuário perguntar sobre as perdas recentes.",
+          parameters: {
+             type: Type.OBJECT,
+             properties: {
+               limite: { type: Type.INTEGER, description: "Quantidade de registros a retornar (ex: 5, máximo 20)" }
+             }
+          }
+        },
+        {
+          name: "buscarInformacoesDeItem",
+          description: "Busca informações específicas de um produto no catálogo (custo, preço, categoria).",
+          parameters: {
+             type: Type.OBJECT,
+             properties: {
+               nome: { type: Type.STRING, description: "Nome completo ou pedaço do nome do produto" }
+             },
+             required: ["nome"]
+          }
+        }
+      ]
+    }];
 
-    // 3. Prepare Prompt Context
     const systemPrompt = `
 Você é a Iris, a assistente inteligente de gestão e controle de perdas do estabelecimento. 
 
 Regras de Comportamento:
-1. Seja sempre amigável, conversacional e humano.
-2. Se o usuário apenas disser "oi", "olá", "tudo bem" ou fizer uma saudação simples, RESPONDA DE FORMA CURTA (1-2 frases) cumprimentando de volta e perguntando como pode ajudar. **NÃO envie relatórios ou resumos de dados se não for solicitado.**
-3. Quando o usuário perguntar sobre dados, perdas, categorias, motivos, vendas, importações ou pedir um resumo, aí sim analise o contexto abaixo e forneça respostas precisas (EXATAS). O contexto contém os DADOS REAIS da loja (Catálogo, Perdas, Vendas, Compras NFe e Motivos de perda).
-4. Ao dar relatórios, seja objetivo, destaque pontos críticos (produtos com alto índice de descarte, motivos mais frequentes) e sugira ações práticas. SEMPRE termine sua resposta com uma pergunta engajadora sugerindo uma nova análise ou aprofundamento sobre o tema que o usuário acabou de perguntar.
-5. Formate a resposta em Markdown. **MUITO IMPORTANTE:** Use quebras de linha DUPLAS entre tópicos diferentes, seções, e antes de iniciar uma nova lista para dar respiro ao layout. NÃO USE linhas divisórias (como --- ou ***), apenas use quebras de linha para separar as seções.
-6. Os dados abaixo usam abreviações para economizar espaço: n=nome, c=custo, cm=custoMedio, pv=precoVenda, cat=categoria, st=status, d=data, m=motivo, q=quantidade, v=valorLiquido/Total, e=emitente, vu=valorUnitario.
+1. Seja sempre amigável e direta.
+2. Você tem acesso a FERRAMENTAS (Tools). Se o usuário fizer uma pergunta que exige dados precisos (ex: "Quais os produtos com mais perda?", "Qual o custo da Coca Cola?"), VOCÊ DEVE CHAMAR A FERRAMENTA APROPRIADA em vez de inventar dados.
+3. Formate a resposta usando Markdown. Use quebras de linha duplas para separar parágrafos.
+4. Responda baseado neste contexto inicial ou nos resultados das ferramentas que você chamar.
 
-Contexto de Dados Atuais (JSON com os últimos 30 dias):
+Contexto da Loja:
 ${JSON.stringify(contextData)}
 `;
 
-    // 4. Generate Content
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
-      contents: userMessage,
-      config: {
-        systemInstruction: systemPrompt
-      }
+    const ai = new GoogleGenAI({ apiKey });
+    const chat = ai.chats.create({
+       model: 'gemini-3.6-flash',
+       config: {
+          systemInstruction: systemPrompt,
+          tools: tools,
+          temperature: 0.1
+       }
     });
 
-    const responseText = response.text;
+    let response = await chat.sendMessage({ message: userMessage });
 
-    return { success: true, text: responseText };
+    // Loop de execução de funções caso a IA decida chamar alguma ferramenta
+    if (response.functionCalls && response.functionCalls.length > 0) {
+      const calls = response.functionCalls;
+      const functionResponses = [];
+
+      for (const call of calls) {
+         if (call.name === "buscarTopPerdas") {
+           const args = call.args as any;
+           const limit = Math.min(Number(args?.limite) || 5, 20); // max 20
+           
+           const perdas = await prisma.evento.findMany({
+              where: { ownerId: session.ownerId, status: { notIn: ["rascunho", "rejeitado"] } },
+              take: limit,
+              orderBy: { dataHora: 'desc' },
+              include: { item: { select: { nome: true } } }
+           });
+           
+           functionResponses.push({
+             functionResponse: {
+               name: call.name,
+               response: { 
+                 resultado: perdas.map(p => ({ 
+                   data: p.dataHora.toISOString().split("T")[0], 
+                   produto: p.item?.nome || "Desconhecido", 
+                   motivo: p.motivo, 
+                   qtd: Number(p.quantidade) 
+                 })) 
+               }
+             }
+           });
+         } 
+         else if (call.name === "buscarInformacoesDeItem") {
+           const args = call.args as any;
+           const itemName = args.nome;
+
+           const itens = await prisma.item.findMany({
+             where: { ownerId: session.ownerId, nome: { contains: itemName, mode: "insensitive" } },
+             take: 5,
+             select: { nome: true, custo: true, custoMedio: true, precoVenda: true, status: true, unidade: true }
+           });
+
+           functionResponses.push({
+             functionResponse: {
+               name: call.name,
+               response: { resultado: itens.length > 0 ? itens : "Nenhum produto encontrado com esse nome." }
+             }
+           });
+         }
+      }
+
+      // Envia as respostas das funções de volta para a IA analisar
+      if (functionResponses.length > 0) {
+        response = await chat.sendMessage({ message: functionResponses as any });
+      }
+    }
+
+    return { success: true, text: response.text };
   } catch (error: any) {
     console.error("Error asking Gemini:", error);
     const errorMessage = error?.message || String(error);
