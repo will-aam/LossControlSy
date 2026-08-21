@@ -132,7 +132,7 @@ export function NavRail() {
         
         {hasPermission("perfil:ver") && (
           <Link 
-            href="/configuracoes"
+            href="/perfil"
             className={cn(
               "p-3 rounded-xl text-muted-foreground hover:bg-surface-2 hover:text-foreground transition-colors flex items-center",
               aberto ? "justify-start gap-3 w-full" : "justify-center"

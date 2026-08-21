@@ -53,7 +53,7 @@ export function BottomNav() {
   ].filter(item => hasPermission(item.permission));
 
   const systemOptions = [
-    { icon: User, label: "Perfil", href: "/configuracoes", permission: "perfil:ver" },
+    { icon: User, label: "Perfil", href: "/perfil", permission: "perfil:ver" },
   ].filter(item => hasPermission(item.permission));
 
   // Hide bottom nav completely on the event creation page to give it full screen

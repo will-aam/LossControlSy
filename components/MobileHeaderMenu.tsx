@@ -51,7 +51,7 @@ export function MobileHeaderMenu() {
   ].filter(item => hasPermission(item.permission));
 
   const systemOptions = [
-    { icon: User, label: "Perfil", href: "/configuracoes", permission: "perfil:ver" },
+    { icon: User, label: "Perfil", href: "/perfil", permission: "perfil:ver" },
   ].filter(item => hasPermission(item.permission));
 
   const allItems = [...mainNavItems, ...secondaryNavItems, ...moreMenuOptions];
