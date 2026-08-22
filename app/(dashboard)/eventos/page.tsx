@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import useSWR from "swr";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,53 +59,53 @@ export default function EventosPage() {
   const [globalSearch, setGlobalSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("todos");
   const [currentPage, setCurrentPage] = useState(1);
-  const [eventosDoBanco, setEventosDoBanco] = useState<Evento[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [eventoToDelete, setEventoToDelete] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    setIsLoading(true);
+  const fetcher = async () => {
     const result = await getEventos();
-
-    if (result.success && result.data) {
-      const mappedEventos: Evento[] = (result.data as any[]).map((ev) => ({
-        id: ev.id,
-        dataHora: ev.dataHora,
-        motivo: ev.motivo,
-        status: ev.status as EventoStatus,
-        quantidade: Number(ev.quantidade),
-        unidade: ev.unidade,
-        custoSnapshot: Number(ev.custoSnapshot),
-        precoVendaSnapshot: Number(ev.precoVendaSnapshot),
-        item: ev.item
-          ? {
-              id: ev.item.id,
-              nome: ev.item.nome,
-              codigoInterno: ev.item.codigoInterno,
-              codigoBarras: ev.item.codigoBarras,
-              categoria: ev.item.categoria?.nome || "Sem Categoria",
-              unidade: ev.item.unidade,
-              custo: Number(ev.item.custo),
-              precoVenda: Number(ev.item.precoVenda),
-              status: ev.item.status,
-              imagemUrl: ev.item.imagemUrl,
-            }
-          : undefined,
-        criadoPor: ev.criadoPor,
-        evidencias: ev.evidencias,
-        nfeEmitida: ev.nfeEmitida,
-      }));
-
-      setEventosDoBanco(mappedEventos);
-    } else {
-      toast.error("Erro ao carregar eventos.");
-    }
-    setIsLoading(false);
+    if (!result.success) throw new Error((result as any).error || (result as any).message || "Erro ao carregar");
+    
+    const mappedEventos: Evento[] = (result.data as any[]).map((ev) => ({
+      id: ev.id,
+      dataHora: ev.dataHora,
+      motivo: ev.motivo,
+      status: ev.status as EventoStatus,
+      quantidade: Number(ev.quantidade),
+      unidade: ev.unidade,
+      custoSnapshot: Number(ev.custoSnapshot),
+      precoVendaSnapshot: Number(ev.precoVendaSnapshot),
+      item: ev.item
+        ? {
+            id: ev.item.id,
+            nome: ev.item.nome,
+            codigoInterno: ev.item.codigoInterno,
+            codigoBarras: ev.item.codigoBarras,
+            categoria: ev.item.categoria?.nome || "Sem Categoria",
+            unidade: ev.item.unidade,
+            custo: Number(ev.item.custo),
+            precoVenda: Number(ev.item.precoVenda),
+            status: ev.item.status,
+            imagemUrl: ev.item.imagemUrl,
+          }
+        : undefined,
+      criadoPor: ev.criadoPor,
+      evidencias: ev.evidencias,
+      nfeEmitida: ev.nfeEmitida,
+    }));
+    return mappedEventos;
   };
+
+  const { data: eventosDoBanco = [], error, isLoading, mutate } = useSWR<Evento[]>(
+    "eventos_list",
+    fetcher,
+    { revalidateOnFocus: true }
+  );
+
+  useEffect(() => {
+    if (error) toast.error("Erro ao carregar eventos.");
+  }, [error]);
+
+
 
   useEffect(() => {
     setCurrentPage(1);
@@ -206,43 +207,48 @@ export default function EventosPage() {
 
   const handleStatusChange = async (eventoId: string, novoStatus: string) => {
     const statusTyped = novoStatus as EventoStatus;
-    setEventosDoBanco((prev) =>
-      prev.map((ev) =>
-        ev.id === eventoId ? { ...ev, status: statusTyped } : ev,
-      ),
+    const optimisicData = eventosDoBanco.map((ev) =>
+      ev.id === eventoId ? { ...ev, status: statusTyped } : ev
     );
+    
+    mutate(optimisicData, false);
+
     const result = await updateEventoStatus(eventoId, statusTyped);
     if (!result.success) {
       toast.error(result.message);
-      loadData();
+      mutate();
     } else {
       toast.success("Status atualizado");
+      mutate(optimisicData, true);
     }
   };
 
   const handleAprovarLoteInteiro = async () => {
     if (!loteSelecionado) return;
     const ids = loteSelecionado.eventos.map((e) => e.id);
-    setEventosDoBanco((prev) =>
-      prev.map((ev) =>
-        ids.includes(ev.id) ? { ...ev, status: "aprovado" } : ev,
-      ),
+    const optimisicData = eventosDoBanco.map((ev) =>
+      ids.includes(ev.id) ? { ...ev, status: "aprovado" as EventoStatus } : ev
     );
+    
+    mutate(optimisicData, false);
+
     await Promise.all(ids.map((id) => updateEventoStatus(id, "aprovado")));
     toast.success("Lote aprovado!");
+    mutate(optimisicData, true);
   };
 
   const confirmDelete = async () => {
     if (eventoToDelete) {
-      setEventosDoBanco((prev) =>
-        prev.filter((ev) => ev.id !== eventoToDelete),
-      );
+      const optimisicData = eventosDoBanco.filter((ev) => ev.id !== eventoToDelete);
+      mutate(optimisicData, false);
+
       const result = await deleteEvento(eventoToDelete);
       if (!result.success) {
         toast.error(result.message);
-        loadData();
+        mutate();
       } else {
         toast.success("Evento excluído com sucesso.");
+        mutate(optimisicData, true);
       }
       setEventoToDelete(null);
     }
@@ -252,19 +258,19 @@ export default function EventosPage() {
     const eventoIds = lote.eventos.map((e) => e.id);
     const newStatus = !lote.nfeEmitida;
     
-
-    setEventosDoBanco((prev) =>
-      prev.map((ev) =>
-        eventoIds.includes(ev.id) ? { ...ev, nfeEmitida: newStatus } : ev
-      )
+    const optimisicData = eventosDoBanco.map((ev) =>
+      eventoIds.includes(ev.id) ? { ...ev, nfeEmitida: newStatus } : ev
     );
+
+    mutate(optimisicData, false);
 
     const result = await toggleNfeEmitidaLote(eventoIds, newStatus);
     if (!result.success) {
       toast.error(result.message);
-      loadData();
+      mutate();
     } else {
       toast.success(newStatus ? "Nota Fiscal marcada como emitida." : "Nota Fiscal desmarcada.");
+      mutate(optimisicData, true);
     }
   };
 

@@ -3,6 +3,7 @@
 import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
+import useSWR from "swr";
 import {
   Bar,
   BarChart,
@@ -164,34 +165,29 @@ export default function Dashboard() {
   const [limiteGlobal, setLimiteGlobal] = useState(2);
   const [soAlertas, setSoAlertas] = useState(false);
 
-  const [linhasA, setLinhasA] = useState<ProdutoLinha[]>([]);
-  const [linhasB, setLinhasB] = useState<ProdutoLinha[]>([]);
-  const [serie, setSerie] = useState<any[]>([]);
-  const [xmlsA, setXmlsA] = useState(0);
-  const [xmlsB, setXmlsB] = useState(0);
-  const [isLoadingReal, setIsLoadingReal] = useState(false);
-
   const diasA = useMemo(() => periodoDias(modo, pa), [modo, pa]);
   const diasB = useMemo(() => periodoDias(modo, pb), [modo, pb]);
 
-  useEffect(() => {
-    async function loadRealData() {
-      setIsLoadingReal(true);
+  const { data: dashboardData, isLoading: isLoadingReal, error } = useSWR(
+    ['dashboard_metrics', diasA, diasB],
+    async ([, dA, dB]: [string, string[], string[]]) => {
       const { getRealDashboardMetrics } = await import("@/app/actions/dashboard");
-      const result = await getRealDashboardMetrics(diasA, diasB);
-      if (result.success && result.data) {
-        setLinhasA(result.data.linhasA);
-        setLinhasB(result.data.linhasB);
-        setSerie(result.data.serie);
-        setXmlsA(result.data.xmlsImportadosA);
-        setXmlsB(result.data.xmlsImportadosB);
-      } else {
-        toast.error("Erro ao carregar métricas reais do dashboard.");
-      }
-      setIsLoadingReal(false);
-    }
-    loadRealData();
-  }, [diasA, diasB]);
+      const result = await getRealDashboardMetrics(dA, dB);
+      if (!result.success) throw new Error(result.error || "Erro ao carregar");
+      return result.data;
+    },
+    { revalidateOnFocus: false }
+  );
+
+  useEffect(() => {
+    if (error) toast.error("Erro ao carregar métricas reais do dashboard.");
+  }, [error]);
+
+  const linhasA = dashboardData?.linhasA || [];
+  const linhasB = dashboardData?.linhasB || [];
+  const serie = dashboardData?.serie || [];
+  const xmlsA = dashboardData?.xmlsImportadosA || 0;
+  const xmlsB = dashboardData?.xmlsImportadosB || 0;
 
   const filteredLinhasA = useMemo(() => {
     const q = busca.trim().toLowerCase();
