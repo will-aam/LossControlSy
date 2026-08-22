@@ -7,7 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, Loader2, User } from "lucide-react";
+import { AlertTriangle, Loader2, User, Settings } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { updateProfile } from "@/app/actions/perfil";
 
@@ -115,6 +116,27 @@ export default function PerfilPage() {
             </div>
           </CardContent>
         </Card>
+
+        {user?.role === "dono" && (
+          <Card className="max-w-2xl mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5" />
+                Configurações do Sistema
+              </CardTitle>
+              <CardDescription>
+                Acesse as configurações globais do sistema e defina permissões.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild variant="outline" className="w-full sm:w-auto">
+                <Link href="/configuracoes">
+                  Acessar Configurações
+                </Link>
+              </Button>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </>
   );
