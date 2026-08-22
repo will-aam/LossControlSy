@@ -45,6 +45,7 @@ import {
   saveUser,
   deleteUser,
 } from "@/app/actions/configuracoes";
+import { getMinhasLojas } from "@/app/actions/auth";
 import {
   AlertTriangle,
   Building2,
@@ -70,6 +71,7 @@ export default function ConfiguracoesPage() {
   const { hasPermission, user: currentUser, isLoading: isAuthLoading } = useAuth();
 
   const [users, setUsers] = useState<User[]>([]);
+  const [lojas, setLojas] = useState<any[]>([]);
   const [settings, setSettings] = useState<any>({
     empresaNome: "",
     exigirFoto: false,
@@ -100,9 +102,13 @@ export default function ConfiguracoesPage() {
         avatarUrl: u.avatarUrl,
         ativo: u.ativo, // Importante: Mapeando o status do banco
         ownerId: u.ownerId,
+        lojasPermitidas: u.lojasPermitidas || [],
       }));
       setUsers(mappedUsers);
     }
+
+    const lojasResult = await getMinhasLojas();
+    setLojas(lojasResult || []);
 
     const settingsResult = await getSettings();
     if (settingsResult.success && settingsResult.data) {
@@ -129,6 +135,7 @@ export default function ConfiguracoesPage() {
     password?: string;
     avatarUrl?: string;
     ativo?: boolean;
+    lojasPermitidas?: string[];
   }) => {
     if (!userData.nome || !userData.email) {
       toast.error("Nome e Email são obrigatórios");
@@ -596,6 +603,8 @@ export default function ConfiguracoesPage() {
         }}
         userToEdit={userToEdit}
         onSave={handleSaveUser}
+        lojas={lojas}
+        currentUser={currentUser}
       />
 
       <AlertDialog

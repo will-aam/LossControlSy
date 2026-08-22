@@ -65,6 +65,8 @@ model User {
   lojaId       String?
   loja         Loja?    @relation("UserLoja", fields: [lojaId], references: [id])
 
+  lojasPermitidas Loja[]   @relation("UserLojasPermitidas")
+
   lojasDono        Loja[]       @relation("LojaDono")
   categoriasLoja   Categoria[]  @relation("CategoriaDono")
   itensLoja        Item[]       @relation("ItemDono")
@@ -90,6 +92,7 @@ model Loja {
   owner     User     @relation("LojaDono", fields: [ownerId], references: [id])
 
   users        User[]        @relation("UserLoja")
+  usersPermitidos User[]     @relation("UserLojasPermitidas")
   eventos      Evento[]
   vendas       VendaDiaria[]
   nfeCompras   NFeCompra[]

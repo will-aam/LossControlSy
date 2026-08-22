@@ -51,8 +51,8 @@ export async function importVendasCSV(formData: FormData) {
       const [year, month, day] = dataManual.split("-").map(Number);
       dateObjIsolado = new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
       
-      let vendaDiaria = await prisma.vendaDiaria.findUnique({
-        where: { data_ownerId: { data: dateObjIsolado, ownerId } }
+      let vendaDiaria = await prisma.vendaDiaria.findFirst({
+        where: { data: dateObjIsolado, ownerId }
       });
       if (!vendaDiaria) {
         vendaDiaria = await prisma.vendaDiaria.create({
@@ -93,8 +93,8 @@ export async function importVendasCSV(formData: FormData) {
         vendaDiariaId = vendaDiariaCache[dateKey];
         if (!vendaDiariaId) {
           const dateObj = new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
-          let vendaDiaria = await prisma.vendaDiaria.findUnique({
-            where: { data_ownerId: { data: dateObj, ownerId } }
+          let vendaDiaria = await prisma.vendaDiaria.findFirst({
+            where: { data: dateObj, ownerId }
           });
           if (!vendaDiaria) {
             vendaDiaria = await prisma.vendaDiaria.create({

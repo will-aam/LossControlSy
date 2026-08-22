@@ -116,6 +116,7 @@ export async function getUsers() {
         avatarUrl: true,
         ativo: true,
         ownerId: true,
+        lojasPermitidas: { select: { id: true } },
       },
     });
     return { success: true, data: users };
@@ -132,6 +133,7 @@ export async function saveUser(data: {
   password?: string;
   avatarUrl?: string;
   ativo?: boolean;
+  lojasPermitidas?: string[];
 }) {
   const auth = await requireServerPermission("usuarios:gerenciar");
   if (!auth.success) return auth;
@@ -179,6 +181,12 @@ export async function saveUser(data: {
         updateData.passwordHash = await hashPassword(data.password);
       }
 
+      if (data.lojasPermitidas !== undefined) {
+        updateData.lojasPermitidas = {
+          set: data.lojasPermitidas.map((id) => ({ id })),
+        };
+      }
+
       await prisma.user.update({
         where: { id: data.id },
         data: updateData,
@@ -202,6 +210,11 @@ export async function saveUser(data: {
           passwordHash,
           ativo: true,
           ownerId: session.ownerId,
+          ...(data.lojasPermitidas && {
+            lojasPermitidas: {
+              connect: data.lojasPermitidas.map((id) => ({ id })),
+            },
+          }),
         },
       });
     }

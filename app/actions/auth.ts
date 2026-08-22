@@ -36,12 +36,21 @@ export async function loginAction(email: string, password?: string) {
 
     const tenantId = user.ownerId || user.id;
 
-    // Descobrir a primeira loja caso seja um dono/gestor sem loja fixa
+    // Descobrir a primeira loja caso não tenha loja fixa (lojaId)
     let initialActiveLojaId = user.lojaId;
-    if (!initialActiveLojaId && (user.role === 'dono' || user.role === 'gestor')) {
-      const firstLoja = await prisma.loja.findFirst({ where: { ownerId: tenantId } });
-      if (firstLoja) {
-        initialActiveLojaId = firstLoja.id;
+    if (!initialActiveLojaId) {
+      if (user.role === 'dono') {
+        const firstLoja = await prisma.loja.findFirst({ where: { ownerId: tenantId } });
+        if (firstLoja) initialActiveLojaId = firstLoja.id;
+      } else {
+        const userWithLojas = await prisma.user.findUnique({ where: { id: user.id }, include: { lojasPermitidas: true } });
+        if (userWithLojas && userWithLojas.lojasPermitidas.length > 0) {
+          initialActiveLojaId = userWithLojas.lojasPermitidas[0].id;
+        } else {
+          // Se lista vazia, tem acesso a todas (conforme regra)
+          const firstLoja = await prisma.loja.findFirst({ where: { ownerId: tenantId } });
+          if (firstLoja) initialActiveLojaId = firstLoja.id;
+        }
       }
     }
 
@@ -73,10 +82,9 @@ export async function switchActiveLoja(lojaId: string) {
   const session = await getSession();
   if (!session) return { success: false, message: "Não autorizado" };
 
-  // Verifica se a loja pertence ao dono da sessão
-  const loja = await prisma.loja.findFirst({
-    where: { id: lojaId, ownerId: session.ownerId },
-  });
+  // Verifica se a loja solicitada está na lista de lojas permitidas do usuário
+  const minhasLojas = await getMinhasLojas();
+  const loja = minhasLojas.find((l: any) => l.id === lojaId);
 
   if (!loja) {
     return { success: false, message: "Loja não encontrada ou acesso negado." };
@@ -100,11 +108,32 @@ export async function switchActiveLoja(lojaId: string) {
 export async function getMinhasLojas() {
   const session = await getSession();
   if (!session) return [];
-  return await prisma.loja.findMany({
-    where: { ownerId: session.ownerId },
-    select: { id: true, nome: true, cnpj: true },
-    orderBy: { nome: 'asc' }
+
+  if (session.role === "dono") {
+    return await prisma.loja.findMany({
+      where: { ownerId: session.ownerId },
+      select: { id: true, nome: true, cnpj: true },
+      orderBy: { nome: 'asc' }
+    });
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.id },
+    include: { lojasPermitidas: { select: { id: true, nome: true, cnpj: true } } }
   });
+
+  if (!user) return [];
+
+  // Se o funcionário/gestor não tem nenhuma loja vinculada, damos acesso a todas (como o dono definiu)
+  if (user.lojasPermitidas.length === 0) {
+    return await prisma.loja.findMany({
+      where: { ownerId: session.ownerId },
+      select: { id: true, nome: true, cnpj: true },
+      orderBy: { nome: 'asc' }
+    });
+  }
+
+  return user.lojasPermitidas;
 }
 
 

@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { User, UserRole } from "@/lib/types";
-import { Loader2 } from "lucide-react";
+import { Loader2, Check } from "lucide-react";
 
 interface UserFormDialogProps {
   open: boolean;
@@ -34,7 +34,10 @@ interface UserFormDialogProps {
     password?: string;
     avatarUrl?: string;
     ativo?: boolean;
+    lojasPermitidas?: string[];
   }) => void;
+  lojas?: any[];
+  currentUser?: any;
 }
 
 export function UserFormDialog({
@@ -42,6 +45,8 @@ export function UserFormDialog({
   onOpenChange,
   userToEdit,
   onSave,
+  lojas,
+  currentUser,
 }: UserFormDialogProps) {
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
@@ -49,6 +54,7 @@ export function UserFormDialog({
   const [password, setPassword] = useState("");
   const [ativo, setAtivo] = useState(true); // Estado do status
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedLojas, setSelectedLojas] = useState<string[]>([]);
 
   // Carrega os dados quando for edição
   useEffect(() => {
@@ -58,6 +64,13 @@ export function UserFormDialog({
       setRole(userToEdit.role);
       setAtivo(userToEdit.ativo !== undefined ? userToEdit.ativo : true);
       setPassword("");
+      // @ts-ignore
+      if (userToEdit.lojasPermitidas) {
+        // @ts-ignore
+        setSelectedLojas(userToEdit.lojasPermitidas.map((l: any) => l.id || l));
+      } else {
+        setSelectedLojas([]);
+      }
     } else {
       // Reseta para novo usuário
       setNome("");
@@ -65,8 +78,17 @@ export function UserFormDialog({
       setRole("funcionario");
       setAtivo(true);
       setPassword("");
+      setSelectedLojas([]);
     }
   }, [userToEdit, open]);
+
+  const toggleLoja = (lojaId: string) => {
+    setSelectedLojas((prev) =>
+      prev.includes(lojaId)
+        ? prev.filter((id) => id !== lojaId)
+        : [...prev, lojaId]
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,6 +102,7 @@ export function UserFormDialog({
       password: password || undefined,
       avatarUrl: userToEdit?.avatarUrl || userToEdit?.avatar,
       ativo, // Envia o status
+      lojasPermitidas: selectedLojas,
     };
 
     await onSave(userData);
@@ -148,6 +171,46 @@ export function UserFormDialog({
                 </p>
               </div>
               <Switch checked={ativo} onCheckedChange={setAtivo} />
+            </div>
+          )}
+
+          {/* Seleção de Lojas Permitidas (só para quem não é dono) */}
+          {role !== "dono" && lojas && lojas.length > 0 && (
+            <div className="grid gap-2 border p-3 rounded-md">
+              <Label className="text-base mb-1">Filiais Permitidas</Label>
+              <p className="text-xs text-muted-foreground mb-3">
+                Selecione as filiais que este usuário poderá acessar. 
+                Se não selecionar nenhuma, ele terá acesso a todas as lojas da rede por padrão.
+              </p>
+              <div className="flex flex-col gap-2 max-h-[150px] overflow-y-auto pr-2">
+                {lojas.map((loja) => (
+                  <label
+                    key={loja.id}
+                    className="flex items-center space-x-2 cursor-pointer group"
+                  >
+                    <div
+                      className={`flex h-4 w-4 items-center justify-center rounded-sm border ${
+                        selectedLojas.includes(loja.id)
+                          ? "bg-primary border-primary text-primary-foreground"
+                          : "border-input"
+                      }`}
+                    >
+                      {selectedLojas.includes(loja.id) && (
+                        <Check className="h-3 w-3" />
+                      )}
+                    </div>
+                    <input
+                      type="checkbox"
+                      className="sr-only"
+                      checked={selectedLojas.includes(loja.id)}
+                      onChange={() => toggleLoja(loja.id)}
+                    />
+                    <span className="text-sm font-medium group-hover:text-primary transition-colors">
+                      {loja.nome}
+                    </span>
+                  </label>
+                ))}
+              </div>
             </div>
           )}
 
