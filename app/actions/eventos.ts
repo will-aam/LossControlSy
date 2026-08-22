@@ -70,10 +70,16 @@ export async function getEventos() {
   if (!session) return { success: false, data: [] };
 
   try {
+    const baseWhere: any = hasAccess 
+      ? { ownerId: session.ownerId } 
+      : { ownerId: session.ownerId, criadoPorId: session.id };
+
+    if (session.activeLojaId) {
+      baseWhere.lojaId = session.activeLojaId;
+    }
+
     const eventos = await prisma.evento.findMany({
-      where: hasAccess 
-        ? { ownerId: session.ownerId } 
-        : { ownerId: session.ownerId, criadoPorId: session.id },
+      where: baseWhere,
       orderBy: { dataHora: "desc" },
       include: {
         item: { include: { categoria: true } },
@@ -139,9 +145,10 @@ export async function createEvento(data: CreateEventoData) {
         unidade: item.unidade,
         custoSnapshot: item.custo,
         precoVendaSnapshot: item.precoVenda,
-        itemId: item.id,
-        criadoPorId: session.id,
-        ownerId: session.ownerId,
+        item: { connect: { id: data.itemId } },
+        criadoPor: { connect: { id: session.id } },
+        owner: { connect: { id: session.ownerId } },
+        ...(session.activeLojaId && { loja: { connect: { id: session.activeLojaId } } }),
         evidencias: {
           create: uploadedUrls.map((url) => ({
             url,
@@ -166,8 +173,15 @@ export async function updateEventoStatus(id: string, novoStatus: EventoStatus) {
   if (!auth.success) return auth;
   const session = auth.session;
   try {
+    const baseWhere: any = { id, ownerId: session.ownerId };
+    if (session.activeLojaId) baseWhere.lojaId = session.activeLojaId;
+
+    const evento = await prisma.evento.findUnique({
+      where: baseWhere,
+      include: { evidencias: true },
+    });
     await prisma.evento.update({
-      where: { id, ownerId: session.ownerId },
+      where: { id: evento!.id },
       data: {
         status: novoStatus,
         aprovadoPorId: ["aprovado", "rejeitado"].includes(novoStatus)
@@ -187,7 +201,10 @@ export async function deleteEvento(id: string) {
   if (!auth.success) return auth;
   const session = auth.session;
   try {
-    await prisma.evento.delete({ where: { id, ownerId: session.ownerId } });
+    const baseWhere: any = { id, ownerId: session.ownerId };
+    if (session.activeLojaId) baseWhere.lojaId = session.activeLojaId;
+
+    await prisma.evento.delete({ where: baseWhere });
     revalidatePath("/eventos");
     return { success: true };
   } catch (error) {
@@ -230,9 +247,12 @@ export async function getNotaDoLote(dataString: string) {
     const start = new Date(`${dataString}T00:00:00.000Z`);
     const end = new Date(`${dataString}T23:59:59.999Z`);
 
+    const baseWhere: any = { ownerId: session.ownerId };
+    if (session.activeLojaId) baseWhere.lojaId = session.activeLojaId;
+
     const nota = await prisma.notaFiscal.findFirst({
       where: {
-        ownerId: session.ownerId,
+        ...baseWhere,
         OR: [
           { dataReferencia: { gte: start, lte: end } },
           { dataEmissao: { gte: start, lte: end }, dataReferencia: null },

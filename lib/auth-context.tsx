@@ -8,6 +8,7 @@ import {
   loginAction,
   logoutAction,
   getClientSession,
+  switchActiveLoja,
 } from "@/app/actions/auth";
 import { getSettings } from "@/app/actions/configuracoes";
 import { toast } from "sonner";
@@ -83,11 +84,13 @@ const ALL_NAV_ITEMS: NavItemWithPermission[] = [
 
 interface AuthContextType {
   user: User | null;
+  activeLojaId: string | null;
   isLoading: boolean;
   navItems: NavItem[];
   settings: any;
   login: (email: string, password?: string) => Promise<void>;
   logout: () => Promise<void>;
+  switchLoja: (lojaId: string) => Promise<void>;
   hasPermission: (permission: string) => boolean;
 }
 
@@ -95,6 +98,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [activeLojaId, setActiveLojaId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [navItems, setNavItems] = useState<NavItem[]>([]);
   const [settings, setSettings] = useState<any>(null);
@@ -124,6 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             avatarUrl: sessionUser.avatarUrl ?? undefined,
           };
           setUser(safeUser);
+          setActiveLojaId(sessionUser.activeLojaId ?? null);
           await loadSettings();
         }
       } catch (error) {
@@ -226,15 +231,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return hasPermission(user.role, permission as Permission);
   };
 
+  const switchLoja = async (lojaId: string) => {
+    setIsLoading(true);
+    try {
+      const result = await switchActiveLoja(lojaId);
+      if (result.success) {
+        setActiveLojaId(lojaId);
+        toast.success(result.message);
+        router.refresh();
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      toast.error("Erro ao alternar loja");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
         user,
+        activeLojaId,
         isLoading,
         navItems,
         settings,
         login,
         logout,
+        switchLoja,
         hasPermission: checkPermission,
       }}
     >

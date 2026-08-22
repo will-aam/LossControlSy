@@ -28,6 +28,7 @@ export async function getDashboardStats() {
     const eventos = await prisma.evento.findMany({
       where: {
         ownerId: session.ownerId,
+        ...(session.activeLojaId && { lojaId: session.activeLojaId }),
         dataHora: {
           gte: dataMinima,
         },
@@ -190,19 +191,19 @@ export async function getRealDashboardMetrics(diasIsoA: string[], diasIsoB: stri
 
 
     const nfes = await prisma.nFeCompra.findMany({
-      where: { ownerId: session.ownerId, dataEmissao: { gte: minDate, lte: maxDate } },
+      where: { ownerId: session.ownerId, ...(session.activeLojaId && { lojaId: session.activeLojaId }), dataEmissao: { gte: minDate, lte: maxDate } },
       include: { itens: true }
     });
 
 
     const vendas = await prisma.vendaDiaria.findMany({
-      where: { ownerId: session.ownerId, data: { gte: minDate, lte: maxDate } },
+      where: { ownerId: session.ownerId, ...(session.activeLojaId && { lojaId: session.activeLojaId }), data: { gte: minDate, lte: maxDate } },
       include: { itens: true }
     });
 
 
     const eventos = await prisma.evento.findMany({
-      where: { ownerId: session.ownerId, dataHora: { gte: minDate, lte: maxDate }, status: { notIn: ["rascunho", "rejeitado"] } }
+      where: { ownerId: session.ownerId, ...(session.activeLojaId && { lojaId: session.activeLojaId }), dataHora: { gte: minDate, lte: maxDate }, status: { notIn: ["rascunho", "rejeitado"] } }
     });
 
 

@@ -20,6 +20,8 @@ export type SessionPayload = {
   nome: string;
   avatarUrl?: string | null;
   ownerId: string;
+  lojaId?: string | null;
+  activeLojaId?: string | null;
   expiresAt: Date;
 };
 
@@ -30,6 +32,8 @@ export async function createSession(user: {
   nome: string;
   avatarUrl?: string | null;
   ownerId: string;
+  lojaId?: string | null;
+  activeLojaId?: string | null;
 }) {
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
   const session = await new SignJWT({ ...user, expiresAt })

@@ -36,6 +36,15 @@ export async function loginAction(email: string, password?: string) {
 
     const tenantId = user.ownerId || user.id;
 
+    // Descobrir a primeira loja caso seja um dono/gestor sem loja fixa
+    let initialActiveLojaId = user.lojaId;
+    if (!initialActiveLojaId && (user.role === 'dono' || user.role === 'gestor')) {
+      const firstLoja = await prisma.loja.findFirst({ where: { ownerId: tenantId } });
+      if (firstLoja) {
+        initialActiveLojaId = firstLoja.id;
+      }
+    }
+
     await createSession({
       id: user.id,
       email: user.email,
@@ -43,6 +52,8 @@ export async function loginAction(email: string, password?: string) {
       nome: user.nome,
       avatarUrl: user.avatarUrl,
       ownerId: tenantId,
+      lojaId: user.lojaId,
+      activeLojaId: initialActiveLojaId,
     });
 
     return { success: true, user };
@@ -58,6 +69,44 @@ export async function logoutAction() {
   redirect("/login");
 }
 
+export async function switchActiveLoja(lojaId: string) {
+  const session = await getSession();
+  if (!session) return { success: false, message: "Não autorizado" };
+
+  // Verifica se a loja pertence ao dono da sessão
+  const loja = await prisma.loja.findFirst({
+    where: { id: lojaId, ownerId: session.ownerId },
+  });
+
+  if (!loja) {
+    return { success: false, message: "Loja não encontrada ou acesso negado." };
+  }
+
+  // Recria a sessão com o novo activeLojaId
+  await createSession({
+    id: session.id,
+    email: session.email,
+    role: session.role,
+    nome: session.nome,
+    avatarUrl: session.avatarUrl,
+    ownerId: session.ownerId,
+    lojaId: session.lojaId,
+    activeLojaId: loja.id,
+  });
+
+  return { success: true, message: "Loja alternada com sucesso" };
+}
+
+export async function getMinhasLojas() {
+  const session = await getSession();
+  if (!session) return [];
+  return await prisma.loja.findMany({
+    where: { ownerId: session.ownerId },
+    select: { id: true, nome: true, cnpj: true },
+    orderBy: { nome: 'asc' }
+  });
+}
+
 
 export async function getClientSession() {
   const session = await getSession();
@@ -70,7 +119,9 @@ export async function getClientSession() {
     role: session.role,
     avatarUrl: session.avatarUrl,
     ownerId: session.ownerId,
-  } as User & { ownerId: string };
+    lojaId: session.lojaId,
+    activeLojaId: session.activeLojaId,
+  } as User & { ownerId: string; activeLojaId?: string | null };
 }
 
 

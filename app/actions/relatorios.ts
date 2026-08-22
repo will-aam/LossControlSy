@@ -19,6 +19,7 @@ export async function getRelatorioGeral(
     const eventos = await prisma.evento.findMany({
       where: {
         ownerId: session.ownerId,
+        ...(session.activeLojaId && { lojaId: session.activeLojaId }),
         dataHora: { gte: minDate, lte: maxDate },
         status: { notIn: ["rascunho", "rejeitado"] },
       },
@@ -35,6 +36,7 @@ export async function getRelatorioGeral(
     const vendas = await prisma.vendaDiaria.findMany({
       where: {
         ownerId: session.ownerId,
+        ...(session.activeLojaId && { lojaId: session.activeLojaId }),
         data: { gte: minDate, lte: maxDate },
       },
       include: {

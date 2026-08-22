@@ -10,6 +10,7 @@ export interface User {
   role: UserRole;
   ativo: boolean;
   ownerId?: string | null;
+  lojaId?: string | null;
   avatarUrl?: string;
   avatar?: string;
   createdAt?: string;

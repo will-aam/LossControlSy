@@ -62,7 +62,10 @@ model User {
   evidencias       Evidencia[]  @relation("UploadedBy")
   Configuracao     Configuracao[] 
 
+  lojaId       String?
+  loja         Loja?    @relation("UserLoja", fields: [lojaId], references: [id])
 
+  lojasDono        Loja[]       @relation("LojaDono")
   categoriasLoja   Categoria[]  @relation("CategoriaDono")
   itensLoja        Item[]       @relation("ItemDono")
   eventosLoja      Evento[]     @relation("EventoDono")
@@ -76,6 +79,26 @@ model User {
   @@map("users")
 }
 
+model Loja {
+  id        String   @id @default(uuid())
+  nome      String
+  cnpj      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ownerId   String
+  owner     User     @relation("LojaDono", fields: [ownerId], references: [id])
+
+  users        User[]        @relation("UserLoja")
+  eventos      Evento[]
+  vendas       VendaDiaria[]
+  nfeCompras   NFeCompra[]
+  evidencias   Evidencia[]
+  notasFiscais NotaFiscal[]
+
+  @@unique([nome, ownerId])
+  @@map("lojas")
+}
 
 model Categoria {
   id        String   @id @default(uuid())
@@ -155,6 +178,9 @@ model Evento {
   ownerId       String
   owner         User   @relation("EventoDono", fields: [ownerId], references: [id])
 
+  lojaId      String?
+  loja        Loja?   @relation(fields: [lojaId], references: [id])
+
   evidencias   Evidencia[]
   notasFiscais NotaFiscal[]
 
@@ -176,6 +202,9 @@ model Evidencia {
 
   ownerId  String
   owner    User   @relation("EvidenciaDono", fields: [ownerId], references: [id])
+
+  lojaId   String?
+  loja     Loja?   @relation(fields: [lojaId], references: [id])
 
   @@map("evidencias")
 }
@@ -206,6 +235,9 @@ model NotaFiscal {
 
   ownerId    String
   owner      User   @relation("NotaDono", fields: [ownerId], references: [id])
+
+  lojaId     String?
+  loja       Loja?   @relation(fields: [lojaId], references: [id])
 
   @@map("notas_fiscais")
 }
@@ -263,9 +295,11 @@ model VendaDiaria {
   ownerId        String
   owner          User     @relation("VendaDono", fields: [ownerId], references: [id])
 
+  lojaId         String?
+  loja           Loja?    @relation(fields: [lojaId], references: [id])
+
   itens          VendaItem[]
 
-  @@unique([data, ownerId])
   @@map("vendas_diarias")
 }
 
@@ -313,6 +347,9 @@ model NFeCompra {
 
   ownerId        String
   owner          User     @relation("NFeCompraDono", fields: [ownerId], references: [id])
+
+  lojaId         String?
+  loja           Loja?    @relation(fields: [lojaId], references: [id])
 
   itens          NFeCompraItem[]
 

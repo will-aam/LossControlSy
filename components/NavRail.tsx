@@ -22,6 +22,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useSidebar } from "./SidebarProvider";
 import { useAuth } from "@/lib/auth-context";
+import { StoreSwitcher } from "./StoreSwitcher";
 
 export function NavRail() {
   const pathname = usePathname();
@@ -69,7 +70,11 @@ export function NavRail() {
         aberto ? "w-56 items-start px-4" : "w-16"
       )}
     >
-      <nav className="flex-1 w-full space-y-4 mt-4 overflow-y-auto pb-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+      <div className="w-full pt-2">
+        <StoreSwitcher isCollapsed={!aberto} />
+      </div>
+
+      <nav className="flex-1 w-full space-y-4 mt-2 overflow-y-auto pb-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         {navGroups.map((group, groupIdx) => {
 
           const filteredItems = group.items.filter((item) => {
