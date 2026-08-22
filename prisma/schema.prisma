@@ -74,7 +74,6 @@ model User {
   evidenciasLoja   Evidencia[]  @relation("EvidenciaDono")
   notasLoja        NotaFiscal[] @relation("NotaDono")
   motivosLoja      Motivo[]     @relation("MotivoDono")
-  subgruposLoja    Subgrupo[]   @relation("SubgrupoDono")
   vendasLoja       VendaDiaria[] @relation("VendaDono")
   nfeComprasLoja   NFeCompra[]  @relation("NFeCompraDono")
 
@@ -115,7 +114,6 @@ model Categoria {
   owner     User     @relation("CategoriaDono", fields: [ownerId], references: [id])
 
   items Item[]
-  subgrupos Subgrupo[]
 
   @@unique([nome, ownerId])
   @@map("categorias")
@@ -138,9 +136,6 @@ model Item {
 
   categoriaId String?
   categoria   Categoria? @relation(fields: [categoriaId], references: [id])
-
-  subgrupoId  String?
-  subgrupo    Subgrupo?  @relation(fields: [subgrupoId], references: [id])
 
   ownerId     String
   owner       User   @relation("ItemDono", fields: [ownerId], references: [id])
@@ -274,21 +269,6 @@ model Configuracao {
   @@map("configuracoes")
 }
 
-model Subgrupo {
-  id          String   @id @default(uuid())
-  codigo      String
-
-  categoriaId String?
-  categoria   Categoria? @relation(fields: [categoriaId], references: [id])
-
-  ownerId     String
-  owner       User     @relation("SubgrupoDono", fields: [ownerId], references: [id])
-
-  items       Item[]
-
-  @@unique([codigo, ownerId])
-  @@map("subgrupos")
-}
 
 model VendaDiaria {
   id             String   @id @default(uuid())
