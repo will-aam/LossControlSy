@@ -76,6 +76,7 @@ export default function LoginPage() {
 
           <CardFooter className="flex flex-col gap-4 pt-4">
             <Button
+              type="submit"
               className="w-full"
               disabled={isLoading}
             >
